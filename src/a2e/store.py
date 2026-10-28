@@ -108,9 +108,26 @@ MIGRATIONS: list[str] = [
              v.family, v.depth, v.n_args, v.governor
         FROM cases c JOIN v_runs v ON v.run_id = c.run_id;
     """,
+    # ---- version 2: operator-level bottleneck analysis ---------------------------------------------
+    """
+    CREATE TABLE bench (
+      bench_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id INTEGER NOT NULL REFERENCES runs(run_id),
+      test TEXT NOT NULL,                              -- pp (prefill) | tg (decode)
+      n_prompt INTEGER, n_gen INTEGER, n_threads INTEGER,
+      avg_tok_s REAL, sd_tok_s REAL, avg_ms REAL, raw_json TEXT
+    );
+    CREATE TABLE kernels (
+      run_id INTEGER NOT NULL REFERENCES runs(run_id),
+      test TEXT NOT NULL,                              -- pp | tg
+      n_tokens INTEGER, rank INTEGER, pct REAL, symbol TEXT, dso TEXT
+    );
+    CREATE INDEX idx_bench_run ON bench(run_id);
+    CREATE INDEX idx_kernels_run ON kernels(run_id);
+    """,
 ]
 
-TABLES = ("experiments", "jobs", "runs", "turns", "cases", "samples")
+TABLES = ("experiments", "jobs", "runs", "turns", "cases", "samples", "bench", "kernels")
 VIEWS = ("v_runs", "v_turns", "v_cases")
 
 

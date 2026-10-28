@@ -1,0 +1,455 @@
+# A2E user guide
+
+This guide explains how to set up A2E, run measurements, and read the results. It assumes you have the repository checked out on a Raspberry Pi 5 or an Apple Silicon Mac. Other documents cover the details:
+
+- [CONFIG_REFERENCE.md](CONFIG_REFERENCE.md) lists every field in every configuration file.
+- [DATA_DICTIONARY.md](DATA_DICTIONARY.md) lists every table and column in the results database and explains how each number is computed.
+- [ARCHITECTURE.md](ARCHITECTURE.md) describes the code and how data moves through it.
+- [REPORT.md](REPORT.md) is the methods report. It explains what the study measures, how, and why each choice was made.
+
+## 1. What A2E does
+
+A2E measures the cost of running small language models as tool-calling agents on edge hardware. A tool-calling agent is a model that answers a request by producing structured calls to functions, e.g., `calculator(expression="12*7")`, instead of only writing text. The program runs the calls, sends the results back to the model, and the model continues until the task is done.
+
+A2E runs the models with llama.cpp on two devices:
+
+- a Raspberry Pi 5 with 8 GB of memory, using only the CPU
+- an Apple Silicon Mac, using the GPU through Metal
+
+For every model call, A2E records how long each stage took, how many tokens were processed, how much energy the device used, how much memory the model server used, and how hot the chip was. It also checks whether the model called the right tools with the right arguments.
+
+The stages it separates are:
+
+- prefill, which is the time the model spends reading the prompt, including the tool descriptions
+- decode, which is the time the model spends writing its answer
+- parse, which is the time spent reading the tool calls out of the answer
+- validate, which is the time spent checking the calls against the tool descriptions
+- tool wait, which is the time spent running the tools
+- template and harness time, which is time spent in A2E itself
+
+The study compares these numbers across models, quantization levels, prompt lengths, decoding settings and the two devices. The goal is to find patterns and real bottlenecks, not to publish single headline numbers.
+
+## 2. Words used in this guide
+
+These words have a fixed meaning in A2E.
+
+- **Suite.** A TOML file in `configs/suites/` that describes a set of measurements. You run a suite with `a2e run <name>`.
+- **Job.** One measured configuration. A job fixes the device, the model file, the server settings, one task and one value for every setting the task uses. A suite expands into a list of jobs.
+- **Job key.** A short hash of a job's settings. The same settings always give the same key.
+- **Experiment.** One suite on one device, stored in the database. Running the same suite again on the same device continues the same experiment.
+- **Run.** One repeat of a job. Each job has warm-up runs, which are recorded but not analysed, followed by measured runs.
+- **Turn.** One call to the model inside a run, with all of its stage timings, token counts and energy.
+- **Case.** One scored task inside a run, e.g., one BFCL test case or one custom tool chain.
+- **Sample.** One reading of power, temperature, clock speed, CPU use and memory, taken several times per second during a run.
+
+## 3. Install
+
+### 3.1 On a Raspberry Pi 5
+
+1. Install Raspberry Pi OS (64 bit). Make sure `vcgencmd` works by running `vcgencmd measure_temp`.
+2. Pick a llama.cpp commit to use for the whole study and write it down. Every measurement must use the same commit.
+3. Build llama.cpp and install uv with the setup script. Replace `<sha>` with the commit.
+
+```bash
+LLAMA_COMMIT=<sha> scripts/setup_pi.sh
+```
+
+4. Install the Python environment with the optional parts for BFCL and the terminal UI.
+
+```bash
+uv sync --extra bfcl --extra tui
+```
+
+### 3.2 On an Apple Silicon Mac
+
+1. Install the Xcode command line tools and CMake.
+2. Build llama.cpp with Metal at the same commit you use on the Pi.
+
+```bash
+LLAMA_COMMIT=<sha> scripts/setup_mac.sh
+```
+
+3. Install the Python environment.
+
+```bash
+uv sync --extra bfcl --extra tui
+```
+
+Energy readings on the Mac come from `powermetrics`, which only works as root. To record energy you run A2E with `sudo -E`. Without root, A2E still runs and records everything except power and thermal pressure.
+
+### 3.3 Model files
+
+A2E reads GGUF model files. The models in the study are listed in `configs/models.toml`. For each model you need one file per quantization, `q4_0` and `q8_0`. By default A2E looks for a file named like this:
+
+```text
+<models_dir>/<model>/<model>-<quant>.gguf
+e.g. ~/models/qwen3-4b/qwen3-4b-q4_0.gguf
+```
+
+If your files have other names, give their exact paths in `configs/local.toml` (see section 4). When you download a model, write down where it came from in the `source` field of `configs/models.toml` and add it to `REFERENCES.md`.
+
+The Pi has 8 GB of memory, so A2E only runs Q8_0 files on the Pi for models of 4 billion parameters or fewer. The 8B models run at Q4_0 on the Pi. Jobs that break this rule are listed as skipped with the reason "not run: memory".
+
+## 4. Configure the machine
+
+Copy the example settings file and edit it.
+
+```bash
+cp configs/local.example.toml configs/local.toml
+```
+
+The important fields are:
+
+- `llama_server`, which is the path to the `llama-server` binary that the setup script built
+- `models_dir`, which is the folder that holds the model files
+- `db`, which is the results database file (the default is `results/a2e.db`)
+- `device`, which you only set if automatic detection fails (`pi5` or `mac`)
+- `cooler`, which records whether the Pi has its active cooler fitted
+- `power`, which is `auto` to record energy or `none` to skip it
+
+`configs/local.toml` is not committed to git because it describes one machine. Relative paths in it are read from the repository folder. See [CONFIG_REFERENCE.md](CONFIG_REFERENCE.md) for every field.
+
+## 5. Check the machine
+
+Run the doctor before a long run.
+
+```bash
+uv run a2e doctor
+```
+
+The doctor checks each of these and prints `ok`, `warn` or `FAIL`:
+
+- the Python version
+- that the device is a Pi 5 or a Mac
+- that the `llama-server` binary exists and can run
+- that each model file exists
+- that `vcgencmd` (Pi) or `powermetrics` and root (Mac) are available
+- that the CPU governor can be read (Pi)
+- that the cooler setting is recorded (Pi)
+- that the BFCL and TUI extras are installed
+- that the database can be written and that there is free disk space
+
+A `FAIL` line stops `scripts/run_suite.sh`. A `warn` line does not, e.g., a missing model file only matters if a suite uses it.
+
+## 6. Suites
+
+### 6.1 The shipped suites
+
+| Suite | What it runs | Runnable jobs | Skipped jobs | Runs | Model loads |
+|---|---|---|---|---|---|
+| `smoke` | One small job of each kind on Qwen3-4B Q4_0, one measured run. Use it to check a new machine. | 8 | 0 | 8 | 2 |
+| `pilot` | Qwen3-4B Q4_0 with KV cache f16 and q8_0. Plain generation, every custom task family, a slice of every BFCL category. | 104 | 0 | 416 | 4 |
+| `baseline` | All five models at Q4_0 and Q8_0. Plain generation next to tool calling. | 108 | 12 | 432 | 18 |
+| `factorial` | The main sweep on custom chains over schema length, decode length, grammar and KV cache. | 1,296 | 144 | 5,184 | 36 |
+| `bfcl` | Accuracy and cost on every BFCL category in scope for every model, quantization and KV cache setting. | 720 | 80 | 1,440 | 36 |
+| `cache_ablation` | Prefix cache on and off, KV cache f16 and q8_0, over long chains and BFCL multi-turn. | 120 | 0 | 480 | 12 |
+| `stability` | 40 long chains back to back with no cooldown, with different CPU governors on the Pi. | 8 | 4 | 24 | 4 |
+
+The counts cover both devices together, so each device runs about half of them. They come from `uv run a2e plan <suite>`, which also prints the counts per device and per task kind. A run is one repeat of one job, so runs equal runnable jobs times warm-up plus measured repeats. Skipped jobs are the 8B models at Q8_0 on the Pi and, in the stability suite, governor jobs on the Mac. Some factorial jobs are also skipped at run time when the tools do not fit the schema length.
+
+Run the suites in this order:
+
+1. `smoke` on each device, to check the setup.
+2. `pilot` on each device. Its timings tell you how long the larger suites will take. They also decide the BFCL subsample sizes, the Pi context size, the cooldown target, whether to fit the Pi cooler, and whether the extra benchmarks (API-Bank, ToolBench, tau-bench) are affordable.
+3. `baseline`, then `bfcl`, `factorial` and `cache_ablation`, in any order.
+4. `stability` last, because it heats the device on purpose.
+
+### 6.2 What a suite file contains
+
+A suite file has these parts:
+
+- `[suite]` gives the name, a description and the random seed.
+- `[repeats]` gives the number of warm-up runs and measured runs per job. The study default is 1 warm-up run and 3 measured runs.
+- `[server]` gives the llama-server context size, the flash attention setting and the thread count.
+- `[run]` gives the idle baseline length, the sampling rate, the cooldown target and the turn limits.
+- `[matrix]` lists the devices, models, quantizations and KV cache types. Every combination is one model load.
+- `[axes]` gives the default values for the settings tasks can vary: grammar, prefix cache, decode length, schema length and CPU governor.
+- Each `[[tasks]]` entry adds one kind of task. A task can override any axis.
+
+Here is the smoke suite in full:
+
+```toml
+[suite]
+name = "smoke"
+description = "One small job of each kind on Qwen3-4B Q4_0, one measured run, no warm-up."
+seed = 0
+
+[repeats]
+warmup = 0
+measured = 1
+
+[server]
+ctx = 8192
+
+[run]
+idle_seconds = 5
+cooldown_c = 0
+
+[matrix]
+device = ["pi5", "mac"]
+model = ["qwen3-4b"]
+quant = ["q4_0"]
+kv_quant = ["f16"]
+
+[axes]
+grammar = [true]
+prefix_cache = [true]
+decode_len = [128]
+schema_len = [512]
+
+[[tasks]]
+kind = "plain"
+n = 2
+
+[[tasks]]
+kind = "custom"
+family = "calc"
+depth = 2
+n = 2
+
+[[tasks]]
+kind = "bfcl"
+category = ["simple_python", "irrelevance"]
+n = 3
+```
+
+### 6.3 The three task kinds
+
+**Plain.** The model writes text for a fixed prompt with no tools. A2E asks llama-server to ignore the end of text token, so every run decodes exactly `decode_len` tokens. This is the baseline that the tool-calling numbers are compared against. The prompts are in `src/a2e/data/plain_prompts.json`.
+
+**Custom.** The model completes a chain of tool calls on real local tools. There are three families:
+
+- `calc` asks for one calculator call per expression. The depth is the number of expressions.
+- `notes` asks the model to save notes and then list them. `n_args` sets how many fields each note has, from 1 to 5.
+- `retrieval` asks the model to search a local document collection, read the best document, compute with a number from it, save a note and list the notes. The depth sets how many of these steps the task has, from 2 to 5.
+
+The tool descriptions in the prompt are padded with extra, unused tools until they reach `schema_len` tokens, counted with the model's own tokenizer. This is how the study controls schema length. Every task in a run gets fresh note files, so tasks cannot see each other's results.
+
+**BFCL.** The model answers test cases from the Berkeley Function Calling Leaderboard, version 4. A2E scores the answers with the official BFCL checker code, which is copied unchanged into `third_party/bfcl_eval/`. The categories in scope are:
+
+- single turn: `simple_python`, `multiple`, `parallel`, `parallel_multiple`
+- no call expected or call expected: `irrelevance`, `live_irrelevance`, `live_relevance`
+- multi-turn: `multi_turn_base`, `multi_turn_miss_func`, `multi_turn_miss_param`
+
+`n` takes a fixed subsample of each category. The subsample is drawn with the suite seed and spread across the category in proportion to its strata, so the Pi and the Mac always run the same cases. Multi-turn categories need `[server] ctx` of at least 16384 because their tool descriptions are several thousand tokens long.
+
+### 6.4 Writing your own suite
+
+Copy a shipped suite, change the name and the values, and check it with `plan`.
+
+```bash
+cp configs/suites/pilot.toml configs/suites/my_test.toml
+uv run a2e plan my_test --jobs
+```
+
+`plan --jobs` prints every job with its key and, for skipped jobs, the reason. A2E rejects a suite with an unknown field, an unknown model, an unknown task family or BFCL category, a depth out of range, or a multi-turn BFCL category with a context below 16384. The error names the problem.
+
+### 6.5 The suite lock file
+
+`configs/suites.lock.json` stores each shipped suite's hash, its number of jobs and a hash of its job keys. The test suite fails if a suite file, or the code that expands suites into jobs, changes without the lock being updated. This makes sure that a suite name means the same jobs in every session and on every machine. After you change a suite on purpose, update the lock:
+
+```bash
+uv run a2e suite-lock
+uv run a2e suite-lock --check
+```
+
+## 7. Running
+
+### 7.1 From the command line
+
+```bash
+uv run a2e run smoke
+```
+
+A2E detects the device, expands the suite, keeps only this device's jobs, and runs them in an order that loads each model file only once. It prints one line per job and one line per repeat. Useful options are:
+
+- `--limit N` runs at most N jobs and then stops. Run the same command again to continue.
+- `--retry-failed` also runs jobs that failed earlier, e.g., after you add a missing model file.
+- `--new` starts a fresh experiment instead of continuing the existing one.
+- `--device pi5` or `--device mac` overrides device detection.
+- `--db path` writes to another database file.
+
+On a Mac, add `sudo -E` to record energy:
+
+```bash
+sudo -E uv run a2e run pilot
+```
+
+`scripts/run_suite.sh <suite>` runs the doctor, prints the plan and then starts the run.
+
+### 7.2 Stopping and resuming
+
+You can stop a run at any time with Ctrl+C. A2E marks the job it was working on as pending again and marks that job's partial runs as aborted. When you run the same command again, A2E continues the same experiment and starts that job from its first repeat. Aborted runs stay in the database for the record, but the analysis views and the results commands never use them.
+
+The same happens if the machine loses power or the process is killed. On the next start A2E finds the job that was running and resets it.
+
+A2E only continues an experiment if the suite file is unchanged. If you edit the suite, its hash changes and the next run starts a new experiment, so results from different suite versions never mix.
+
+### 7.3 What happens during a job
+
+For each job, A2E does these steps in order:
+
+1. If the job sets a CPU governor, A2E sets it (Pi only, needs root).
+2. If the model file or server settings differ from the previous job, A2E stops the old llama-server and starts a new one. It records the load time and then measures idle power for `idle_seconds` while the model is loaded but not working.
+3. If `cooldown_c` is set, A2E waits until the chip is cooler than that temperature, up to `cooldown_timeout_s`.
+4. For each repeat, A2E clears the prompt cache, starts sampling at `sample_hz`, runs the task, stops sampling, and writes all turns, cases and samples to the database in one transaction.
+5. When all repeats are written, the job is marked done.
+
+If a job fails, e.g., because a model file is missing, A2E records the error and continues with the next job. If llama-server crashed, the next job starts a new server.
+
+### 7.4 From the terminal UI
+
+```bash
+uv run a2e tui
+```
+
+The TUI has five tabs. Press the number keys to switch between them.
+
+1. **Suites** lists the suite files. Select one to see its job counts, model loads and runs.
+2. **Run** runs the selected suite. You can set a job limit. The progress bar counts finished jobs and the log shows the same lines as the command line. "Stop after this job" finishes the current job and then stops cleanly.
+3. **Results** lists the experiments in the database. Select one to see its summary table. "Write report for selected" saves a markdown report next to the database.
+4. **Tests** lists the test groups. Select one and press "Run group" to run it and watch the output.
+5. **Doctor** shows the same checks as `a2e doctor`.
+
+Press `q` to quit. The TUI reads the same `configs/local.toml` as the command line.
+
+## 8. Reading the results
+
+All results go into one SQLite database file, `results/a2e.db` by default. You can read it with the `a2e results` commands, the TUI, a notebook, or any SQLite tool. You can read it while a run is writing to it.
+
+### 8.1 Commands
+
+```bash
+uv run a2e results list                       # experiments and their job counts
+uv run a2e results jobs 1 --status failed     # jobs of experiment 1, with reasons and errors
+uv run a2e results summary --exp 1            # one row per configuration
+uv run a2e results summary --by device,model,quant --csv out.csv
+uv run a2e results stages --exp 1             # share of time in each stage
+uv run a2e results stability --exp 3          # speed drift over long sessions
+uv run a2e results timeline 42                # power, temperature, memory over one run
+uv run a2e results report 1 --out report.md   # a markdown report with all of the above
+uv run a2e results export out/ --fmt parquet  # every table and view as files
+```
+
+`summary` and `stages` accept `--exp` more than once, so you can put a Pi experiment and a Mac experiment in one table and group by `device`.
+
+### 8.2 What the summary columns mean
+
+Every summary number uses only measured runs of complete jobs. Each number is first computed for each run and then averaged over the measured runs of a configuration. A column ending in `_sd` is the standard deviation across those runs.
+
+- `prefill_ms`, `decode_ms` and `tool_wait_ms` are the mean time per model call, in milliseconds.
+- `prefill_tok_s` is the number of prompt tokens the model processed per second of prefill. Tokens served from the prefix cache are not counted, because the model did not process them.
+- `decode_tok_s` is the number of generated tokens per second of decode.
+- `cache_hit` is the share of prompt tokens served from the prefix cache.
+- `prefill_share`, `decode_share` and `tool_share` are the share of total turn time spent in each stage. `overhead_share` is the share spent in parsing, validation, the chat template and the harness.
+- `j_per_turn` is the energy of one model call in joules, with the idle baseline subtracted.
+- `j_per_prompt_token` is prefill energy divided by processed prompt tokens.
+- `j_per_gen_token` is decode energy divided by generated tokens.
+- `tokens_per_joule` is generated tokens divided by decode energy. This is the same number as tokens per second per watt.
+- `j_per_success` is the energy of all turns in a run divided by the number of cases that passed.
+- `success` is the share of scored cases that passed.
+- `peak_rss_mb`, `max_temp_c` and `throttled_turns` are the highest memory use of the server process, the highest chip temperature and the number of turns during which the Pi reported throttling.
+
+[DATA_DICTIONARY.md](DATA_DICTIONARY.md) gives the exact formula for each column and explains how energy is split between stages.
+
+### 8.3 Using SQL or pandas directly
+
+Three views in the database make analysis easier. They contain only complete runs, and they add the main settings as columns:
+
+- `v_runs` adds `model`, `quant`, `kv_quant`, `grammar`, `prefix_cache`, `decode_len`, `schema_len`, `family`, `depth`, `n_args`, `category` and `governor` to each run.
+- `v_turns` adds those settings, the run phase and the device to each turn.
+- `v_cases` does the same for each case.
+
+```python
+from a2e.store import Store
+st = Store("results/a2e.db")
+df = st.df("SELECT model, quant, avg(decode_ms) AS decode_ms FROM v_turns WHERE phase = 'measured' "
+           "AND task_kind = 'custom' GROUP BY model, quant")
+```
+
+### 8.4 Energy numbers
+
+Energy numbers are software estimates. They are meant for comparing configurations on the same device, not for absolute claims.
+
+- On the Pi, A2E reads the voltage and current of each power rail from the power management chip with `vcgencmd pmic_read_adc` and adds them up. This leaves out the power supply's own losses and anything plugged into the USB ports.
+- On the Mac, A2E reads the combined CPU, GPU and Neural Engine power from `powermetrics`. This leaves out memory, the display and the power supply.
+
+Every run stores its `power_scope` so the meaning travels with the numbers. Do not compare joules directly between the Pi and the Mac. Compare the patterns, e.g., whether a longer schema costs more energy per call on both devices.
+
+### 8.5 BFCL raw outputs and rescoring
+
+For BFCL jobs, A2E also writes the model's raw text for every case to `results/raw/exp<N>.jsonl`. You can score these files again without the model, e.g., after updating the vendored checker:
+
+```bash
+uv run a2e bfcl rescore --raw results/raw/exp1.jsonl
+```
+
+## 9. Tests
+
+The tests are grouped in `configs/tests.toml`, so a group name means the same tests in every session.
+
+```bash
+uv run a2e test --list
+uv run a2e test quick                  # unit and integration tests, about a minute
+uv run a2e test sweep                  # large sweeps, a few minutes
+uv run a2e test bfcl -x                # extra arguments go to pytest
+scripts/run_tests.sh runner
+```
+
+The groups are:
+
+- `quick` runs unit and integration tests. Run it after every change.
+- `unit` runs pure logic tests.
+- `integration` starts real processes. It uses a fake llama-server that answers over HTTP like the real one, so it needs no model.
+- `sweep` runs every BFCL ground truth answer through the official checker, every custom chain, and the full suite grid.
+- `bfcl` runs everything about the BFCL integration.
+- `runner` runs the suite, store, runner and results tests.
+- `hardware` runs on a real device with a real llama-server and model. It skips itself unless `A2E_LLAMA_SERVER` and `A2E_GGUF` are set.
+- `all` runs everything.
+
+The hardware group is the first place where A2E meets a real llama-server. It checks the parts of the llama-server interface that the fake server copies, e.g., the names of the timing fields in a reply. Run it once on each device before a long run:
+
+```bash
+export A2E_LLAMA_SERVER=~/a2e-deps/llama.cpp/build/bin/llama-server
+export A2E_GGUF=~/models/qwen3-4b/qwen3-4b-q4_0.gguf
+export A2E_CTX=16384
+uv run a2e test hardware -v
+```
+
+If a hardware test fails, its message names the part of the interface that did not match. [tests/README.md](../tests/README.md) describes every test file.
+
+## 10. Troubleshooting
+
+**"cannot tell whether this is a pi5 or a mac".** Set `device` under `[machine]` in `configs/local.toml`, or pass `--device`.
+
+**A job failed with "model file missing".** Check the path in the error, fix the file name or set the exact path in `configs/local.toml`, and run again with `--retry-failed`.
+
+**A job was skipped with "core tools need ... tokens".** The task's tool descriptions do not fit in the requested schema length, e.g., the retrieval family at 256 tokens. This is expected in the factorial suite.
+
+**No energy columns in the summary.** On the Mac, run with `sudo -E`. On the Pi, check that `vcgencmd pmic_read_adc` prints rail readings. Check `power = "auto"` in `configs/local.toml`. `a2e results report` prints the power scope that was recorded.
+
+**llama-server does not start.** A2E writes the server's own log to `results/work/exp<N>/llama-server-<model>-<quant>.log`. Older llama.cpp builds may not accept `--flash-attn on`. In that case set `flash_attn` in the suite's `[server]` table to the value your build accepts.
+
+**Multi-turn BFCL jobs fail with a server error.** The prompt grew past the context size. Raise `[server] ctx`. On the Pi, use `kv_quant = "q8_0"` for large contexts so the KV cache fits in memory.
+
+**Qwen3 answers are empty or cut off.** Qwen3 can spend its whole decode budget on its thinking text before it writes a tool call. A2E strips thinking text before parsing, so a cut-off answer counts as no call. Use a larger `decode_len` if this happens often. The pilot shows how often it happens.
+
+**The suite lock check fails.** A suite file or the expansion code changed. If the change was intended, run `uv run a2e suite-lock`.
+
+## 11. Where things are
+
+```text
+configs/models.toml           models in the study (committed)
+configs/local.toml            this machine's paths and facts (not committed)
+configs/suites/*.toml         suites
+configs/suites.lock.json      expected jobs per suite
+configs/tests.toml            test groups
+results/a2e.db                results database (not committed)
+results/raw/exp<N>.jsonl      BFCL raw model outputs
+results/work/exp<N>/          llama-server logs and per-task working files
+third_party/bfcl_eval/        official BFCL checker and data, unchanged (see NOTICE)
+src/a2e/                      the code
+tests/                        the tests
+docs/                         these documents
+REFERENCES.md                 every source, tool and dataset the project uses
+```

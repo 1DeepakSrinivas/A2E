@@ -42,8 +42,9 @@ class TurnRecord:
 
     @property
     def harness_ms(self) -> float:
+        """Turn time not spent in the template, the model call, parsing, validation or tools."""
         model = self.completion.wall_ms if self.completion else 0.0
-        return max(self.wall_ms - model - self.parse_ms - self.validate_ms - self.tool_wait_ms, 0.0)
+        return max(self.wall_ms - self.template_ms - model - self.parse_ms - self.validate_ms - self.tool_wait_ms, 0.0)
 
     def row(self, run_id: int, task_id: str, correct: bool | None = None) -> dict:
         c = self.completion

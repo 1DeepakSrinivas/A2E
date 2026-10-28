@@ -1,0 +1,42 @@
+{
+  "baseline": {
+    "job_keys_sha": "a83b3858b9a40f73",
+    "jobs": 120,
+    "suite_hash": "3db6476608555211"
+  },
+  "bfcl": {
+    "job_keys_sha": "f43e7e3dd8668084",
+    "jobs": 800,
+    "suite_hash": "3f3668c71587781b"
+  },
+  "cache_ablation": {
+    "job_keys_sha": "1f046481ef0b9c51",
+    "jobs": 120,
+    "suite_hash": "1656f1dae854b544"
+  },
+  "factorial": {
+    "job_keys_sha": "de9a7000f5c9193d",
+    "jobs": 1440,
+    "suite_hash": "ebf3a4453299964d"
+  },
+  "kernels": {
+    "job_keys_sha": "8a61707bf261838e",
+    "jobs": 40,
+    "suite_hash": "f07d81a05caa1599"
+  },
+  "pilot": {
+    "job_keys_sha": "aabc66868b429f35",
+    "jobs": 108,
+    "suite_hash": "8017381c0e3581c4"
+  },
+  "smoke": {
+    "job_keys_sha": "9ff4df20be38bc55",
+    "jobs": 8,
+    "suite_hash": "8f59af6051402522"
+  },
+  "stability": {
+    "job_keys_sha": "fb1d72bb918655cf",
+    "jobs": 12,
+    "suite_hash": "ed14abdd8d9dc342"
+  }
+}

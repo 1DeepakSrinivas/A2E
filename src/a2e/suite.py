@@ -26,8 +26,9 @@ AXES_FOR_KIND = {
     "plain": ("prefix_cache", "decode_len", "governor"),
     "custom": ("grammar", "prefix_cache", "decode_len", "schema_len", "governor"),
     "bfcl": ("grammar", "prefix_cache", "decode_len", "governor"),
+    "bench": ("governor",),
 }
-KIND_ORDER = {"plain": 0, "custom": 1, "bfcl": 2}
+KIND_ORDER = {"plain": 0, "custom": 1, "bfcl": 2, "bench": 3}  # bench last: it needs the server stopped
 SERVER_FIELDS = ("device", "model", "quant", "kv_quant", "ctx", "flash_attn", "threads")
 
 
@@ -96,12 +97,16 @@ class Axes(_Strict):
 
 
 class Task(_Strict):
-    kind: Literal["plain", "custom", "bfcl"]
+    kind: Literal["plain", "custom", "bfcl", "bench"]
     n: int | None = Field(None, ge=1)  # prompts / chains / BFCL cases per run; BFCL: all when unset
     family: list[str] = []
     depth: list[int] = []
     n_args: list[int] = [2]
     category: list[str] = []
+    n_prompt: list[int] = []  # bench: prompt sizes for the prefill test
+    n_gen: list[int] = []  # bench: token counts for the decode test
+    perf: bool = False  # bench: also record top kernels with Linux perf (Pi)
+    reps: int = Field(5, ge=1)  # bench: llama-bench repetitions per test
     # per-task axis overrides
     grammar: list[bool] | None = None
     prefix_cache: list[bool] | None = None
@@ -109,8 +114,8 @@ class Task(_Strict):
     schema_len: list[int] | None = None
     governor: list[str] | None = None
 
-    _l = field_validator("family", "depth", "n_args", "category", "grammar", "prefix_cache", "decode_len",
-                         "schema_len", "governor", mode="before")(lambda v: v if v is None else _listify(v))
+    _l = field_validator("family", "depth", "n_args", "category", "n_prompt", "n_gen", "grammar", "prefix_cache",
+                         "decode_len", "schema_len", "governor", mode="before")(lambda v: v if v is None else _listify(v))
 
     @model_validator(mode="after")
     def _check(self):
@@ -131,6 +136,13 @@ class Task(_Strict):
             bad = [c for c in self.category if c not in ALL_CATEGORIES]
             if bad:
                 raise ValueError(f"unknown BFCL categories {bad}; choose from {list(ALL_CATEGORIES)}")
+        if self.kind == "bench":
+            if not self.n_prompt and not self.n_gen:
+                raise ValueError("bench tasks need n_prompt and/or n_gen")
+            if any(x < 1 for x in self.n_prompt + self.n_gen):
+                raise ValueError("n_prompt and n_gen must be >= 1")
+        elif self.n_prompt or self.n_gen or self.perf:
+            raise ValueError("n_prompt, n_gen and perf only apply to bench tasks")
         if self.kind != "custom" and (self.family or self.depth):
             raise ValueError("family/depth only apply to custom tasks")
         if self.kind != "bfcl" and self.category:
@@ -209,8 +221,10 @@ def expand(suite: Suite, settings: Settings) -> list[dict]:
                 grid = [{"family": f, "depth": d, "n_args": a, "n": task.n or 5}
                         for f in task.family for d in task.depth for a in task.n_args
                         if not (f == "retrieval" and d < 2)]
-            else:
+            elif task.kind == "bfcl":
                 grid = [{"category": c, "n": task.n} for c in task.category]
+            else:
+                grid = [{"n_prompt": task.n_prompt, "n_gen": task.n_gen, "perf": task.perf, "reps": task.reps}]
             for combo in itertools.product(*axis_values):
                 for g in grid:
                     cfg = {**cell, "kind": task.kind, **dict(zip(axes, combo)), **g}
@@ -231,7 +245,8 @@ def plan_summary(jobs: list[dict]) -> dict:
     runnable = [j for j in jobs if not j["skip_reason"]]
     per_kind = {k: sum(1 for j in runnable if j["kind"] == k) for k in KIND_ORDER}
     return {"jobs": len(jobs), "runnable": len(runnable), "skipped": len(jobs) - len(runnable),
-            "server_loads": len({server_key(j) for j in runnable}), "by_kind": per_kind,
+            "server_loads": len({server_key(j) for j in runnable if j["kind"] != "bench"}),  # bench runs llama-bench
+            "by_kind": per_kind,
             "runs": sum(j["warmup"] + j["measured"] for j in runnable),
             "by_device": {d: sum(1 for j in runnable if j["device"] == d) for d in ("pi5", "mac")}}
 

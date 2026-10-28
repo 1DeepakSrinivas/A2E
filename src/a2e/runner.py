@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from a2e import env as envmod
+from a2e.bench import bench_args, perf_available, run_bench
 from a2e.agent.loop import AgentLoop, TurnRecord
 from a2e.agent.schema_gen import SchemaTooLarge, pad_tools
 from a2e.client import Client
@@ -346,6 +347,81 @@ class Runner:
                       "valid": sum(ok), "scored": len(ok)})
         st.update("jobs", "job_id", job["job_id"], {"status": "done", "finished_at": time.time()})
 
+    def run_bench_job(self, job: dict, inst: Instruments) -> None:
+        """llama-bench prefill/decode tests (and perf top kernels on the Pi). No llama-server involved."""
+        st = self.store
+        st.update("jobs", "job_id", job["job_id"], {"status": "running", "started_at": time.time(), "error": None,
+                                                     "attempts": (st.scalar("SELECT attempts FROM jobs WHERE job_id=?",
+                                                                            [job["job_id"]]) or 0) + 1})
+        st.execute("UPDATE runs SET status = 'aborted' WHERE job_id = ? AND status != 'aborted'", [job["job_id"]])
+        if job.get("governor"):
+            set_governor(job["governor"])
+        self._stop_server()  # llama-bench loads its own copy of the model; two copies may not fit on the Pi
+        binary = self.settings.bench_binary()
+        if not binary or not Path(binary).exists():
+            raise FileNotFoundError("llama-bench not found: set [paths] llama_bench in configs/local.toml")
+        model_path = self.settings.model_path(job["model"], job["quant"])
+        if not model_path.exists():
+            raise FileNotFoundError(f"model file missing: {model_path}")
+        notes = list(inst.notes)
+        perf = None
+        if job["perf"]:
+            if job["device"] != "pi5":
+                notes.append("kernel profiling is only implemented on the Pi (Linux perf)")
+            else:
+                perf = perf_available(self.settings.perf)
+                if not perf:
+                    notes.append("perf not found: no kernel profile")
+        waited, temp = wait_for_cooldown(inst.thermal, self.suite.run.cooldown_c, self.suite.run.cooldown_timeout_s)
+        cfg_json = json.dumps({k: v for k, v in job.items() if k not in ("job_id", "skip_reason")}, sort_keys=True)
+        tests = [("pp", n, 0) for n in job["n_prompt"]] + [("tg", 0, n) for n in job["n_gen"]]
+        for r in range(job["warmup"] + job["measured"]):
+            _check_stop({"stop": self.stop})
+            phase = "warmup" if r < job["warmup"] else "measured"
+            server_json = json.dumps({"bench": binary, "model_file": envmod.file_fingerprint(model_path),
+                                      "cooldown_wait_s": waited, "governor_actual": read_governor(),
+                                      "cooler": self.settings.cooler, "instrument_notes": notes}, default=str)
+            run_id = st.insert("runs", {
+                "exp_id": self.exp_id, "job_id": job["job_id"], "config_json": cfg_json, "device": job["device"],
+                "phase": phase, "repeat_idx": r, "task_kind": "bench", "status": "running", "started_at": time.time(),
+                "power_scope": inst.scope, "server_json": server_json})
+            t_run0 = time.perf_counter()
+            bench_rows, kernel_rows, samples = [], [], []
+            for test, p, g in tests:
+                _check_stop({"stop": self.stop})
+                holder: dict = {}
+
+                def on_start(pid, holder=holder):
+                    holder["s"] = Sampler(pid, inst.power, inst.thermal, hz=self.suite.run.sample_hz).start()
+
+                args = bench_args(binary, str(model_path), n_prompt=p, n_gen=g, reps=job["reps"],
+                                  device=job["device"], kv_quant=job["kv_quant"], flash_attn=job["flash_attn"],
+                                  threads=job["threads"] or self.settings.threads)
+                try:
+                    results, kernels, note = run_bench(args, test, p, g, perf=perf, on_start=on_start)
+                finally:
+                    if "s" in holder:
+                        samples += holder["s"].stop()
+                if note:
+                    notes.append(note)
+                bench_rows += [{"run_id": run_id, "test": b.test, "n_prompt": b.n_prompt, "n_gen": b.n_gen,
+                                "n_threads": b.n_threads, "avg_tok_s": b.avg_tok_s, "sd_tok_s": b.sd_tok_s,
+                                "avg_ms": b.avg_ms, "raw_json": json.dumps(b.raw)} for b in results]
+                kernel_rows += [{"run_id": run_id, "test": test, "n_tokens": p or g, **k} for k in kernels]
+            with st.transaction():
+                st.insert_many("bench", bench_rows)
+                st.insert_many("kernels", kernel_rows)
+                st.insert_many("samples", [{"run_id": run_id, "t": x[0] - t_run0, "rss_mb": x[1], "cpu_pct": x[2],
+                                            "temp_c": x[3], "freq_mhz": x[4], "power_w": x[5],
+                                            "throttled": None if x[6] is None else int(x[6]), "pressure": x[7]}
+                                           for x in samples])
+                st.update("runs", "run_id", run_id, {"status": "complete", "finished_at": time.time(),
+                                                     "server_json": json.dumps({**json.loads(server_json),
+                                                                                "instrument_notes": notes})})
+            self.log({"event": "run_done", "job_id": job["job_id"], "repeat": r, "phase": phase,
+                      "units": len(bench_rows), "valid": 0, "scored": 0})
+        st.update("jobs", "job_id", job["job_id"], {"status": "done", "finished_at": time.time()})
+
     def _write_run(self, run_id: int, units: list[Unit], samples: list[tuple], t_run0: float,
                    idle_w: float | None) -> None:
         st = self.store
@@ -395,7 +471,7 @@ class Runner:
                 self.log({"event": "job_start", "i": i, "n": len(todo), "job_id": job["job_id"], "kind": job["kind"],
                           "label": job_label(job)})
                 try:
-                    self.run_job(job, inst)
+                    (self.run_bench_job if job["kind"] == "bench" else self.run_job)(job, inst)
                     self.log({"event": "job_done", "i": i, "n": len(todo), "job_id": job["job_id"]})
                 except (Stop, KeyboardInterrupt):
                     self._abort_job(job, "pending", "stopped by user")
@@ -436,7 +512,8 @@ class Runner:
 
 def job_label(job: dict) -> str:
     parts = [job["model"], job["quant"], f"kv={job['kv_quant']}", job["kind"]]
-    for k in ("family", "depth", "n_args", "category", "schema_len", "decode_len", "grammar", "prefix_cache", "governor"):
+    for k in ("family", "depth", "n_args", "category", "n_prompt", "n_gen", "perf", "schema_len", "decode_len",
+              "grammar", "prefix_cache", "governor"):
         if k in job and job[k] not in ("", None):
             parts.append(f"{k}={job[k]}")
     return " ".join(str(p) for p in parts)

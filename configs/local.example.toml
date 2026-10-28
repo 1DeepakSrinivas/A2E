@@ -2,6 +2,8 @@
 
 [paths]
 llama_server = "~/a2e-deps/llama.cpp/build/bin/llama-server"   # built by scripts/setup_pi.sh or setup_mac.sh
+# llama_bench = "~/a2e-deps/llama.cpp/build/bin/llama-bench"   # default: llama-bench next to llama-server
+# perf = "/usr/bin/perf"                                       # Pi kernel profiles; default: perf on PATH
 models_dir = "~/models"                                          # GGUF files, see configs/models.toml
 db = "results/a2e.db"                                            # one SQLite file for all runs on this machine
 raw_dir = "results/raw"

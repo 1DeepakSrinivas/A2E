@@ -29,6 +29,9 @@ def run_checks(settings: Settings, models: list[str] | None = None) -> list[Chec
     srv = settings.llama_server
     srv_ok = bool(srv) and Path(srv).is_file() and os.access(srv, os.X_OK)
     out.append(Check("llama-server binary", srv_ok, srv or "not set: [paths] llama_server in configs/local.toml"))
+    bench = settings.bench_binary()
+    out.append(Check("llama-bench binary (bench jobs)", bool(bench) and Path(bench).exists(),
+                     bench or "not found next to llama-server; set [paths] llama_bench", critical=False))
     for name in models or sorted(settings.models):
         for q in QUANTS:
             p = settings.model_path(name, q)
@@ -39,6 +42,8 @@ def run_checks(settings: Settings, models: list[str] | None = None) -> list[Chec
         gov = Path("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor")
         out.append(Check("cpu governor readable", gov.exists(), gov.read_text().strip() if gov.exists() else "missing",
                          critical=False))
+        perf = settings.perf or shutil.which("perf")
+        out.append(Check("perf (kernel profiles)", bool(perf), perf or "sudo apt install linux-perf", critical=False))
         out.append(Check("cooler recorded in local.toml", settings.cooler is not None, str(settings.cooler), critical=False))
     if dev == "mac":
         pm = shutil.which("powermetrics")

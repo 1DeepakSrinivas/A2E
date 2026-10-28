@@ -35,6 +35,8 @@ class ModelEntry(BaseModel):
 
 class Settings(BaseModel):
     llama_server: str | None = None
+    llama_bench: str | None = None  # default: llama-bench next to llama-server
+    perf: str | None = None  # Linux perf binary for kernel profiles; default: found on PATH
     models_dir: str = str(REPO / "models")
     db: str = str(REPO / "results" / "a2e.db")
     raw_dir: str = str(REPO / "results" / "raw")
@@ -44,6 +46,14 @@ class Settings(BaseModel):
     power: str = "auto"  # auto | none
     threads: int | None = None
     models: dict[str, ModelEntry] = Field(default_factory=dict)
+
+    def bench_binary(self) -> str | None:
+        if self.llama_bench:
+            return self.llama_bench
+        if self.llama_server:
+            cand = Path(self.llama_server).with_name("llama-bench")
+            return str(cand) if cand.exists() else None
+        return None
 
     def model(self, name: str) -> ModelEntry:
         if name not in self.models:
@@ -76,7 +86,7 @@ def load_settings(config_dir: str | Path | None = None, local: str | Path | None
     for field, var in env.items():
         if os.environ.get(var):
             setattr(s, field, os.environ[var])
-    for field in ("llama_server", "models_dir", "db", "raw_dir", "work_dir"):  # ~ and repo-relative paths
+    for field in ("llama_server", "llama_bench", "perf", "models_dir", "db", "raw_dir", "work_dir"):  # ~ and repo-relative paths
         v = getattr(s, field)
         if v:
             p = Path(os.path.expanduser(v))
