@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from a2e.bfcl.load import ALL_CATEGORIES, MULTI_TURN_CATEGORIES
 from a2e.settings import CONFIG_DIR, Settings
-from a2e.tasks.custom import FAMILY_TOOLS
+from a2e.tasks.custom import FAMILY_DEPTH, FAMILY_TOOLS
 
 MIN_CTX_MULTI_TURN = 16384
 PI_Q8_MAX_PARAMS_B = 4.0
@@ -102,6 +102,7 @@ class Task(_Strict):
     family: list[str] = []
     depth: list[int] = []
     n_args: list[int] = [2]
+    distractors: Literal["bfcl", "synthetic"] = "bfcl"  # custom: pad the tool list with real BFCL functions or made-up ones
     category: list[str] = []
     n_prompt: list[int] = []  # bench: prompt sizes for the prefill test
     n_gen: list[int] = []  # bench: token counts for the decode test
@@ -125,9 +126,9 @@ class Task(_Strict):
             for f in self.family:
                 if f not in FAMILY_TOOLS:
                     raise ValueError(f"unknown family {f!r}; choose from {sorted(FAMILY_TOOLS)}")
-                lo = 2 if f == "retrieval" else 1
-                if any(not lo <= d <= 5 for d in self.depth):
-                    raise ValueError(f"family {f} needs depth {lo} to 5")
+                lo, hi = FAMILY_DEPTH[f]
+                if any(not lo <= d <= hi for d in self.depth):
+                    raise ValueError(f"family {f} needs depth {lo} to {hi}")
             if any(not 1 <= a <= 5 for a in self.n_args):
                 raise ValueError("n_args must be 1 to 5")
         if self.kind == "bfcl":
@@ -218,9 +219,8 @@ def expand(suite: Suite, settings: Settings) -> list[dict]:
             if task.kind == "plain":
                 grid = [{"n": task.n or 6}]
             elif task.kind == "custom":
-                grid = [{"family": f, "depth": d, "n_args": a, "n": task.n or 5}
-                        for f in task.family for d in task.depth for a in task.n_args
-                        if not (f == "retrieval" and d < 2)]
+                grid = [{"family": f, "depth": d, "n_args": a, "n": task.n or 5, "distractors": task.distractors}
+                        for f in task.family for d in task.depth for a in task.n_args]
             elif task.kind == "bfcl":
                 grid = [{"category": c, "n": task.n} for c in task.category]
             else:

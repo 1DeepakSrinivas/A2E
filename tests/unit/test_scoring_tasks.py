@@ -97,8 +97,9 @@ def test_note_arg_count_controls_expected_args(n_args):
 
 
 def test_tool_sets_exist_and_contain_all_used_tools(tmp_path, corpus):
+    from a2e.tasks.custom import FAMILY_ENV
     names = {s["name"] for s in build_registry(tmp_path).specs()}
-    for fam in FAMILY_TOOLS:
+    for fam in [f for f in FAMILY_TOOLS if FAMILY_ENV[f] == "builtin"]:
         tasks = generate(fam, 2, 3, corpus=corpus)
         for t in tasks:
             assert set(t.tool_names) <= names and "final_answer" in t.tool_names

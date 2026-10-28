@@ -51,6 +51,9 @@ def run_checks(settings: Settings, models: list[str] | None = None) -> list[Chec
         out.append(Check("powermetrics available", bool(pm), pm or "missing", critical=settings.power != "none"))
         out.append(Check("running as root (powermetrics needs it)", root, "use sudo -E for energy runs",
                          critical=False))
+    key = settings.web.api_key_env
+    out.append(Check(f"web search key ({key}, web family only)", bool(settings.web.api_key()),
+                     "set" if settings.web.api_key() else f"export {key}=<Brave Search API key>", critical=False))
     out.append(Check("bfcl extra (mpmath)", importlib.util.find_spec("mpmath") is not None,
                      "uv sync --extra bfcl", critical=False))
     out.append(Check("tui extra (textual)", importlib.util.find_spec("textual") is not None,

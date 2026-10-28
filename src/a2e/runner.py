@@ -87,26 +87,40 @@ def exec_plain(client, job: dict, ctx: dict) -> list[Unit]:
 
 
 def exec_custom(client, job: dict, ctx: dict) -> list[Unit]:
+    from a2e.tasks.custom import FAMILY_ENV
+    from a2e.tasks.envs import build_task_registry, family_core_specs
+    from a2e.tools.bfcl_tools import distractor_pool
     base = Path(ctx["work_dir"])
-    meta = make_corpus(base / "corpus_meta", n=30, seed=job["seed"])
+    fam = job["family"]
+    meta = make_corpus(base / "corpus_meta", n=30, seed=job["seed"]) if fam == "retrieval" else None
     count, how = _safe_counter(client)
-    core = build_registry(base / "probe").specs(FAMILY_TOOLS[job["family"]])
-    specs, n_tok = pad_tools(core, job["schema_len"], count, seed=job["seed"])  # SchemaTooLarge -> job skipped
+    pool = list(distractor_pool()) if job.get("distractors", "bfcl") == "bfcl" else None
+    specs, n_tok = pad_tools(family_core_specs(fam), job["schema_len"], count, seed=job["seed"], pool=pool)
     out = []
-    for i, task in enumerate(generate(job["family"], job["n"], job["depth"], job["n_args"], job["seed"], meta)):
+    for i, task in enumerate(generate(fam, job["n"], job["depth"], job["n_args"], job["seed"], meta)):
         _check_stop(ctx)
-        wd = base / f"task{i}"  # fresh notes/reminders per task so tasks cannot see each other's state
-        make_corpus(wd, n=30, seed=job["seed"])
-        reg = build_registry(wd)
+        # a fresh tool state per task (notes folder, BFCL instances, web URL list), so tasks cannot see each other
+        reg = build_task_registry(task, base / f"task{i}", job["seed"], ctx.get("web"))
         trace = AgentLoop(client, reg, specs, grammar=job["grammar"], n_predict=job["decode_len"],
                           cache_prompt=job["prefix_cache"]).run(task.prompt, max_turns=ctx["max_turns"])
         sc = trace.score(task.steps)
+        if task.state_check is not None:
+            sc.state_ok = bool(task.state_check(reg))
         correct = [sc.steps[k].ok if k < len(sc.steps) else None for k in range(len(trace.turns))]
-        out.append(Unit(task.task_id, f"custom:{job['family']}", trace.turns, sc.success,
-                        None if sc.success else (trace.status if trace.status != "final_answer" else "wrong_step"),
-                        trace.status, 1, n_tok,
-                        {"n_correct": sc.n_correct, "n_steps": len(task.steps), "finished": sc.finished,
-                         "token_count": how}, correct=correct))
+        extra = {"n_correct": sc.n_correct, "n_steps": len(task.steps), "finished": sc.finished,
+                 "token_count": how, "tools": FAMILY_ENV[fam], "distractors": job.get("distractors", "bfcl")}
+        if task.state_check is not None:
+            extra["state_ok"] = sc.state_ok
+        if task.env.get("scenario"):
+            extra["scenario"] = task.env["scenario"]
+        if getattr(reg, "web", None) is not None:
+            extra.update({"web_returned_urls": len(reg.web.returned), "web_errors": reg.web.errors[:5],
+                          "question": task.env.get("question")})
+        status = trace.status
+        err = None if sc.success else ("wrong_state" if sc.state_ok is False and status == "final_answer"
+                                       else status if status != "final_answer" else "wrong_step")
+        out.append(Unit(task.task_id, f"custom:{fam}", trace.turns, sc.success, err, status, 1, n_tok, extra,
+                        correct=correct))
     return out
 
 
@@ -336,7 +350,7 @@ class Runner:
                 sampler.start()
             work = Path(self.settings.work_dir) / f"exp{self.exp_id}" / job["job_key"] / f"r{r}"
             try:
-                units = EXECUTORS[job["kind"]](client, job, {"work_dir": work,
+                units = EXECUTORS[job["kind"]](client, job, {"work_dir": work, "web": self.settings.web,
                                                              "max_turns": self.suite.run.max_turns,
                                                              "max_steps": self.suite.run.max_steps})
             finally:

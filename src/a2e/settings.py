@@ -33,6 +33,19 @@ class ModelEntry(BaseModel):
                                                    QUANT=quant.upper())))
 
 
+class WebSettings(BaseModel):
+    """Live web search for the `web` task family (Brave Search API)."""
+    provider: str = "brave"
+    api_key_env: str = "BRAVE_SEARCH_API_KEY"  # the key itself stays in the environment, never in a file
+    base_url: str = "https://api.search.brave.com"
+    timeout_s: float = 15.0
+    max_page_chars: int = 4000  # fetched pages are cut to this many characters before the model sees them
+    max_results: int = 10
+
+    def api_key(self) -> str | None:
+        return os.environ.get(self.api_key_env) or None
+
+
 class Settings(BaseModel):
     llama_server: str | None = None
     llama_bench: str | None = None  # default: llama-bench next to llama-server
@@ -46,6 +59,7 @@ class Settings(BaseModel):
     power: str = "auto"  # auto | none
     threads: int | None = None
     models: dict[str, ModelEntry] = Field(default_factory=dict)
+    web: WebSettings = Field(default_factory=WebSettings)
 
     def bench_binary(self) -> str | None:
         if self.llama_bench:
@@ -80,8 +94,9 @@ def load_settings(config_dir: str | Path | None = None, local: str | Path | None
     data = _merge(_read(cdir / "models.toml"), _read(Path(local) if local else cdir / "local.toml"))
     paths = data.pop("paths", {})
     machine = data.pop("machine", {})
+    web = WebSettings(**data.pop("web", {}))
     models = {k: ModelEntry(name=k, **v) for k, v in data.pop("models", {}).items()}
-    s = Settings(**paths, **machine, models=models)
+    s = Settings(**paths, **machine, models=models, web=web)
     env = {"llama_server": "A2E_LLAMA_SERVER", "models_dir": "A2E_MODELS_DIR", "db": "A2E_DB", "device": "A2E_DEVICE"}
     for field, var in env.items():
         if os.environ.get(var):

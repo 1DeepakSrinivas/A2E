@@ -19,3 +19,10 @@ power = "auto"        # auto: PMIC on the Pi, powermetrics on the Mac (needs sud
 # [models.qwen3-4b.files]
 # q4_0 = "~/models/Qwen3-4B-Q4_0.gguf"
 # q8_0 = "~/models/Qwen3-4B-Q8_0.gguf"
+
+# Live web search for the `web` task family (Brave Search API). The key is read from the environment only:
+#   export BRAVE_SEARCH_API_KEY=...
+[web]
+api_key_env = "BRAVE_SEARCH_API_KEY"
+# timeout_s = 15
+# max_page_chars = 4000

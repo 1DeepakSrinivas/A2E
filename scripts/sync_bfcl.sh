@@ -14,7 +14,7 @@ head=$(git -C "$SRC_REPO" rev-parse HEAD)
 CATS=(simple_python multiple parallel parallel_multiple irrelevance live_relevance live_irrelevance
       multi_turn_base multi_turn_miss_func multi_turn_miss_param)
 BACKENDS=(gorilla_file_system math_api message_api posting_api ticket_api trading_bot travel_booking vehicle_control long_context)
-DOCS=(gorilla_file_system math_api message_api posting_api ticket_api trading_bot travel_booking vehicle_control)
+DOCS=(gorilla_file_system math_api message_api posting_api ticket_api trading_bot travel_booking vehicle_control web_search)
 
 FILES=(__init__.py constants/__init__.py constants/enums.py constants/type_mappings.py constants/default_prompts.py
        constants/executable_backend_config.py

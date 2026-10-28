@@ -18,7 +18,8 @@ def reg(tmp_path):
 @pytest.mark.parametrize("family", list(FAMILY_TOOLS))
 @pytest.mark.parametrize("target", [256, 1024, 2048])
 def test_lands_within_tolerance_or_core_too_big(reg, family, target):
-    core = reg.specs(FAMILY_TOOLS[family])
+    from a2e.tasks.envs import family_core_specs
+    core = family_core_specs(family)
     if count(render_tools(core)) > target * 1.05:
         with pytest.raises(SchemaTooLarge):
             pad_tools(core, target, count)
@@ -74,3 +75,27 @@ def test_works_with_word_level_counter(reg):
     words = lambda t: len(t.replace(",", " ").replace(":", " ").split())  # noqa: E731
     _, n = pad_tools(reg.specs(["calculator", "final_answer"]), 300, words, tolerance=0.1)
     assert abs(n - 300) / 300 <= 0.1
+
+
+@pytest.mark.parametrize("target", [512, 1024, 2048])
+def test_real_bfcl_pool_fills_first_and_real_specs_are_not_edited(reg, target):
+    from a2e.tools.bfcl_tools import distractor_pool
+    core = reg.specs(FAMILY_TOOLS["calc"])
+    pool = list(distractor_pool())
+    specs, n = pad_tools(core, target, count, seed=4, pool=pool)
+    assert abs(n - target) / target <= 0.05
+    by_name = {p["name"]: p for p in pool}
+    real = [s for s in specs if s["name"] in by_name]
+    assert len(real) >= 3 and all(s == by_name[s["name"]] for s in real)  # untouched BFCL docs
+    synthetic = [s for s in specs if s["name"] not in by_name and s not in core]
+    assert len(synthetic) <= 2  # only to close the last gap
+    assert pad_tools(core, target, count, seed=4, pool=pool) == (specs, n)
+
+
+def test_pool_never_duplicates_core_names(reg):
+    from a2e.tools.bfcl_tools import distractor_pool
+    from a2e.tasks.envs import family_core_specs
+    core = family_core_specs("fs_search")
+    specs, _ = pad_tools(core, 2048, count, seed=1, pool=list(distractor_pool()))
+    names = [s["name"] for s in specs]
+    assert len(names) == len(set(names)) and {"find", "cd", "cat"} <= set(names)

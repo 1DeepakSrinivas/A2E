@@ -1,0 +1,1422 @@
+{
+ "distinct_scenarios_in_bfcl": 52,
+ "kept": 25,
+ "limits": {
+  "max_chars": 800,
+  "max_depth": 3,
+  "max_files": 6,
+  "min_files": 2
+ },
+ "scenarios": [
+  {
+   "config": {
+    "root": {
+     "Quarter1_Reports": {
+      "contents": {
+       "Backup": {
+        "contents": {},
+        "type": "directory"
+       },
+       "History101.txt": {
+        "content": "Introduction to History. Ancient civilizations.",
+        "type": "file"
+       },
+       "History202.txt": {
+        "content": "Advanced History. Modern world events.",
+        "type": "file"
+       },
+       "MonthlySummary.docx": {
+        "content": "Summary of monthly activities and achievements.",
+        "type": "file"
+       },
+       "report1.txt": {
+        "content": "Quarter 1 financial report.",
+        "type": "file"
+       },
+       "report2.txt": {
+        "content": "Quarter 1 sales report.",
+        "type": "file"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 27,
+     "lines": 1,
+     "name": "report1.txt",
+     "path": []
+    },
+    {
+     "chars": 23,
+     "lines": 1,
+     "name": "report2.txt",
+     "path": []
+    },
+    {
+     "chars": 47,
+     "lines": 1,
+     "name": "MonthlySummary.docx",
+     "path": []
+    },
+    {
+     "chars": 47,
+     "lines": 1,
+     "name": "History101.txt",
+     "path": []
+    },
+    {
+     "chars": 38,
+     "lines": 1,
+     "name": "History202.txt",
+     "path": []
+    }
+   ],
+   "id": "fs_07f87543",
+   "root": "Quarter1_Reports",
+   "sources": [
+    "multi_turn_base_18",
+    "multi_turn_miss_func_18",
+    "multi_turn_miss_param_18"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "alex": {
+      "contents": {
+       "workspace": {
+        "contents": {
+         "old_project_analysis.txt": {
+          "content": "Old analysis content.",
+          "type": "file"
+         },
+         "project_analysis.txt": {
+          "content": "Initial analysis content.",
+          "type": "file"
+         },
+         "project_archive": {
+          "contents": {},
+          "type": "directory"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 3,
+   "files": [
+    {
+     "chars": 25,
+     "lines": 1,
+     "name": "project_analysis.txt",
+     "path": [
+      "workspace"
+     ]
+    },
+    {
+     "chars": 21,
+     "lines": 1,
+     "name": "old_project_analysis.txt",
+     "path": [
+      "workspace"
+     ]
+    }
+   ],
+   "id": "fs_2699f1e6",
+   "root": "alex",
+   "sources": [
+    "multi_turn_base_22",
+    "multi_turn_miss_func_22",
+    "multi_turn_miss_param_22"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "temp": {
+      "contents": {
+       "file1.txt": {
+        "content": "Sample content of file1",
+        "type": "file"
+       },
+       "file2.txt": {
+        "content": "Sample content of file2",
+        "type": "file"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 1,
+   "files": [
+    {
+     "chars": 23,
+     "lines": 1,
+     "name": "file1.txt",
+     "path": []
+    },
+    {
+     "chars": 23,
+     "lines": 1,
+     "name": "file2.txt",
+     "path": []
+    }
+   ],
+   "id": "fs_290c5f93",
+   "root": "temp",
+   "sources": [
+    "multi_turn_base_11",
+    "multi_turn_miss_func_11",
+    "multi_turn_miss_param_11"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "workspace": {
+      "contents": {
+       "archive": {
+        "contents": {},
+        "type": "directory"
+       },
+       "document": {
+        "contents": {
+         "final_report.pdf": {
+          "content": "Year2024 This is the final report content including budget analysis and other sections.",
+          "type": "file"
+         },
+         "previous_report.pdf": {
+          "content": "Year203 This is the previous report content with different budget analysis.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 87,
+     "lines": 1,
+     "name": "final_report.pdf",
+     "path": [
+      "document"
+     ]
+    },
+    {
+     "chars": 75,
+     "lines": 1,
+     "name": "previous_report.pdf",
+     "path": [
+      "document"
+     ]
+    }
+   ],
+   "id": "fs_2aa5d6d8",
+   "root": "workspace",
+   "sources": [
+    "multi_turn_base_0",
+    "multi_turn_miss_func_0"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "workspace": {
+      "contents": {
+       "project": {
+        "contents": {
+         "file1.txt": {
+          "content": "This is a test file.",
+          "type": "file"
+         },
+         "file2.txt": {
+          "content": "Another document.",
+          "type": "file"
+         },
+         "test_report.docx": {
+          "content": "Kelly Total Score: 96",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 20,
+     "lines": 1,
+     "name": "file1.txt",
+     "path": [
+      "project"
+     ]
+    },
+    {
+     "chars": 17,
+     "lines": 1,
+     "name": "file2.txt",
+     "path": [
+      "project"
+     ]
+    },
+    {
+     "chars": 21,
+     "lines": 1,
+     "name": "test_report.docx",
+     "path": [
+      "project"
+     ]
+    }
+   ],
+   "id": "fs_36ab6c96",
+   "root": "workspace",
+   "sources": [
+    "multi_turn_base_17",
+    "multi_turn_miss_func_17",
+    "multi_turn_miss_param_17"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "project": {
+      "contents": {
+       "archives": {
+        "contents": {},
+        "type": "directory"
+       },
+       "report_draft.txt": {
+        "content": "Initial draft content for the report.",
+        "type": "file"
+       },
+       "report_final.txt": {
+        "content": "Finalized content for the report.",
+        "type": "file"
+       },
+       "temp_notes.txt": {
+        "content": "Temporary notes for the project.",
+        "type": "file"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 37,
+     "lines": 1,
+     "name": "report_draft.txt",
+     "path": []
+    },
+    {
+     "chars": 33,
+     "lines": 1,
+     "name": "report_final.txt",
+     "path": []
+    },
+    {
+     "chars": 32,
+     "lines": 1,
+     "name": "temp_notes.txt",
+     "path": []
+    }
+   ],
+   "id": "fs_51b2a1ce",
+   "root": "project",
+   "sources": [
+    "multi_turn_base_24",
+    "multi_turn_miss_func_24",
+    "multi_turn_miss_param_24"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "workspace": {
+      "contents": {
+       "data.txt": {
+        "content": "Q1 results Q2 results Q3 results Q4 financials Q4 financials analysis End of year summary",
+        "type": "file"
+       },
+       "summary.doc": {
+        "content": "This is the summary document content.",
+        "type": "file"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 1,
+   "files": [
+    {
+     "chars": 37,
+     "lines": 1,
+     "name": "summary.doc",
+     "path": []
+    },
+    {
+     "chars": 89,
+     "lines": 1,
+     "name": "data.txt",
+     "path": []
+    }
+   ],
+   "id": "fs_6bae58dd",
+   "root": "workspace",
+   "sources": [
+    "multi_turn_base_31",
+    "multi_turn_miss_func_31",
+    "multi_turn_miss_param_31"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "alex": {
+      "contents": {
+       "documents": {
+        "contents": {
+         "file1.txt": {
+          "content": "The quick brown fox jumps over the lazy dog.",
+          "type": "file"
+         },
+         "file2.txt": {
+          "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+          "type": "file"
+         },
+         "file3.txt": {
+          "content": "To be or not to be, that is the question.",
+          "type": "file"
+         },
+         "file4.txt": {
+          "content": "All that glitters is not gold.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 44,
+     "lines": 1,
+     "name": "file1.txt",
+     "path": [
+      "documents"
+     ]
+    },
+    {
+     "chars": 56,
+     "lines": 1,
+     "name": "file2.txt",
+     "path": [
+      "documents"
+     ]
+    },
+    {
+     "chars": 41,
+     "lines": 1,
+     "name": "file3.txt",
+     "path": [
+      "documents"
+     ]
+    },
+    {
+     "chars": 30,
+     "lines": 1,
+     "name": "file4.txt",
+     "path": [
+      "documents"
+     ]
+    }
+   ],
+   "id": "fs_6c6c8ec8",
+   "root": "alex",
+   "sources": [
+    "multi_turn_base_20",
+    "multi_turn_miss_func_20",
+    "multi_turn_miss_param_20"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "alex": {
+      "contents": {
+       "workspace": {
+        "contents": {
+         ".hidden_file": {
+          "content": "This is a hidden file.",
+          "type": "file"
+         },
+         "archive": {
+          "contents": {},
+          "type": "directory"
+         },
+         "log.txt": {
+          "content": "This is a log file. No errors found. Another line. Yet another line. Error: Something went wrong. Final line.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 3,
+   "files": [
+    {
+     "chars": 109,
+     "lines": 1,
+     "name": "log.txt",
+     "path": [
+      "workspace"
+     ]
+    },
+    {
+     "chars": 22,
+     "lines": 1,
+     "name": ".hidden_file",
+     "path": [
+      "workspace"
+     ]
+    }
+   ],
+   "id": "fs_71b68816",
+   "root": "alex",
+   "sources": [
+    "multi_turn_base_1",
+    "multi_turn_miss_func_1",
+    "multi_turn_miss_param_1"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "alex": {
+      "contents": {
+       "Documents": {
+        "contents": {
+         "Q4_summary.doc": {
+          "content": "The Q4 summary concludes with a positive outlook for the next fiscal year.",
+          "type": "file"
+         },
+         "annual_report.txt": {
+          "content": "This is the annual report. It includes Q4 results and other financial data.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       },
+       "Reports": {
+        "contents": {
+         "Archives": {
+          "contents": {},
+          "type": "directory"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 3,
+   "files": [
+    {
+     "chars": 75,
+     "lines": 1,
+     "name": "annual_report.txt",
+     "path": [
+      "Documents"
+     ]
+    },
+    {
+     "chars": 74,
+     "lines": 1,
+     "name": "Q4_summary.doc",
+     "path": [
+      "Documents"
+     ]
+    }
+   ],
+   "id": "fs_794469f0",
+   "root": "alex",
+   "sources": [
+    "multi_turn_base_43",
+    "multi_turn_miss_func_43",
+    "multi_turn_miss_param_43"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "alex": {
+      "contents": {
+       "tmp": {
+        "contents": {
+         "file1.txt": {
+          "content": "This is some important data. Another line of text.",
+          "type": "file"
+         },
+         "file2.txt": {
+          "content": "Just some random text. More important data here.",
+          "type": "file"
+         },
+         "file3.txt": {
+          "content": "Nothing important here. Yet another line.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 50,
+     "lines": 1,
+     "name": "file1.txt",
+     "path": [
+      "tmp"
+     ]
+    },
+    {
+     "chars": 48,
+     "lines": 1,
+     "name": "file2.txt",
+     "path": [
+      "tmp"
+     ]
+    },
+    {
+     "chars": 41,
+     "lines": 1,
+     "name": "file3.txt",
+     "path": [
+      "tmp"
+     ]
+    }
+   ],
+   "id": "fs_7ac5d115",
+   "root": "alex",
+   "sources": [
+    "multi_turn_base_26",
+    "multi_turn_miss_func_26",
+    "multi_turn_miss_param_26"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "workspace": {
+      "contents": {
+       "initial_directory": {
+        "contents": {
+         "notes": {
+          "content": "Meeting notes and project details.",
+          "type": "file"
+         },
+         "other_file.txt": {
+          "content": "Some other content.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 34,
+     "lines": 1,
+     "name": "notes",
+     "path": [
+      "initial_directory"
+     ]
+    },
+    {
+     "chars": 19,
+     "lines": 1,
+     "name": "other_file.txt",
+     "path": [
+      "initial_directory"
+     ]
+    }
+   ],
+   "id": "fs_aa89927a",
+   "root": "workspace",
+   "sources": [
+    "multi_turn_base_41",
+    "multi_turn_miss_func_41",
+    "multi_turn_miss_param_41"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "shared_workspace": {
+      "contents": {
+       "ResearchDocs": {
+        "contents": {
+         "draft_notes.txt": {
+          "content": "This is a draft document for research purposes. It contains preliminary findings and notes.",
+          "type": "file"
+         },
+         "final_report.pdf": {
+          "content": "This is the final report of the research project.",
+          "type": "file"
+         },
+         "summary_draft.docx": {
+          "content": "Draft summary of the research project.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 91,
+     "lines": 1,
+     "name": "draft_notes.txt",
+     "path": [
+      "ResearchDocs"
+     ]
+    },
+    {
+     "chars": 38,
+     "lines": 1,
+     "name": "summary_draft.docx",
+     "path": [
+      "ResearchDocs"
+     ]
+    },
+    {
+     "chars": 49,
+     "lines": 1,
+     "name": "final_report.pdf",
+     "path": [
+      "ResearchDocs"
+     ]
+    }
+   ],
+   "id": "fs_b1f91c96",
+   "root": "shared_workspace",
+   "sources": [
+    "multi_turn_base_45",
+    "multi_turn_miss_func_45",
+    "multi_turn_miss_param_45"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "workspace": {
+      "contents": {
+       "academic_venture": {
+        "contents": {
+         "goals.txt": {
+          "content": "Research topic selection Literature review Data collection Data analysis Draft writing Final submission",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       },
+       "reference_goals.txt": {
+        "content": "Data analysis Data collection Draft writing Final submission Literature review Research topic selection",
+        "type": "file"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 103,
+     "lines": 1,
+     "name": "goals.txt",
+     "path": [
+      "academic_venture"
+     ]
+    },
+    {
+     "chars": 103,
+     "lines": 1,
+     "name": "reference_goals.txt",
+     "path": []
+    }
+   ],
+   "id": "fs_b4a9ff9e",
+   "root": "workspace",
+   "sources": [
+    "multi_turn_base_7",
+    "multi_turn_miss_func_7",
+    "multi_turn_miss_param_7"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "archive": {
+      "contents": {},
+      "type": "directory"
+     },
+     "data": {
+      "contents": {
+       "project": {
+        "contents": {
+         "analysis_report.csv": {
+          "content": "Data analysis results...",
+          "type": "file"
+         },
+         "archive": {
+          "contents": {},
+          "type": "directory"
+         },
+         "archive_summary.txt": {
+          "content": "Summary of archived files: analysis_report.csv",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 3,
+   "files": [
+    {
+     "chars": 24,
+     "lines": 1,
+     "name": "analysis_report.csv",
+     "path": [
+      "project"
+     ]
+    },
+    {
+     "chars": 46,
+     "lines": 1,
+     "name": "archive_summary.txt",
+     "path": [
+      "project"
+     ]
+    }
+   ],
+   "id": "fs_b840f1c8",
+   "root": "data",
+   "sources": [
+    "multi_turn_base_5",
+    "multi_turn_miss_func_5",
+    "multi_turn_miss_param_5"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "alex": {
+      "contents": {
+       "documents": {
+        "contents": {
+         "report.txt": {
+          "content": "Zebra Apple Orange",
+          "type": "file"
+         },
+         "summary.txt": {
+          "content": "Banana Grape Lemon",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 18,
+     "lines": 1,
+     "name": "report.txt",
+     "path": [
+      "documents"
+     ]
+    },
+    {
+     "chars": 18,
+     "lines": 1,
+     "name": "summary.txt",
+     "path": [
+      "documents"
+     ]
+    }
+   ],
+   "id": "fs_bab6b4ec",
+   "root": "alex",
+   "sources": [
+    "multi_turn_base_13",
+    "multi_turn_miss_func_13",
+    "multi_turn_miss_param_13"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "scientific_data": {
+      "contents": {
+       "experiment_log.txt": {
+        "content": "Observation 1: Normal Observation 2: Anomaly detected Observation 3: Normal Observation 4: Anomaly detected ",
+        "type": "file"
+       },
+       "previous_study_log.txt": {
+        "content": "Observation A: Normal Observation B: Normal Observation C: Anomaly detected",
+        "type": "file"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 1,
+   "files": [
+    {
+     "chars": 108,
+     "lines": 1,
+     "name": "experiment_log.txt",
+     "path": []
+    },
+    {
+     "chars": 75,
+     "lines": 1,
+     "name": "previous_study_log.txt",
+     "path": []
+    }
+   ],
+   "id": "fs_c6d198c3",
+   "root": "scientific_data",
+   "sources": [
+    "multi_turn_base_8",
+    "multi_turn_miss_func_8",
+    "multi_turn_miss_param_8"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "workspace": {
+      "contents": {
+       "assignment.docx": {
+        "content": "This is the assignment document content.",
+        "type": "file"
+       },
+       "completed_tasks": {
+        "contents": {},
+        "type": "directory"
+       },
+       "submissions": {
+        "contents": {},
+        "type": "directory"
+       },
+       "test": {
+        "contents": {
+         "test_file1.txt": {
+          "content": "This is a test file.",
+          "type": "file"
+         },
+         "test_file2.txt": {
+          "content": "Another test file.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 40,
+     "lines": 1,
+     "name": "assignment.docx",
+     "path": []
+    },
+    {
+     "chars": 20,
+     "lines": 1,
+     "name": "test_file1.txt",
+     "path": [
+      "test"
+     ]
+    },
+    {
+     "chars": 18,
+     "lines": 1,
+     "name": "test_file2.txt",
+     "path": [
+      "test"
+     ]
+    }
+   ],
+   "id": "fs_c7b5a812",
+   "root": "workspace",
+   "sources": [
+    "multi_turn_base_48",
+    "multi_turn_miss_func_48",
+    "multi_turn_miss_param_48"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "workspace": {
+      "contents": {
+       "Backups": {
+        "contents": {},
+        "type": "directory"
+       },
+       "Draft.txt": {
+        "content": "Old draft content.",
+        "type": "file"
+       },
+       "ProjectOverview.txt": {
+        "content": "Initial summary of the project. ",
+        "type": "file"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 32,
+     "lines": 1,
+     "name": "ProjectOverview.txt",
+     "path": []
+    },
+    {
+     "chars": 18,
+     "lines": 1,
+     "name": "Draft.txt",
+     "path": []
+    }
+   ],
+   "id": "fs_c7fe1d7c",
+   "root": "workspace",
+   "sources": [
+    "multi_turn_base_21",
+    "multi_turn_miss_func_21",
+    "multi_turn_miss_param_21"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "alex": {
+      "contents": {
+       "workspace": {
+        "contents": {
+         "notes.md": {
+          "content": "Meeting highlights and notes.",
+          "type": "file"
+         },
+         "proposal.docx": {
+          "content": "Initial project proposal document content.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 42,
+     "lines": 1,
+     "name": "proposal.docx",
+     "path": [
+      "workspace"
+     ]
+    },
+    {
+     "chars": 29,
+     "lines": 1,
+     "name": "notes.md",
+     "path": [
+      "workspace"
+     ]
+    }
+   ],
+   "id": "fs_dbc98f9d",
+   "root": "alex",
+   "sources": [
+    "multi_turn_base_10",
+    "multi_turn_miss_func_10",
+    "multi_turn_miss_param_10"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "alex": {
+      "contents": {
+       "projects": {
+        "contents": {
+         "deep_folder": {
+          "contents": {
+           "config.py": {
+            "content": "Initialization of the system Error in module Setup complete Initialization successful Error detected",
+            "type": "file"
+           },
+           "real_config.py": {
+            "content": "Real Config.",
+            "type": "file"
+           }
+          },
+          "type": "directory"
+         }
+        },
+        "type": "directory"
+       },
+       "temp": {
+        "contents": {},
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 3,
+   "files": [
+    {
+     "chars": 100,
+     "lines": 1,
+     "name": "config.py",
+     "path": [
+      "projects",
+      "deep_folder"
+     ]
+    },
+    {
+     "chars": 12,
+     "lines": 1,
+     "name": "real_config.py",
+     "path": [
+      "projects",
+      "deep_folder"
+     ]
+    }
+   ],
+   "id": "fs_ddf6377a",
+   "root": "alex",
+   "sources": [
+    "multi_turn_base_35",
+    "multi_turn_miss_func_35",
+    "multi_turn_miss_param_35"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "workspace": {
+      "contents": {
+       "data": {
+        "contents": {
+         "analysis_report.txt": {
+          "content": "Line 1: No error Line 2: Minor error detected Line 3: All systems operational Line 4: Critical error found",
+          "type": "file"
+         },
+         "file3.txt": {
+          "content": "Zebra Apple Monkey Banana",
+          "type": "file"
+         },
+         "project_summary.txt": {
+          "content": "Summary line 1 Summary line 2 Summary line 3 Summary line 4 Summary line 5",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 106,
+     "lines": 1,
+     "name": "analysis_report.txt",
+     "path": [
+      "data"
+     ]
+    },
+    {
+     "chars": 74,
+     "lines": 1,
+     "name": "project_summary.txt",
+     "path": [
+      "data"
+     ]
+    },
+    {
+     "chars": 25,
+     "lines": 1,
+     "name": "file3.txt",
+     "path": [
+      "data"
+     ]
+    }
+   ],
+   "id": "fs_e216f6df",
+   "root": "workspace",
+   "sources": [
+    "multi_turn_base_28",
+    "multi_turn_miss_func_28",
+    "multi_turn_miss_param_28"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "temp": {
+      "contents": {
+       "file1.txt": {
+        "content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11\nLine 12\nLine 13\nLine 14\nLine 15\nLine 16\nLine 17\nLine 18\nLine 19\nLine 20",
+        "type": "file"
+       },
+       "file2.txt": {
+        "content": "Alpha\nBeta\nGamma\nDelta\nEpsilon\nZeta\nEta\nTheta\nIota\nKappa\nLambda\nMu\nNu\nXi\nOmicron\nPi\nRho\nSigma\nTau\nUpsilon",
+        "type": "file"
+       },
+       "file3.txt": {
+        "content": "Zebra\nApple\nOrange\nBanana\nGrape\nCherry\nMango\nPeach\nLemon\nLime\nKiwi\nPlum\nPear\nFig\nDate\nCoconut\nPineapple\nPapaya\nGuava\nLychee",
+        "type": "file"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 1,
+   "files": [
+    {
+     "chars": 150,
+     "lines": 20,
+     "name": "file1.txt",
+     "path": []
+    },
+    {
+     "chars": 105,
+     "lines": 20,
+     "name": "file2.txt",
+     "path": []
+    },
+    {
+     "chars": 123,
+     "lines": 20,
+     "name": "file3.txt",
+     "path": []
+    }
+   ],
+   "id": "fs_e3c0f604",
+   "root": "temp",
+   "sources": [
+    "multi_turn_base_49",
+    "multi_turn_miss_func_49",
+    "multi_turn_miss_param_49"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "workspace": {
+      "contents": {
+       "archive": {
+        "contents": {},
+        "type": "directory"
+       },
+       "document": {
+        "contents": {
+         "final_report.pdf": {
+          "content": "Year2024 This is the final report content including budget analysis and other sections.",
+          "type": "file"
+         },
+         "previous_report.pdf": {
+          "content": "Year203 This is the previous report content with different budget analysis.",
+          "type": "file"
+         },
+         "report_final.pdf": {
+          "content": "Year2024 This is another final report with summary and conclusions.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 87,
+     "lines": 1,
+     "name": "final_report.pdf",
+     "path": [
+      "document"
+     ]
+    },
+    {
+     "chars": 75,
+     "lines": 1,
+     "name": "previous_report.pdf",
+     "path": [
+      "document"
+     ]
+    },
+    {
+     "chars": 67,
+     "lines": 1,
+     "name": "report_final.pdf",
+     "path": [
+      "document"
+     ]
+    }
+   ],
+   "id": "fs_e9bede17",
+   "root": "workspace",
+   "sources": [
+    "multi_turn_miss_param_0"
+   ]
+  },
+  {
+   "config": {
+    "root": {
+     "researcher": {
+      "contents": {
+       "BackupResearch": {
+        "contents": {
+         "findings_report": {
+          "content": "Backup research data from previous experiments.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       },
+       "OldResearch": {
+        "contents": {
+         "findings_report": {
+          "content": "Legacy research archive from 2020 studies.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       },
+       "SuperResearch": {
+        "contents": {
+         "findings_report": {
+          "content": "This document contains a breakthrough in our research. Further analysis is required to understand the full implications of this breakthrough.",
+          "type": "file"
+         }
+        },
+        "type": "directory"
+       }
+      },
+      "type": "directory"
+     }
+    }
+   },
+   "depth": 2,
+   "files": [
+    {
+     "chars": 141,
+     "lines": 1,
+     "name": "findings_report",
+     "path": [
+      "SuperResearch"
+     ]
+    },
+    {
+     "chars": 47,
+     "lines": 1,
+     "name": "findings_report",
+     "path": [
+      "BackupResearch"
+     ]
+    },
+    {
+     "chars": 42,
+     "lines": 1,
+     "name": "findings_report",
+     "path": [
+      "OldResearch"
+     ]
+    }
+   ],
+   "id": "fs_fca71314",
+   "root": "researcher",
+   "sources": [
+    "multi_turn_miss_param_38"
+   ]
+  }
+ ]
+}

@@ -31,40 +31,53 @@ def _distractor(rng: random.Random, taken: set[str]) -> dict:
 
 
 def pad_tools(core: list[dict], target_tokens: int, count: Callable[[str], int], seed: int = 0,
-              tolerance: float = 0.05) -> tuple[list[dict], int]:
-    """Core tools plus seeded distractor tools so the rendered schema is within `tolerance` of target_tokens.
+              tolerance: float = 0.05, pool: list[dict] | None = None) -> tuple[list[dict], int]:
+    """Core tools plus distractor tools so the rendered schema is within `tolerance` of target_tokens.
 
-    `count` measures text in model tokens (Client.tokenize). Distractors are added until the next one would
-    overshoot, then the last one's description is lengthened word by word to close the remaining gap.
-    Order is shuffled deterministically so required tools are not always first. Same (core, target, seed)
-    always gives the same schema, keeping the prompt prefix identical across tasks (prefix-cache friendly).
+    `count` measures text in model tokens (Client.tokenize). With a `pool` of real tool specs (e.g. BFCL functions),
+    distractors are taken from it in a seeded order, skipping any that would overshoot. Seeded synthetic distractors
+    then close the remaining gap; only their descriptions are lengthened or shortened, real specs are never edited.
+    Order is shuffled deterministically so required tools are not always first. Same inputs always give the same
+    schema, keeping the prompt prefix identical across tasks (prefix-cache friendly).
     """
     lo, hi = target_tokens * (1 - tolerance), target_tokens * (1 + tolerance)
     if count(render_tools(core)) > hi:
         raise SchemaTooLarge(f"core tools need {count(render_tools(core))} tokens > target {target_tokens}")
     rng = random.Random(seed)
     taken = {s["name"] for s in core}
-    extra: list[dict] = []
+    real: list[dict] = []
+    synth: list[dict] = []
 
     def total() -> int:
-        return count(render_tools(core + extra))
+        return count(render_tools(core + real + synth))
 
+    if pool:
+        candidates = [p for p in pool if p["name"] not in taken]
+        random.Random(f"{seed}/pool").shuffle(candidates)
+        for spec in candidates:
+            if total() >= lo:
+                break
+            real.append(spec)
+            if total() > hi:
+                real.pop()
+                continue
+            taken.add(spec["name"])
     while total() < lo:
-        extra.append(_distractor(rng, taken))
+        synth.append(_distractor(rng, taken))
         if total() > hi:  # overshot: shrink its description, then drop it if still too big
-            words = extra[-1]["description"].split()
+            words = synth[-1]["description"].split()
             while len(words) > 1 and total() > hi:
                 words.pop()
-                extra[-1]["description"] = " ".join(words)
+                synth[-1]["description"] = " ".join(words)
             if total() > hi:
-                extra.pop()
+                synth.pop()
                 break
     i = 0
-    while extra and total() < lo:  # absorb the remaining gap in the last distractor's description
-        extra[-1]["description"] += " " + _WORDS[i % len(_WORDS)]
+    while synth and total() < lo:  # absorb the remaining gap in the last synthetic distractor
+        synth[-1]["description"] += " " + _WORDS[i % len(_WORDS)]
         i += 1
-    if total() > hi:
+    if total() > hi or total() < lo:
         raise SchemaTooLarge("could not land inside the tolerance band")
-    specs = core + extra
+    specs = core + real + synth
     random.Random(seed + 1).shuffle(specs)
     return specs, count(render_tools(specs))

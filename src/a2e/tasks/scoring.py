@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -33,6 +34,8 @@ class ExpectedCall:
     args: dict | Callable[[list[str]], dict]  # callable gets the outputs of earlier tool calls
     compare_keys: list[str] | None = None  # None = every expected key; else only these (free-text args)
     squash_ws: bool = False  # drop all whitespace before comparing (calculator expressions)
+    rel_tol: float | None = None  # numbers copied from earlier tool output may be rounded by the model
+    check: Callable[[dict, list[str]], bool] | None = None  # extra rule on (actual args, earlier tool outputs)
 
     def resolve(self, results: list[str]) -> dict:
         return self.args(results) if callable(self.args) else self.args
@@ -53,10 +56,11 @@ class StepScore:
 class ChainScore:
     steps: list[StepScore] = field(default_factory=list)
     finished: bool = False  # reached final_answer
+    state_ok: bool | None = None  # final tool state matches the oracle's (families that define a state check)
 
     @property
     def success(self) -> bool:
-        return self.finished and all(s.ok for s in self.steps)
+        return self.finished and all(s.ok for s in self.steps) and self.state_ok is not False
 
     @property
     def n_correct(self) -> int:
@@ -77,6 +81,24 @@ def score_call(exp: ExpectedCall, results: list[str], actual: ToolCall) -> StepS
         a, w = actual.arguments.get(k), want.get(k)
         if exp.squash_ws and isinstance(a, str) and isinstance(w, str):
             a, w = re.sub(r"\s+", "", a), re.sub(r"\s+", "", w)
+        if exp.rel_tol is not None and _numbers(a, w):
+            if not math.isclose(float(a), float(w), rel_tol=exp.rel_tol, abs_tol=exp.rel_tol):
+                return StepScore(name_ok=True, note=f"arg {k!r}: got {a!r}, want {w!r}")
+            continue
         if norm(a) != norm(w):
             return StepScore(name_ok=True, note=f"arg {k!r}: got {a!r}, want {w!r}")
+    if exp.check is not None:
+        try:
+            if not exp.check(actual.arguments, results):
+                return StepScore(name_ok=True, note="check failed")
+        except Exception as e:  # noqa: BLE001 - a malformed argument or earlier result fails the rule
+            return StepScore(name_ok=True, note=f"check failed: {type(e).__name__}")
     return StepScore(True, True)
+
+
+def _numbers(a, w) -> bool:
+    try:
+        float(a), float(w)
+    except (TypeError, ValueError):
+        return False
+    return not isinstance(a, bool) and not isinstance(w, bool)
