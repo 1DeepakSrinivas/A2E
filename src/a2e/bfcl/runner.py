@@ -50,10 +50,11 @@ def run_case(client, case: Case, *, grammar=False, cache_prompt=True, n_predict=
 def run_category(client, category: str, store: Store, run_id: int, *, n: int | None = None, seed: int = 0,
                  raw_path: str | Path | None = None, **kw) -> list[CaseOutcome]:
     """Run (a fixed-seed subsample of) one category, writing `turns` and `cases` rows and raw outputs."""
+    cases = load_subset(category, n, seed)  # validates the category before anything is written
     outcomes = []
     raw = open(raw_path, "a") if raw_path else None
     try:
-        for case in load_subset(category, n, seed):
+        for case in cases:
             o = run_case(client, case, **kw)
             outcomes.append(o)
             for t in o.turns:

@@ -118,7 +118,15 @@ def test_cli_list_and_run_and_rescore_against_fake_server(fake_server, tmp_path)
     assert "simple_python: 0/5 valid" in out.output and "irrelevance: 5/5 valid" in out.output
 
 
-def test_cli_rejects_unknown_category(fake_server, tmp_path):
+def test_cli_rejects_unknown_category_and_writes_no_raw_file(fake_server, tmp_path):
+    raw = tmp_path / "raw.jsonl"
     res = CliRunner().invoke(app, ["bfcl", "run", "--url", fake_server().url, "--category", "nope", "--model", "m",
-                                   "--quant", "q4_0", "--device", "mac", "--db", str(tmp_path / "x.db")])
-    assert res.exit_code != 0
+                                   "--quant", "q4_0", "--device", "mac", "--db", str(tmp_path / "x.db"),
+                                   "--raw", str(raw)])
+    assert res.exit_code != 0 and not raw.exists()
+
+
+def test_default_output_paths_are_not_touched_by_tests(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # guards against tests littering the repo root
+    CliRunner().invoke(app, ["bfcl", "list"])
+    assert not list(tmp_path.iterdir())
