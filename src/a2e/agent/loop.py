@@ -77,7 +77,7 @@ class Trace:
 
 
 def model_step(client, messages: list[dict], step: int, n_predict: int, cache_prompt: bool,
-               schema: dict | None, allow_empty: bool = False) -> tuple[TurnRecord, tuple | None]:
+               schema: dict | None, allow_empty: bool = False, **extra) -> tuple[TurnRecord, tuple | None]:
     """Template + model call + parse for one turn. Returns (turn, (t0, t1, t2, t3)); the stamps are None when
     the server call failed (turn.error is set and wall_ms covers the attempt). The caller validates/executes
     the calls and then calls turn.finalize with the remaining stamps."""
@@ -86,7 +86,7 @@ def model_step(client, messages: list[dict], step: int, n_predict: int, cache_pr
     try:
         prompt = client.apply_template(messages)
         t1 = time.perf_counter()
-        turn.completion = client.complete(prompt, n_predict, json_schema=schema, cache_prompt=cache_prompt)
+        turn.completion = client.complete(prompt, n_predict, json_schema=schema, cache_prompt=cache_prompt, **extra)
     except httpx.HTTPError as e:
         turn.error = f"{type(e).__name__}: {e}"
         turn.wall_ms = (time.perf_counter() - t0) * 1000

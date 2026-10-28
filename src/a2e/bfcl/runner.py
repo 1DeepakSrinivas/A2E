@@ -47,6 +47,19 @@ def run_case(client, case: Case, *, grammar=False, cache_prompt=True, n_predict=
     return CaseOutcome(case, res, [turn], [turn.text], "server_error" if turn.error else "done")
 
 
+def case_row(o: CaseOutcome, run_id: int) -> dict:
+    return {"run_id": run_id, "case_id": o.case.id, "category": o.case.category, "valid": int(o.result.valid),
+            "error_type": o.result.error_type, "status": o.status, "n_user_turns": len(o.case.turns),
+            "n_model_calls": len(o.turns), "schema_tokens": o.result.extra.get("schema_tokens"),
+            "wall_ms": sum(t.wall_ms for t in o.turns),
+            "extra_json": json.dumps({k: v for k, v in o.result.extra.items() if k != "schema_tokens"})}
+
+
+def raw_record(o: CaseOutcome, run_id: int) -> str:
+    return json.dumps({"run_id": run_id, "case_id": o.case.id, "category": o.case.category, "status": o.status,
+                       "texts": o.texts})
+
+
 def run_category(client, category: str, store: Store, run_id: int, *, n: int | None = None, seed: int = 0,
                  raw_path: str | Path | None = None, **kw) -> list[CaseOutcome]:
     """Run (a fixed-seed subsample of) one category, writing `turns` and `cases` rows and raw outputs."""
@@ -59,15 +72,9 @@ def run_category(client, category: str, store: Store, run_id: int, *, n: int | N
             outcomes.append(o)
             for t in o.turns:
                 store.insert("turns", t.row(run_id, case.id))
-            store.insert("cases", {
-                "run_id": run_id, "case_id": case.id, "category": category, "valid": int(o.result.valid),
-                "error_type": o.result.error_type, "status": o.status, "n_user_turns": len(case.turns),
-                "n_model_calls": len(o.turns), "schema_tokens": o.result.extra.get("schema_tokens"),
-                "wall_ms": sum(t.wall_ms for t in o.turns),
-                "extra_json": json.dumps({k: v for k, v in o.result.extra.items() if k != "schema_tokens"})})
+            store.insert("cases", case_row(o, run_id))
             if raw:
-                raw.write(json.dumps({"run_id": run_id, "case_id": case.id, "category": category,
-                                      "status": o.status, "texts": o.texts}) + "\n")
+                raw.write(raw_record(o, run_id) + "\n")
                 raw.flush()
     finally:
         if raw:

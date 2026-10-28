@@ -20,6 +20,9 @@ a2e = "a2e.cli:app"
 bfcl = [
     "mpmath>=1.4.1",
 ]
+tui = [
+    "textual>=8.2.8",
+]
 
 [dependency-groups]
 dev = ["pytest>=8"]

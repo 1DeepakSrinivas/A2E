@@ -1,0 +1,19 @@
+# Copy to configs/local.toml on each machine (it is git-ignored) and edit.
+
+[paths]
+llama_server = "~/a2e-deps/llama.cpp/build/bin/llama-server"   # built by scripts/setup_pi.sh or setup_mac.sh
+models_dir = "~/models"                                          # GGUF files, see configs/models.toml
+db = "results/a2e.db"                                            # one SQLite file for all runs on this machine
+raw_dir = "results/raw"
+work_dir = "results/work"
+
+[machine]
+# device = "pi5"      # pi5 or mac; detected automatically when unset
+# cooler = true       # Pi only: is the active cooler fitted? stored with every run
+power = "auto"        # auto: PMIC on the Pi, powermetrics on the Mac (needs sudo); none: no energy data
+# threads = 4         # llama-server -t; unset lets llama.cpp choose
+
+# Exact file paths when your downloads do not follow the default naming:
+# [models.qwen3-4b.files]
+# q4_0 = "~/models/Qwen3-4B-Q4_0.gguf"
+# q8_0 = "~/models/Qwen3-4B-Q8_0.gguf"

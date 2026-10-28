@@ -13,7 +13,7 @@ from a2e.metrics.thermal import Thermal
 class Sampler:
     """Background sampler of RSS (server + children), CPU, thermals and power at a fixed rate.
 
-    Each sample is (t, rss_mb, cpu_pct, temp_c, freq_mhz, power_w) on the perf_counter clock,
+    Each sample is (t, rss_mb, cpu_pct, temp_c, freq_mhz, power_w, throttled, pressure) on the perf_counter clock,
     the same clock used for stage windows, so energy can be integrated per stage.
     """
 
@@ -44,7 +44,7 @@ class Sampler:
                 break
             th = self.thermal() if self.thermal else Thermal()
             w = self.power.read_watts() if self.power else None
-            self.samples.append((t, rss, cpu, th.temp_c, th.freq_mhz, w))
+            self.samples.append((t, rss, cpu, th.temp_c, th.freq_mhz, w, th.throttled, th.pressure))
             self._stop.wait(self.period)
 
     def start(self) -> "Sampler":

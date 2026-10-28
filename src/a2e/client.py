@@ -53,9 +53,11 @@ class Client:
 
     def complete(self, prompt: str, n_predict: int, grammar: str | None = None,
                  cache_prompt: bool = True, temperature: float = 0.0, seed: int = 0,
-                 json_schema: dict | None = None) -> Completion:
+                 json_schema: dict | None = None, ignore_eos: bool = False) -> Completion:
         payload = {"prompt": prompt, "n_predict": n_predict, "cache_prompt": cache_prompt,
                    "temperature": temperature, "seed": seed}
+        if ignore_eos:
+            payload["ignore_eos"] = True  # decode exactly n_predict tokens (plain-generation baseline)
         if grammar:
             payload["grammar"] = grammar
         if json_schema:

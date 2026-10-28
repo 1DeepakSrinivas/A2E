@@ -1,0 +1,31 @@
+# Models in the study. Committed; machine-specific paths go in configs/local.toml.
+#
+# Each model needs a GGUF file per quantization (q4_0, q8_0). By default the file is expected at
+#   {models_dir}/{name}/{name}-{quant}.gguf      e.g. models/qwen3-4b/qwen3-4b-q4_0.gguf
+# Change `file` (a template) or set exact paths under [models.<name>.files] in local.toml.
+# params_b is used for the Pi memory rule (Q8_0 only for models of 4B parameters or fewer).
+# Record where each GGUF came from in `source` when you download it, and add it to REFERENCES.md.
+
+[models.qwen3-4b]
+params_b = 4.0
+notes = "Qwen3 4B. Has a thinking mode; see docs for the decode budget."
+
+[models.qwen3-8b]
+params_b = 8.0
+notes = "Qwen3 8B. Q4_0 only on the Pi."
+
+[models.xlam2-3b]
+params_b = 3.0
+notes = "Salesforce xLAM-2 3B, function-calling model."
+
+[models.xlam2-8b]
+params_b = 8.0
+notes = "Salesforce xLAM-2 8B. Q4_0 only on the Pi."
+
+[models.phi4-mini]
+params_b = 3.8
+notes = "Microsoft Phi-4-mini 3.8B."
+
+# Z.ai GLM small model: not chosen yet. Add an entry here once it is picked, e.g.
+# [models.glm-small]
+# params_b = 9.0

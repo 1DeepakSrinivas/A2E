@@ -47,3 +47,6 @@ htmlcov/
 a2e.db
 bfcl_raw.jsonl
 *.db
+configs/local.toml
+results/
+models/
