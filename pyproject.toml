@@ -27,3 +27,10 @@ packages = ["src/a2e"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "unit: pure logic, no processes",
+    "integration: fake llama-server over HTTP, sampler, store",
+    "sweep: factorial grid and baseline protocol",
+    "slow: takes more than a few seconds",
+    "hardware: needs a real device and/or llama-server (self-skips otherwise)",
+]

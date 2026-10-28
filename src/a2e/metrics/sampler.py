@@ -26,8 +26,13 @@ class Sampler:
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def _rss_mb(self) -> float:
-        procs = [self.proc, *self.proc.children(recursive=True)]
-        return sum(p.memory_info().rss for p in procs if p.is_running()) / 2**20
+        total = self.proc.memory_info().rss  # raises NoSuchProcess if the server died
+        for p in self.proc.children(recursive=True):
+            try:
+                total += p.memory_info().rss
+            except psutil.Error:  # child exited or is not inspectable; keep sampling the rest
+                pass
+        return total / 2**20
 
     def _run(self) -> None:
         self.proc.cpu_percent(None)

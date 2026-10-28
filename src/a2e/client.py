@@ -67,4 +67,4 @@ class Client:
         return self.http.get("/slots").json()
 
     def reset_cache(self) -> None:
-        self.http.post("/slots/0?action=erase")
+        self.http.post("/slots/0?action=erase").raise_for_status()

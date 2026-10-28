@@ -35,7 +35,9 @@ class RunConfig(BaseModel):
 
 def feasible(cfg: RunConfig) -> tuple[bool, str]:
     """Pi 5 (8GB) rule: 8B models run Q4_0 only; Q8_0 is for <=4B models."""
-    if cfg.device == "pi5" and cfg.quant == "q8_0" and MODEL_PARAMS_B.get(cfg.model, 0) > 4.0:
+    if cfg.model not in MODEL_PARAMS_B:
+        return False, f"unknown model {cfg.model!r}: add it to MODEL_PARAMS_B"
+    if cfg.device == "pi5" and cfg.quant == "q8_0" and MODEL_PARAMS_B[cfg.model] > 4.0:
         return False, "not run: memory"
     return True, ""
 
