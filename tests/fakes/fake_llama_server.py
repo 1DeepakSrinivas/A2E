@@ -53,6 +53,11 @@ def main() -> None:
         def do_POST(self):
             n = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(n) or b"{}")
+            if self.path == "/apply-template":
+                text = "".join(f"<|im_start|>{m['role']}\n{m['content']}<|im_end|>\n" for m in body["messages"])
+                return self._send(200, {"prompt": text + "<|im_start|>assistant\n"})
+            if self.path == "/tokenize":
+                return self._send(200, {"tokens": [0] * len(body.get("content", "").split())})
             if self.path.startswith("/slots/0"):
                 state["last"] = []
                 return self._send(200, {"id_slot": 0})
@@ -70,7 +75,7 @@ def main() -> None:
             fresh = len(words) - cached
             gen = int(body.get("n_predict", 16))
             prompt_ms = fresh * args.ms_per_prompt_token
-            per_tok = args.ms_per_gen_token * (args.grammar_overhead if body.get("grammar") else 1.0)
+            per_tok = args.ms_per_gen_token * (args.grammar_overhead if (body.get("grammar") or body.get("json_schema")) else 1.0)
             pred_ms = gen * per_tok
             time.sleep((prompt_ms + pred_ms) / 1000)
             if args.bad_json:

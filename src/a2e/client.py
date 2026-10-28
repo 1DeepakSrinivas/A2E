@@ -52,11 +52,14 @@ class Client:
         self.http = httpx.Client(base_url=base_url, timeout=timeout)
 
     def complete(self, prompt: str, n_predict: int, grammar: str | None = None,
-                 cache_prompt: bool = True, temperature: float = 0.0, seed: int = 0) -> Completion:
+                 cache_prompt: bool = True, temperature: float = 0.0, seed: int = 0,
+                 json_schema: dict | None = None) -> Completion:
         payload = {"prompt": prompt, "n_predict": n_predict, "cache_prompt": cache_prompt,
                    "temperature": temperature, "seed": seed}
         if grammar:
             payload["grammar"] = grammar
+        if json_schema:
+            payload["json_schema"] = json_schema  # llama-server converts it to a grammar
         t0 = time.perf_counter()
         r = self.http.post("/completion", json=payload)
         wall = (time.perf_counter() - t0) * 1000
@@ -68,3 +71,14 @@ class Client:
 
     def reset_cache(self) -> None:
         self.http.post("/slots/0?action=erase").raise_for_status()
+
+    def apply_template(self, messages: list[dict]) -> str:
+        """Render messages with the model's own chat template (role markup only, no tools)."""
+        r = self.http.post("/apply-template", json={"messages": messages})
+        r.raise_for_status()
+        return r.json()["prompt"]
+
+    def tokenize(self, text: str) -> int:
+        r = self.http.post("/tokenize", json={"content": text})
+        r.raise_for_status()
+        return len(r.json()["tokens"])

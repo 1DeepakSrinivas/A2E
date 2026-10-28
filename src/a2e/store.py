@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS turns (
   turn_id INTEGER PRIMARY KEY AUTOINCREMENT,
   run_id INTEGER NOT NULL REFERENCES runs(run_id),
   task_id TEXT, step INTEGER,
-  prefill_ms REAL, decode_ms REAL, parse_ms REAL, tool_wait_ms REAL, wall_ms REAL,
+  prefill_ms REAL, decode_ms REAL, parse_ms REAL, validate_ms REAL, tool_wait_ms REAL,
+  harness_ms REAL, wall_ms REAL,
   prompt_tokens INTEGER, cached_tokens INTEGER, gen_tokens INTEGER,
   energy_j REAL, peak_rss_mb REAL, max_temp_c REAL, throttled INTEGER,
   correct INTEGER
