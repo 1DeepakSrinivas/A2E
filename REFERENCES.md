@@ -1,0 +1,155 @@
+# References
+
+Everything this project relies on or cites: benchmarks, papers, tools, datasets, system interfaces, and the
+user-supplied proposal. Keep this file current: add an entry **when something is first used**, not afterwards.
+
+**Status key**
+- **Verified**: fetched or inspected in a session; the detail below was checked then.
+- **From memory**: stated from model knowledge, not checked. Confirm the title, authors, year and URL before citing.
+- **Unreachable**: the session's network policy blocked it, so nothing about it has been checked.
+- **Pending**: planned but not yet chosen or used.
+
+How to add an entry: name, URL or location, version/commit and access date where relevant, status, what we use it
+for, and where in the repo.
+
+---
+
+## 1. Benchmarks and datasets
+
+### Berkeley Function Calling Leaderboard (BFCL) v4: official evaluator and data
+- **Repo:** https://github.com/ShishirPatil/gorilla, folder `berkeley-function-call-leaderboard/`
+- **Pinned commit:** `6ea57973c7a6097fd7c5915698c54c17c5b1b6c8` (committed 2026-03-23), shallow-cloned 2026-10-28
+- **License:** Apache 2.0 (repo `LICENSE`). Keep attribution when vendoring any file.
+- **Authors (from the package's `pyproject.toml`):** Huanzhi Mao, Shishir Patil, Sky Computing Lab (UC Berkeley)
+- **PyPI package:** `bfcl-eval` 2026.3.23, project URL points to the folder above (checked via the PyPI JSON API)
+- **Status:** Verified (repo contents inspected). The leaderboard web page itself is **Unreachable** (see below).
+- **Files inspected:** `bfcl_eval/data/BFCL_v4_*.json` (questions and function docs), `bfcl_eval/data/possible_answer/`
+  (ground truth), `bfcl_eval/data/multi_turn_func_doc/` (multi-turn tool docs), `bfcl_eval/eval_checker/`
+  (`ast_eval/ast_checker.py`, `multi_turn_eval/`).
+- **Categories present in the data dir:** simple_python / simple_java / simple_javascript, multiple, parallel,
+  parallel_multiple, irrelevance, live_* (simple, multiple, parallel, parallel_multiple, irrelevance, relevance),
+  multi_turn_base / miss_func / miss_param / long_context, memory, web_search, format_sensitivity.
+- **Format facts (observed):** each test case is JSON with `id`, `question` (list of turns of messages) and
+  `function` (docs using BFCL type names such as `dict`, `float`, `tuple`, `any`, not strict JSON Schema);
+  ground truth is `[{func_name: {param: [accepted values...]}}]`, where an empty string in the list marks an
+  optional parameter.
+- **Used for:** the public-benchmark arm of the task suite (Phase 4); `src/a2e/tasks/bfcl.py` (planned).
+- **Checker structure (inspected):** `ast_checker.ast_checker(func_description, model_output, possible_answer,
+  language, test_category, model_name)` with `simple_function_checker`, `parallel_function_checker_no_order`,
+  `parallel_function_checker_enforce_order`, `multiple_function_checker`. It imports
+  `bfcl_eval.constants.model_config`, which imports every model handler (all LLM SDKs), so it cannot be imported
+  standalone. The package pins `numpy==1.26.4`, `faiss-cpu`, `sentence-transformers`, `tree_sitter`, and many SDKs.
+- **Open:** how to reuse the official scoring (see the decision recorded in the change log).
+
+### BFCL leaderboard page
+- **URL:** https://gorilla.cs.berkeley.edu/leaderboard.html (supplied by the user as the official source)
+- **Status:** **Unreachable** on 2026-10-28: host denied by the session network policy. Needs
+  `gorilla.cs.berkeley.edu` added to Allowed domains to read it.
+
+### BFCL dataset on Hugging Face
+- **URL:** https://huggingface.co/datasets/gorilla-llm/Berkeley-Function-Calling-Leaderboard
+- **Status:** **Unreachable** on 2026-10-28 (connection failed). The same data is in the GitHub repo above, which is
+  what we use.
+
+### BFCL paper
+- **Citation:** Patil, S. G., Mao, H., et al. "The Berkeley Function Calling Leaderboard (BFCL): From Tool Use to
+  Agentic Evaluation of Large Language Models." ICML 2025.
+- **Status:** From memory. Not checked: confirm title, author list and venue/year, and add a URL.
+- **Used for:** methodology citation for the BFCL arm.
+
+### Gorilla paper
+- **Citation:** Patil, S. G., Zhang, T., Wang, X., Gonzalez, J. E. "Gorilla: Large Language Model Connected with
+  Massive APIs." 2023 (arXiv).
+- **Status:** From memory. Confirm the arXiv id and venue before citing.
+
+### Additional tool-calling benchmarks (decision after pilot)
+| Benchmark | Status | Note |
+|---|---|---|
+| API-Bank | Pending | Candidate. Not yet looked up. |
+| ToolBench | Pending | Candidate. Depends on external APIs; may need a cached subset. |
+| tau-bench | Pending | Candidate. Needs a simulated-user LLM. |
+
+---
+
+## 2. Models (4 to 8B tool-calling class)
+
+All **Pending verification** of exact checkpoint, license, GGUF source and tool-call format. None downloaded yet.
+
+| Model | Planned sizes | Notes |
+|---|---|---|
+| Qwen3 | 4B, 8B | Has a thinking mode that can consume the decode budget before a call is emitted. |
+| xLAM-2 (Salesforce) | 3B, 8B | Function-calling specialist. |
+| Phi-4-mini (Microsoft) | 3.8B | |
+| Z.ai GLM small model | TBD | Needs user sign-off; research current release first. |
+
+Where used: `MODEL_PARAMS_B` in `src/a2e/config.py` (parameter counts are approximate, from memory).
+
+---
+
+## 3. Runtime and system interfaces
+
+### llama.cpp / llama-server
+- **Repo:** https://github.com/ggml-org/llama.cpp (cloned by `scripts/setup_*.sh`, commit to be pinned by the user)
+- **Status:** From memory. **None of the API details below have been checked against a real build.**
+- **Interfaces assumed:** `/health`, `/completion` (fields `prompt`, `n_predict`, `cache_prompt`, `grammar`,
+  `json_schema`, `temperature`, `seed`; response `timings` with `prompt_n`, `prompt_ms`, `cache_n`, `predicted_n`,
+  `predicted_ms`), `/slots`, `POST /slots/0?action=erase`, `/apply-template`, `/tokenize`; flags `--jinja`,
+  `--flash-attn`, `--cache-type-k`, `--cache-type-v`, `-ngl`, `-c`, `-t`.
+- **Where used:** `src/a2e/server.py`, `src/a2e/client.py`, `tests/fakes/fake_llama_server.py` (a stand-in written
+  from these assumptions), `tests/hardware/` (the check that the assumptions hold).
+- **Also used:** GGUF model format and Q8_0 / Q4_0 quantization types; KV-cache quantization (`q8_0`).
+
+### Raspberry Pi `vcgencmd`
+- **Commands used:** `pmic_read_adc`, `measure_temp`, `measure_clock arm`, `get_throttled`
+- **Docs:** Raspberry Pi documentation, "vcgencmd" section (URL not yet recorded)
+- **Status:** From memory (output formats and rail names unverified; first check is `tests/hardware/test_pi.py`).
+- **Where used:** `src/a2e/metrics/power_pi.py`, `src/a2e/metrics/thermal.py`.
+- **Caveat recorded:** the PMIC rail sum is an on-board estimate and excludes power-supply losses and peripherals.
+
+### Apple `powermetrics`
+- **Source:** macOS `man powermetrics` (needs root)
+- **Status:** From memory (output format unverified; first check is `tests/hardware/test_mac.py`).
+- **Where used:** `src/a2e/metrics/power_mac.py`.
+- **Caveat recorded:** reports CPU+GPU+ANE package power; excludes DRAM, display and power-supply losses.
+
+### Standards and formats
+- **JSON Schema** (draft 2020-12): validation of tool calls and the grammar-mode schema (`jsonschema` library).
+  llama.cpp's converter is assumed to support only a subset of keywords (see `SUPPORTED_KEYWORDS` in
+  `src/a2e/agent/grammar.py`); unverified.
+- **GBNF**: llama.cpp's grammar format. Not used directly (grammar mode sends `json_schema` instead).
+
+---
+
+## 4. Software dependencies (this project)
+
+Python 3.11+, managed with **uv**.
+`pydantic`, `httpx`, `psutil`, `typer`, `pandas`, `pyarrow`, `jsonschema`; dev: `pytest`; build backend `hatchling`.
+Exact versions are locked in `uv.lock`. Status: Verified (installed and exercised by the test suites).
+
+---
+
+## 5. Project inputs supplied by the user
+
+- **Base study (Project 1) and extension proposal:** the "Metrics & Instrumentation", "Study Design & Methodology",
+  "Introduction", "Methods and scope of work" and "Analysis checklist" text pasted by the user in the first
+  message. Source document and authors not recorded: **ask the user for a citable source.**
+- **Decisions the user made** (devices, runtimes, quantization, benchmarks, grammar ablation, prompt format,
+  energy method) are recorded in `/root/.claude/plans/plan-the-implementation-for-fuzzy-willow.md` and in commit
+  messages.
+
+---
+
+## 6. Measurement caveats to cite alongside results
+
+- Energy is a **software estimate** (Pi PMIC rails; Mac `powermetrics`), reported with error bars and compared
+  across devices as patterns, not absolute joules.
+- The Pi and Mac use different power scopes (see sections above), so cross-device energy comparisons must state that.
+- Fixed prompt format for all models (one tool-instruction prompt, role markup from the model's own chat template
+  via `/apply-template`) means accuracy may differ from each model's published, natively formatted numbers.
+
+---
+
+## Change log
+- 2026-10-28: BFCL checker inspected; standalone import is not possible (imports all model handlers).
+- 2026-10-28: file created. Added BFCL repo (verified), leaderboard page and HF dataset (unreachable), papers (from
+  memory), model list (pending), runtime interfaces (from memory), dependencies.
