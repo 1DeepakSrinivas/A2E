@@ -64,7 +64,7 @@ Section 7.4 maps each item to the result table that answers it.
 | Models | Qwen3-4B, Qwen3-8B, xLAM-2 3B, xLAM-2 8B, Phi-4-mini 3.8B. One Z.ai GLM small model is planned but not chosen. |
 | Quantization | Q8_0 and Q4_0 weights. KV cache at f16 or q8_0. |
 | Sequence lengths | Tool schema of 256, 1024 or 2048 tokens. Decode length of 128 or 512 tokens. Agent chains of 2 to 5 tool calls. |
-| Workloads | Plain generation, custom tool chains on real local tools, BFCL v4 single-turn, relevance and multi-turn categories, llama-bench prefill and decode tests. |
+| Workloads | Plain generation, custom tool chains on A2E's own local tools, on BFCL's simulated file system and math tools, and on live web search, BFCL v4 single-turn, relevance and multi-turn categories, llama-bench prefill and decode tests. |
 | Measurements | Stage timing, token counts, prefix cache use, energy, memory, temperature, clock, throttling, CPU use, accuracy, top kernels (Pi). |
 
 ### 2.2 Out of scope, and why
@@ -93,11 +93,13 @@ The shipped suites are:
 | Suite | Purpose (study design step) | Runnable jobs | Skipped | Runs | Model loads |
 |---|---|---|---|---|---|
 | `smoke` | Check a new setup | 8 | 0 | 8 | 2 |
-| `pilot` | Pilot (step 1) | 108 | 0 | 432 | 4 |
+| `pilot` | Pilot (step 1) | 140 | 0 | 560 | 4 |
 | `baseline` | Baseline, plain vs tool calling (A) | 108 | 12 | 432 | 18 |
 | `factorial` | Factorial sweep on custom chains (B) | 1,296 | 144 | 5,184 | 36 |
 | `chains` | Chain depth 2 to 5 and argument count (B) | 720 | 80 | 2,880 | 18 |
 | `bfcl` | Public benchmark accuracy and cost (B) | 720 | 80 | 1,440 | 36 |
+| `local_tools` | On-device tool use with BFCL's file system and math tools (B) | 1,080 | 120 | 4,320 | 18 |
+| `web_live` | Live web search, tool path only | 24 | 0 | 48 | 4 |
 | `cache_ablation` | Prefix cache and KV cache over multi-turn sessions (question 3) | 120 | 0 | 480 | 12 |
 | `kernels` | Operator-level bottleneck analysis (C) | 36 | 4 | 36 | 0 |
 | `stability` | Thermal throttling and governor variation (D) | 8 | 4 | 24 | 4 |
@@ -168,19 +170,30 @@ Plain generation is the baseline for research question 1. Fixing the output leng
 
 The document collection has 30 synthetic settlement reports with a name, population, founding year, area and main export. It is generated from the seed, so it is the same on every machine.
 
-**Families.** Three families control chain depth and argument count:
+**BFCL tools.** The `GorillaFileSystem` (18 functions, e.g., `find`, `cd`, `cat`, `grep`, `wc`, `mkdir`, `mv`) and `MathAPI` (17 functions, e.g., `mean`, `standard_deviation`, `round_number`, `percentage`) classes from the vendored BFCL backends are also offered as tools, unchanged. Each documented method becomes a tool whose schema is BFCL's own function document, bound to a fresh instance for every task. Results are turned into text as BFCL's executor does: dictionaries as JSON, anything else with `str()`.
+
+**Small file systems.** BFCL's multi-turn data has 52 distinct starting file systems, written for models of every size. `scripts/curate_fs_scenarios.py` keeps the 25 that have 2 to 6 files, at most 3 folder levels and at most 800 characters of file content, and stores them with the BFCL case ids they came from. Only the first top-level folder is kept, because that is the only one BFCL loads, and the original key order is kept, because `ls` and `find` list entries in that order. The 25 files are mostly single lines, which is why the file plus math family counts words rather than lines.
+
+**Live web search.** Two tools have the names and arguments of BFCL's web search tools, `search_engine_query(keywords, max_results, region)` and `fetch_url_content(url, mode)`, with BFCL's result format (a list of `title`, `href` and `body`). BFCL implements them with SerpAPI. A2E implements them with the Brave Search API (`GET /res/v1/web/search`, header `X-Subscription-Token`), with the key read only from `BRAVE_SEARCH_API_KEY`. A fetch is refused unless the link came from a search in the same task. Pages are stripped of HTML with Python's own parser and cut to 4,000 characters.
+
+**Families.** Eight families control chain depth and argument count:
 
 - `calc` takes depth 1 to 5. The model makes one calculator call per expression.
 - `notes` takes depth 1 to 5. The model writes depth minus 1 notes and then lists them. `n_args` from 1 to 5 sets how many fields each note has.
 - `retrieval` takes depth 2 to 5. The model searches, reads the best document, doubles its population with the calculator, saves a note and lists the notes, in that order, up to the depth. Later steps depend on earlier tool output, e.g., the document id comes from the search result.
+- `fs_search` takes depth 2 to 5. On a curated file system the model finds a file, goes into its folder one level per call, shows it, shows the lines with a given word, counts its words and sorts it.
+- `fs_organize` takes depth 2 to 5. The model creates a folder, moves a file into it, goes into it, lists it and renames the file. The final file system is compared with the result of running the expected calls on a fresh copy, the same comparison BFCL's multi-turn checker makes.
+- `math` takes depth 1 to 5. Given five numbers, the model computes the mean and the standard deviation, rounds the deviation, finds the largest number and works out a percentage. Numbers copied from earlier results count as correct within a relative tolerance of 0.001.
+- `fs_math` takes depth 3 to 5. The model counts the words in two files, adds the counts in either order, works out a percentage and rounds it.
+- `web` takes depth 2 to 4. The model answers one of 16 questions with stable answers by searching, opening a result, saving a note and listing the notes. Only the path is scored: non-empty keywords, an opened link that the search returned, and the later calls. The answer is not checked, because live results change.
 
-**Schema length.** Each family has a fixed set of core tools. A2E adds seeded distractor tools with plausible names and parameters until the rendered tool list is within 5% of `schema_len` tokens, counted with the model's own tokenizer through `/tokenize`. The last distractor's description is lengthened or shortened to close the gap. The tool order is shuffled with the seed so the needed tools are not always first. The same core tools, target and seed always give the same text, so the prompt prefix is identical across tasks and the prefix cache can work. If the core tools alone are larger than the target, the job is skipped.
+**Schema length.** Each family has a fixed set of core tools. A2E adds distractor tools until the rendered tool list is within 5% of `schema_len` tokens, counted with the model's own tokenizer through `/tokenize`. By default the distractors are real BFCL function documents, taken in a seeded order from a pool of 130 functions across 9 BFCL classes. Real documents are never edited. A made-up distractor closes the last part of the gap, and only its description is lengthened or shortened. `distractors = "synthetic"` uses made-up tools only. The tool order is shuffled with the seed so the needed tools are not always first. The same core tools, target and seed always give the same text, so the prompt prefix is identical across tasks and the prefix cache can work. If the core tools alone are larger than the target, the job is skipped.
 
 **Loop.** The model is called, its calls are validated against each tool's JSON schema, valid calls run, and the results go back to the model in a `<tool_response>` message. Invalid calls and tool errors are reported back to the model as text so it can recover. Tool output is cut at 1,000 characters. The loop ends at `final_answer`, at a parse error, at a server error, or after `max_turns` (8) model calls. Each task runs in its own folder, so one task cannot see another task's notes.
 
-**Scoring.** Step k of a task is scored against the first call in model turn k. The call must have the expected tool name, and the expected arguments must match after normalization: strings ignore case and extra spaces, numbers compare by value, and calculator expressions ignore all spaces. For dependent steps, the expected arguments are computed from the real output of the model's earlier calls. A task succeeds when every step is correct and the model called `final_answer`.
+**Scoring.** Step k of a task is scored against the first call in model turn k. The call must have the expected tool name, and the expected arguments must match after normalization. Strings ignore case and extra spaces, numbers compare by value, and calculator expressions ignore all spaces. Some steps use a tolerance for copied numbers, and some use a rule instead of exact arguments, e.g., "the link was returned by the search". For dependent steps, the expected arguments are computed from the real output of the model's earlier calls. A task succeeds when every step is correct, the model called `final_answer`, and, for `fs_organize`, the final file system matches the expected one.
 
-**Why.** Real local tools make tool wait a real cost, with real file and CPU work, instead of a fixed sleep. Controlled families let the study vary schema size, argument count and chain depth one at a time, which the public benchmark cannot do. The document collection, notes and arithmetic need no network, so tool time does not depend on a remote service.
+**Why.** Real local tools make tool wait a real cost, with real file and CPU work, instead of a fixed sleep. Controlled families let the study vary schema size, argument count and chain depth one at a time, which the public benchmark cannot do. BFCL's file system and math tools add functions that a public benchmark also uses, on worlds small enough for 4B to 8B models. Real BFCL functions as distractors make the padded tool list look like a real assistant's tool list. The user asked for live web search over an offline copy. It is the only family whose tool time includes the network, and its results are not repeatable, so it is scored on the path only and kept in its own suite.
 
 ### 5.3 BFCL v4
 
@@ -394,6 +407,8 @@ The hardware test group checks each of these on a real device, and each failure 
 
 **Kernel profiles.** Pi only, and only when perf is permitted.
 
+**Live web search.** The `web` family depends on the network and on the search results of the day. Its tool wait includes network latency, its runs cannot be repeated exactly, and its answers are not checked. Its numbers belong with the other families' only as a separate condition.
+
 ## 13. Reliability and data integrity
 
 - **One transaction per run.** A run's turns, cases and samples are written together, after the run finishes. A crash never leaves half a run.
@@ -408,7 +423,7 @@ The hardware test group checks each of these on a real device, and each failure 
 - **BFCL multi-turn.** Upstream's executor runs `eval()` on call strings. A2E builds those strings only from function names in the case's own whitelist and `repr()` of JSON values that have passed type checks. Non-finite numbers, non-string keys, unknown types, nesting deeper than 20 levels and call strings over 20,000 characters are refused. Tests run known injection payloads and check that nothing executes.
 - **Calculator.** A parser that allows only numbers, arithmetic operators and parentheses. No names, calls or attributes.
 - **Notes.** Note titles are turned into safe file names, so a title cannot write outside the notes folder.
-- **No network tools.** No tool reaches the network.
+- **Network tools.** Only the `web` family reaches the network. The model can open only links returned by its own search in the same task, so it cannot make the device fetch an arbitrary or local-network address. The API key is read from the environment and never written to the database or logs.
 - **Root.** Root is needed only for `powermetrics` on the Mac, for setting the CPU governor on the Pi, and for perf if the kernel setting does not allow it.
 
 ## 15. Performance and overhead of the harness
@@ -423,14 +438,14 @@ The system runs on Linux on the Pi and macOS on the Mac, with Python 3.11 or new
 
 ## 17. Maintainability and testing
 
-The test suite has 617 tests in four groups:
+The test suite has 707 tests in four groups:
 
 | Group | Tests | What it covers |
 |---|---|---|
-| unit | 322 | Parsers, configuration, suite expansion, scoring, store, energy maths, BFCL conversion and safety, vendored file integrity |
-| integration | 141 | Real processes against simulated llama-server, llama-bench and perf: server lifecycle, HTTP client, sampler, agent loop, BFCL runners, the runner end to end, results, CLI, TUI |
-| sweep | 117 | BFCL ground truth through the official checkers for every in-scope case, every custom chain, the full suite grid |
-| hardware | 37 | Real device and real llama-server. These skip themselves elsewhere. |
+| unit | 364 | Parsers, configuration, suite expansion, scoring, store, energy maths, BFCL conversion and safety, vendored file integrity |
+| integration | 143 | Real processes against simulated llama-server, llama-bench and perf: server lifecycle, HTTP client, sampler, agent loop, BFCL runners, the runner end to end, results, CLI, TUI |
+| sweep | 161 | BFCL ground truth through the official checkers for every in-scope case, every custom chain of every family and depth, the full suite grid |
+| hardware | 39 | Real device and real llama-server. These skip themselves elsewhere. |
 
 In the build environment, all non-hardware tests pass and the hardware tests are skipped. While the tests were being written they found real bugs, e.g., a calculator parameter name that broke every call and energy that was zero for stages shorter than the sampling interval. All of these were fixed before this report.
 
@@ -477,6 +492,9 @@ The vendored BFCL files are Apache 2.0. Their license and a NOTICE with the sour
 | Storage | One SQLite file per machine | A database server | Simple, enough for one writer per device | User asked for SQLite if simple |
 | Test running | CLI, scripts and a TUI, with groups in a config file | | Same tests in every session | User |
 | Operator analysis | llama-bench, plus perf on the Pi | Profiling inside llama-server | llama-server has no per-operator timing | Design |
+| More tools | BFCL file system and math as new families and as distractors | BFCL travel, trading and other classes | File system and math fit an on-device assistant and can be scored exactly | User |
+| Starting states | 25 BFCL file systems cherry-picked for small models | All BFCL states, states written for A2E | BFCL targets every model size | User |
+| Web search | Live, Brave Search API, scored on the tool path only | Offline pages with BFCL's interface, SerpAPI as in BFCL | Chosen by the user. Live results cannot be scored exactly. | User |
 
 ## 21. Open items
 
@@ -490,3 +508,4 @@ The vendored BFCL files are Apache 2.0. Their license and a NOTICE with the sour
 8. **Allocator logs** are not parsed. llama-server's load-time memory report is kept in its log file. Peak memory comes from the process's resident set size.
 9. **Confirm the citations** marked "from memory" in `REFERENCES.md`, e.g., the BFCL paper.
 10. **Kernel profiles on the Mac** would need Xcode Instruments.
+11. **Check the Brave Search API** on a device with a key (`tests/hardware/test_real_web.py`). The endpoint, header and field names were written from knowledge of the API.

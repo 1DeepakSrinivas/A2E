@@ -132,13 +132,13 @@ One row per scored task in a run.
 | `case_id` | Task or BFCL case id. |
 | `category` | `plain`, `custom:<family>` or the BFCL category. |
 | `valid` | 1 passed, 0 failed, empty for plain prompts (not scored). |
-| `error_type` | Why it failed, e.g., BFCL's `simple_function_checker:wrong_func_name`, `multi_turn:instance_state_mismatch`, A2E's `a2e:no_call:no_json`, or for custom chains `parse_error`, `max_turns`, `server_error` or `wrong_step`. |
+| `error_type` | Why it failed, e.g., BFCL's `simple_function_checker:wrong_func_name`, `multi_turn:instance_state_mismatch`, A2E's `a2e:no_call:no_json`, or for custom chains `parse_error`, `max_turns`, `server_error`, `wrong_step` or `wrong_state` (every call was right but the final file system differs from the expected one). |
 | `status` | How the task ended: `done`, `final_answer`, `parse_error`, `max_turns`, `force_terminated` or `server_error`. |
 | `n_user_turns` | User turns in the case (1 except BFCL multi-turn). |
 | `n_model_calls` | Model calls the task used. |
 | `schema_tokens` | Size of the tool descriptions in model tokens. |
 | `wall_ms` | Sum of the turns' `wall_ms`. |
-| `extra_json` | Custom: `n_correct`, `n_steps`, `finished`, `token_count`. BFCL multi-turn: `irrelevance_valid`, `unseen_calls`. `token_count` is `server` when token counts came from llama-server's tokenizer, or `approx_chars_div_4` when that was not available. |
+| `extra_json` | Custom: `n_correct`, `n_steps`, `finished`, `token_count`, `tools` (`builtin`, `bfcl` or `web`), `distractors` (`bfcl` or `synthetic`). File-system families add `scenario` (the curated BFCL file system id), and `fs_organize` adds `state_ok`. `web` adds `question`, `web_returned_urls` and up to five `web_errors`. BFCL multi-turn: `irrelevance_valid`, `unseen_calls`. `token_count` is `server` when token counts came from llama-server's tokenizer, or `approx_chars_div_4` when that was not available. |
 
 ### 4.6 `samples`
 

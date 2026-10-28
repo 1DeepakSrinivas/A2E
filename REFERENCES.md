@@ -45,6 +45,12 @@ for, and where in the repo.
   user turn (`MAXIMUM_STEP_LIMIT`); on a `miss_func` reveal turn the held-out docs go into a user message with the
   default sentence "I have updated some more functions you can choose from. What about now?" (prompting mode);
   any method of the involved classes can run, including held-out ones before they are revealed.
+- **Also used as agent tools (2026-10-28):** the `GorillaFileSystem` and `MathAPI` backends and their function
+  documents (`tools/bfcl_tools.py`), all 9 shipped function-document files as the distractor pool, and the
+  `web_search.json` function document (vendored as data only; BFCL's SerpAPI backend is not used).
+- **Curated file systems:** `src/a2e/data/fs_scenarios.json`, made by `scripts/curate_fs_scenarios.py` from the
+  `initial_config` of BFCL multi-turn cases: 25 of 52 distinct file systems kept (2 to 6 files, depth at most 3, at most
+  800 content characters). Each entry lists the BFCL case ids it came from.
 - **Upstream data quirks found while validating (pinned commit):**
   - `parallel_multiple_12` and `parallel_multiple_26`: ground truth lists optional parameters (`permeability`,
     `type`) that the function docs do not declare, so a call that includes them is rejected by the checker.
@@ -149,6 +155,12 @@ Where used: `MODEL_PARAMS_B` in `src/a2e/config.py` (parameter counts are approx
 - **Source:** `/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor` (Linux kernel cpufreq interface).
 - **Status:** From memory. **Where used:** `src/a2e/hardware.py` (stability suite). Needs root.
 
+### Brave Search API
+- **Endpoint used:** `GET https://api.search.brave.com/res/v1/web/search` with `q`, `count` and `country`, header
+  `X-Subscription-Token`, results read from `web.results[]` (`title`, `url`, `description`).
+- **Status:** From memory. Checked by `tests/hardware/test_real_web.py` when `BRAVE_SEARCH_API_KEY` is set.
+- **Where used:** `src/a2e/tools/web.py` (the `web` task family, `web_live` suite). Results change over time.
+
 ### SQLite
 - **Version in the build environment:** 3.45.1 (Python `sqlite3`). Features used: WAL journal mode, `user_version`,
   JSON functions (`json_extract`) for the analysis views.
@@ -195,6 +207,7 @@ Exact versions are locked in `uv.lock`. Status: Verified (installed and exercise
 ---
 
 ## Change log
+- 2026-10-28: BFCL file system and math tools, curated small file systems, Brave Search API for live web search.
 - 2026-10-28: Phase 5 added SQLite store v2, suites, runner, results, TUI, llama-bench/perf bench jobs; added
   entries for llama-bench, Linux perf, cpufreq, SQLite and Textual.
 - 2026-10-28: BFCL subset vendored (pin above), runners/scoring/CLI added; user chose vendoring with a stubbed

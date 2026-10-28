@@ -211,7 +211,8 @@ def _fs_math(rng: random.Random, tid: str, depth: int) -> ChainTask:
 
     plan = [(ExpectedCall("wc", {"file_name": fa["name"], "mode": "w"}), f"count the words in '{fa['name']}'"),
             (ExpectedCall("wc", {"file_name": fb["name"], "mode": "w"}), f"count the words in '{fb['name']}'"),
-            (ExpectedCall("add", {}, compare_keys=[], check=add_ok), "add the two counts"),
+            (ExpectedCall("add", {}, compare_keys=[], check=add_ok,
+                          oracle=lambda r: {"a": counts(r)[0], "b": counts(r)[1]}), "add the two counts"),
             (ExpectedCall("percentage", lambda r: {"part": counts(r)[0], "whole": _result(r[2])}, rel_tol=tol),
              f"work out what percentage of the total comes from '{fa['name']}'"),
             (ExpectedCall("round_number", lambda r: {"number": _result(r[3]), "decimal_places": 1}, rel_tol=tol),
@@ -254,9 +255,13 @@ def _fetch_ok(a, r) -> bool:
 
 def _web(rng: random.Random, tid: str, depth: int) -> ChainTask:
     q = rng.choice(WEB_QUESTIONS)
-    plan = [(ExpectedCall("search_engine_query", {}, compare_keys=[], check=_search_ok), "search the web"),
-            (ExpectedCall("fetch_url_content", {}, compare_keys=[], check=_fetch_ok), "open one of the results"),
-            (ExpectedCall("note_write", {"title": "web-answer"}, compare_keys=["title"]),
+    plan = [(ExpectedCall("search_engine_query", {}, compare_keys=[], check=_search_ok,
+                          oracle=lambda r, q=q: {"keywords": q}), "search the web"),
+            (ExpectedCall("fetch_url_content", {}, compare_keys=[], check=_fetch_ok,
+                          oracle=lambda r: {"url": json.loads(r[0])[0]["href"], "mode": "truncate"}),
+             "open one of the results"),
+            (ExpectedCall("note_write", {"title": "web-answer"}, compare_keys=["title"],
+                          oracle=lambda r: {"title": "web-answer", "body": "answer from the fetched page"}),
              "save a note titled 'web-answer' with the answer"),
             (ExpectedCall("note_list", {}), "list your notes")][:depth]
     prompt = (f"Answer this question using web search: {q} " + _join([t for _, t in plan]).capitalize()

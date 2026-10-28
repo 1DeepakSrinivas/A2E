@@ -36,9 +36,14 @@ class ExpectedCall:
     squash_ws: bool = False  # drop all whitespace before comparing (calculator expressions)
     rel_tol: float | None = None  # numbers copied from earlier tool output may be rounded by the model
     check: Callable[[dict, list[str]], bool] | None = None  # extra rule on (actual args, earlier tool outputs)
+    oracle: Callable[[list[str]], dict] | None = None  # one correct call, for steps scored by `check` only
 
     def resolve(self, results: list[str]) -> dict:
         return self.args(results) if callable(self.args) else self.args
+
+    def example(self, results: list[str]) -> dict:
+        """A concrete correct call (used by oracles and tests)."""
+        return self.oracle(results) if self.oracle else self.resolve(results)
 
 
 @dataclass

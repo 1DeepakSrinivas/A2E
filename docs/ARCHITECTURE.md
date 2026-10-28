@@ -46,7 +46,10 @@ A2E has five layers. Each layer only calls the layers below it.
 | `agent/grammar.py` | `call_schema` builds the JSON schema of valid calls that grammar mode sends to llama-server. `SUPPORTED_KEYWORDS` lists the JSON Schema keywords the tool schemas may use. |
 | `agent/schema_gen.py` | `pad_tools` adds seeded distractor tools until the rendered tool list reaches the target token count. |
 | `tools/base.py`, `tools/builtin.py` | The tool registry, schema validation and the real local tools (calculator, notes on disk, document search and read, reminders, `final_answer`), plus the synthetic document collection. |
-| `tasks/custom.py`, `tasks/scoring.py` | The chain generators for the three families and the step scoring, including steps whose expected arguments depend on earlier tool output. |
+| `tools/bfcl_tools.py` | BFCL's `GorillaFileSystem` and `MathAPI` classes as tools: each documented method becomes a `Tool`, bound to a fresh instance per task. Also the pool of 130 real BFCL function specs used as distractors. |
+| `tools/web.py` | Live web search with BFCL's function names on the Brave Search API. Only links returned by the task's own search can be opened. |
+| `tasks/custom.py`, `tasks/scoring.py` | The chain generators for the eight families and the step scoring: exact arguments, numbers within a tolerance, rule checks (e.g., the opened link came from the search), and a final state check. |
+| `tasks/envs.py` | Builds the fresh tools for one task (A2E's own tools, BFCL instances on a curated file system, or web search plus notes) and the specs a family shows the model. |
 | `bfcl/` | `load.py` (categories, cases, stratified subsampling), `convert.py` (BFCL types to JSON Schema, safe call strings), `score.py` (official checkers), `single_turn.py`, `multi_turn.py`, `runner.py` (case rows, raw outputs, rescoring) and `replay.py`. `paths.py` puts the vendored package on the import path. |
 | `bench.py` | Builds llama-bench command lines, runs them optionally under perf, and parses both outputs. |
 
@@ -129,7 +132,9 @@ A turn is timed with six `time.perf_counter` stamps:
 
 **Add a task kind.** Add the kind to `Task.kind`, `AXES_FOR_KIND` and `KIND_ORDER` in `suite.py`, add its grid to `expand`, and write an executor `fn(client, job, ctx) -> list[Unit]` in `runner.py` registered in `EXECUTORS`. A `Unit` holds the task's turns and its score.
 
-**Add a custom tool family.** Add the tools to `tools/builtin.py`, a generator to `tasks/custom.py`, and the family's tool list to `FAMILY_TOOLS`.
+**Add a custom tool family.** Add the family to `FAMILY_TOOLS`, `FAMILY_DEPTH`, `FAMILY_ENV` (and `FAMILY_CLASSES` for BFCL classes) in `tasks/custom.py`, write its generator, and register it in `generate`. New tools go in `tools/builtin.py`, or come from a BFCL class through `tools/bfcl_tools.py`. The oracle sweep in `tests/sweep/test_agent_tools_oracle.py` shows whether every generated task can be solved.
+
+**Change the curated file systems.** Edit the limits in `scripts/curate_fs_scenarios.py` and run it. A test checks that the committed `src/a2e/data/fs_scenarios.json` matches the script's output.
 
 **Add a BFCL category.** Add its data files to `CATS` in `scripts/sync_bfcl.sh`, run the script, and add the category to `bfcl/load.py`. The oracle sweep in `tests/sweep/test_bfcl_oracle.py` will show whether the official checker accepts the ground truth.
 

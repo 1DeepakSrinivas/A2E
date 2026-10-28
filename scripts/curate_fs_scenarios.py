@@ -51,7 +51,10 @@ def curate() -> dict:
             files: list[dict] = []
             depth = [1]
             walk(cfg["root"][root_name], [], files, depth)  # upstream loads only the first root entry
-            seen[key] = {"config": cfg, "root": root_name, "files": files, "depth": depth[0], "sources": [case.id]}
+            # keep only the root folder BFCL loads (the first entry), in BFCL's own key order: ls and find
+            # list entries in that order, and json sort_keys would change which root comes first
+            used = {"root": {root_name: cfg["root"][root_name]}}
+            seen[key] = {"config": used, "root": root_name, "files": files, "depth": depth[0], "sources": [case.id]}
     keep = []
     for s in seen.values():
         n, chars = len(s["files"]), sum(f["chars"] for f in s["files"])
@@ -66,5 +69,5 @@ def curate() -> dict:
 
 if __name__ == "__main__":
     data = curate()
-    OUT.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n")
+    OUT.write_text(json.dumps(data, indent=1) + "\n")  # no sort_keys: order is part of the scenario
     print(f"kept {data['kept']} of {data['distinct_scenarios_in_bfcl']} BFCL file-system scenarios -> {OUT}")

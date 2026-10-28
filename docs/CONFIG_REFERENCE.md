@@ -89,9 +89,10 @@ Each entry adds one kind of task to every model load in the matrix.
 |---|---|---|---|---|
 | `kind` | all | string | required | `plain`, `custom`, `bfcl` or `bench` |
 | `n` | all | integer, 1 or more | plain 6, custom 5, BFCL all cases | Prompts, chains or BFCL cases per run |
-| `family` | custom | list | required for custom | `calc`, `notes`, `retrieval` |
-| `depth` | custom | list | required for custom | Tool calls per chain. `calc` and `notes` take 1 to 5, `retrieval` takes 2 to 5. |
+| `family` | custom | list | required for custom | `calc`, `notes`, `retrieval`, `fs_search`, `fs_organize`, `math`, `fs_math`, `web` |
+| `depth` | custom | list | required for custom | Tool calls per chain. `calc`, `notes` and `math` take 1 to 5. `retrieval`, `fs_search` and `fs_organize` take 2 to 5. `fs_math` takes 3 to 5. `web` takes 2 to 4. |
 | `n_args` | custom | list | `[2]` | Arguments per note, 1 to 5. Only changes the `notes` family. |
+| `distractors` | custom | string | `"bfcl"` | Extra tools that pad the tool list to `schema_len`. `bfcl` uses real BFCL function documents (130 functions from 9 BFCL classes). `synthetic` uses made-up tools. |
 | `category` | bfcl | list | required for bfcl | BFCL categories (see below) |
 | `n_prompt` | bench | list | empty | Prompt sizes for llama-bench prefill tests (`-p N -n 0`). |
 | `n_gen` | bench | list | empty | Token counts for llama-bench decode tests (`-p 0 -n N`). A bench task needs at least one of `n_prompt` and `n_gen`. |
@@ -198,7 +199,19 @@ A leading `~` is expanded. A relative path is read from the repository folder.
 | `power` | `"auto"` | `auto` records energy where possible. `none` turns energy off. |
 | `threads` | unset | llama-server `-t` when the suite's `threads` is 0. |
 
-### 3.3 Per-model overrides
+### 3.3 `[web]`
+
+Settings for the `web` task family, which uses the Brave Search API.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `api_key_env` | `"BRAVE_SEARCH_API_KEY"` | Name of the environment variable that holds the key. The key is never read from a file. |
+| `base_url` | `"https://api.search.brave.com"` | API address. Tests point it at a local fake. |
+| `timeout_s` | `15.0` | Timeout per search or page fetch, in seconds. |
+| `max_page_chars` | `4000` | Fetched pages are cut to this many characters before the model sees them. |
+| `max_results` | `10` | Most results one search can return, whatever the model asks for. |
+
+### 3.4 Per-model overrides
 
 ```toml
 [models.qwen3-4b.files]
@@ -217,6 +230,7 @@ These win over both files.
 | `A2E_DB` | `[paths] db` |
 | `A2E_DEVICE` | `[machine] device` |
 | `A2E_CONFIG_DIR` | the `configs` folder |
+| `BRAVE_SEARCH_API_KEY` | The Brave Search API key for the `web` family. It is not an override. `[web] api_key_env` sets the variable's name. |
 
 The hardware test group also reads these:
 

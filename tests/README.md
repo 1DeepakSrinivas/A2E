@@ -23,7 +23,10 @@ Helpers:
 
 - `tests/rig.py` builds a whole machine setup in a temporary folder. It has fake binaries, dummy model files, settings, a small suite and constant fake power.
 - `tests/stubs.py` is an in-process client with scripted model output.
-- `tests/oracle.py` and `tests/bfcl_oracle.py` turn expected answers into model output.
+- `tests/oracle.py` and `tests/bfcl_oracle.py` turn expected answers into model output. `oracle_outputs_any` works for every custom family.
+- `tests/fakes/fake_brave.py` is a local stand-in for the Brave Search API and the pages its results point to.
+
+The tests for the BFCL tool families and web search are `tests/unit/test_agent_tools.py`, `tests/sweep/test_agent_tools_oracle.py` (every family, every depth, many seeds) and `tests/integration/test_agent_tools_runner.py`. `tests/hardware/test_real_web.py` checks the real Brave API when `BRAVE_SEARCH_API_KEY` is set.
 
 ## Running the hardware group
 

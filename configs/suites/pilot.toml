@@ -59,3 +59,9 @@ n_prompt = [512]
 n_gen = [128]
 perf = true
 reps = 3
+
+[[tasks]]
+kind = "custom"
+family = ["fs_search", "fs_organize", "math", "fs_math"]
+depth = 3
+n = 3

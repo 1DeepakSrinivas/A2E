@@ -9,7 +9,9 @@ from a2e.agent.grammar import call_schema
 from a2e.agent.loop import AgentLoop
 from a2e.agent.prompt import render_tools
 from a2e.agent.schema_gen import SchemaTooLarge, pad_tools
-from a2e.tasks.custom import FAMILY_TOOLS, generate
+from a2e.tasks.custom import FAMILY_ENV, FAMILY_TOOLS, generate
+
+BUILTIN = [f for f in FAMILY_TOOLS if FAMILY_ENV[f] == "builtin"]  # new families: test_agent_tools_oracle.py
 from tests.oracle import make_env, oracle_outputs
 from tests.stubs import StubClient
 
@@ -68,7 +70,7 @@ def count(text):
     return StubClient([]).tokenize(text)
 
 
-SCHEMA_CASES = [(f, t) for f in FAMILY_TOOLS for t in (256, 1024, 2048)]
+SCHEMA_CASES = [(f, t) for f in BUILTIN for t in (256, 1024, 2048)]
 
 
 @pytest.mark.parametrize("family,target", SCHEMA_CASES)
@@ -90,7 +92,7 @@ def test_padded_schema_still_solves_chains_and_grammar_admits_oracle(tmp_path, c
     assert all(c["json_schema"] == call_schema(specs) for c in client.calls)
 
 
-@pytest.mark.parametrize("family", list(FAMILY_TOOLS))
+@pytest.mark.parametrize("family", BUILTIN)
 def test_same_tools_give_identical_prefix_across_tasks(tmp_path, corpus, family):
     """Prefix caching only helps if the schema text is byte-identical across tasks in a session."""
     reg, _ = make_env(tmp_path, "run")

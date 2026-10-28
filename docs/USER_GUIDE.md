@@ -107,6 +107,12 @@ The important fields are:
 - `cooler`, which records whether the Pi has its active cooler fitted
 - `power`, which is `auto` to record energy or `none` to skip it
 
+The `web` task family also needs a Brave Search API key in the environment. A2E never reads the key from a file.
+
+```bash
+export BRAVE_SEARCH_API_KEY=<your key>
+```
+
 `configs/local.toml` is not committed to git because it describes one machine. Relative paths in it are read from the repository folder. See [CONFIG_REFERENCE.md](CONFIG_REFERENCE.md) for every field.
 
 ## 5. Check the machine
@@ -140,12 +146,14 @@ A `FAIL` line stops `scripts/run_suite.sh`. A `warn` line does not, e.g., a miss
 | Suite | What it runs | Runnable jobs | Skipped jobs | Runs | Model loads |
 |---|---|---|---|---|---|
 | `smoke` | One small job of each kind on Qwen3-4B Q4_0, one measured run. Use it to check a new machine. | 8 | 0 | 8 | 2 |
-| `pilot` | Qwen3-4B Q4_0 with KV cache f16 and q8_0. Plain generation, every custom task family, a slice of every BFCL category, and one llama-bench test with kernel profiling. | 108 | 0 | 432 | 4 |
+| `pilot` | Qwen3-4B Q4_0 with KV cache f16 and q8_0. Plain generation, every offline custom task family, a slice of every BFCL category, and one llama-bench test with kernel profiling. | 140 | 0 | 560 | 4 |
 | `baseline` | All five models at Q4_0 and Q8_0. Plain generation next to tool calling. | 108 | 12 | 432 | 18 |
 | `chains` | Chains of 2 to 5 tool calls for every family, and notes with 1, 3 or 5 arguments per call. | 720 | 80 | 2,880 | 18 |
 | `factorial` | The main sweep on custom chains over schema length, decode length, grammar and KV cache. | 1,296 | 144 | 5,184 | 36 |
 | `bfcl` | Accuracy and cost on every BFCL category in scope for every model, quantization and KV cache setting. | 720 | 80 | 1,440 | 36 |
 | `cache_ablation` | Prefix cache on and off, KV cache f16 and q8_0, over long chains and BFCL multi-turn. | 120 | 0 | 480 | 12 |
+| `local_tools` | File search, file organizing, math and file plus math chains of 2 to 5 calls, on small BFCL file systems, for every model at Q4_0 and Q8_0. | 1,080 | 120 | 4,320 | 18 |
+| `web_live` | Live web search through the Brave Search API on Qwen3-4B and Phi-4-mini. Needs a key and network access. | 24 | 0 | 48 | 4 |
 | `kernels` | llama-bench prefill and decode tests for every model, quantization and KV cache setting, with the top kernels from Linux perf on the Pi. | 36 | 4 | 36 | 0 |
 | `stability` | 40 long chains back to back with no cooldown, with different CPU governors on the Pi. | 8 | 4 | 24 | 4 |
 
@@ -155,8 +163,9 @@ Run the suites in this order:
 
 1. `smoke` on each device, to check the setup.
 2. `pilot` on each device. Its timings tell you how long the larger suites will take. They also decide the BFCL subsample sizes, the Pi context size, the cooldown target, whether to fit the Pi cooler, and whether the extra benchmarks (API-Bank, ToolBench, tau-bench) are affordable.
-3. `baseline`, then `bfcl`, `factorial`, `chains`, `cache_ablation` and `kernels`, in any order.
-4. `stability` last, because it heats the device on purpose.
+3. `baseline`, then `bfcl`, `factorial`, `chains`, `local_tools`, `cache_ablation` and `kernels`, in any order.
+4. `web_live` whenever the device has network access and `BRAVE_SEARCH_API_KEY` is set.
+5. `stability` last, because it heats the device on purpose.
 
 ### 6.2 What a suite file contains
 
@@ -221,13 +230,26 @@ n = 3
 
 **Plain.** The model writes text for a fixed prompt with no tools. A2E asks llama-server to ignore the end of text token, so every run decodes exactly `decode_len` tokens. This is the baseline that the tool-calling numbers are compared against. The prompts are in `src/a2e/data/plain_prompts.json`.
 
-**Custom.** The model completes a chain of tool calls on real local tools. There are three families:
+**Custom.** The model completes a chain of tool calls. Each task has an exact expected call for every step, so A2E can score each step. There are eight families. Three use A2E's own tools:
 
-- `calc` asks for one calculator call per expression. The depth is the number of expressions.
+- `calc` asks for one calculator call per expression. The depth is the number of expressions, from 1 to 5.
 - `notes` asks the model to save notes and then list them. `n_args` sets how many fields each note has, from 1 to 5.
 - `retrieval` asks the model to search a local document collection, read the best document, compute with a number from it, save a note and list the notes. The depth sets how many of these steps the task has, from 2 to 5.
 
-The tool descriptions in the prompt are padded with extra, unused tools until they reach `schema_len` tokens, counted with the model's own tokenizer. This is how the study controls schema length. Every task in a run gets fresh note files, so tasks cannot see each other's results.
+Four use the simulated file system and math tools from BFCL (`GorillaFileSystem` and `MathAPI`), unchanged:
+
+- `fs_search` (depth 2 to 5) asks the model to find a file, go into its folder one level at a time, show it, show the lines with a given word, count its words and sort it.
+- `fs_organize` (depth 2 to 5) asks the model to create a folder, move a file into it, go into it, list it and rename the file. A2E also compares the final file system with the expected one, so a correct sequence of calls that leaves extra damage still fails.
+- `math` (depth 1 to 5) gives five numbers and asks for the mean, the standard deviation, rounding, the largest number and a percentage. Later steps use earlier results. A number the model copies from an earlier result counts as correct within 0.1%.
+- `fs_math` (depth 3 to 5) asks the model to count the words in two files, add the counts, work out a percentage and round it.
+
+These four start from small file systems taken from BFCL's own multi-turn data. BFCL is written for every model size, so A2E keeps only the 25 of its 52 file systems that have 2 to 6 files, at most 3 folder levels and at most 800 characters of file content. `scripts/curate_fs_scenarios.py` makes this selection and writes `src/a2e/data/fs_scenarios.json`. Each task picks one of them with the seed.
+
+One family uses live web search:
+
+- `web` (depth 2 to 4) asks a question with a stable answer, e.g., "Who wrote the novel Pride and Prejudice?". The model searches the web, opens one of the results, saves a note and lists the notes. The tools have BFCL's names and arguments (`search_engine_query`, `fetch_url_content`) and call the Brave Search API. Results change over time, so A2E only checks the path: that the model searched with non-empty keywords, opened a link that its own search returned, and made the later calls correctly. It does not check the answer. The model can only open links that a search in the same task returned. Network time counts as tool wait. These tasks need `BRAVE_SEARCH_API_KEY` (section 4) and network access.
+
+The tool descriptions in the prompt are padded with extra tools until they reach `schema_len` tokens, counted with the model's own tokenizer. This is how the study controls schema length. By default the extra tools are real BFCL functions, e.g., `book_flight` or `get_stock_info`, which look like the tools a real assistant would offer. Set `distractors = "synthetic"` on a task to use made-up tools instead. A2E never edits a real BFCL description. Only a made-up tool closes the last few tokens of the gap. Every task gets fresh tools: fresh note files, a fresh copy of its file system, and its own list of links it may open. Tasks cannot see each other's results.
 
 **BFCL.** The model answers test cases from the Berkeley Function Calling Leaderboard, version 4. A2E scores the answers with the official BFCL checker code, which is copied unchanged into `third_party/bfcl_eval/`. The categories in scope are:
 
@@ -449,6 +471,8 @@ If a hardware test fails, its message names the part of the interface that did n
 **Qwen3 answers are empty or cut off.** Qwen3 can spend its whole decode budget on its thinking text before it writes a tool call. A2E strips thinking text before parsing, so a cut-off answer counts as no call. Use a larger `decode_len` if this happens often. The pilot shows how often it happens.
 
 **The kernel profile is empty.** Run the kernels suite as root, or lower `kernel.perf_event_paranoid` with `sudo sysctl kernel.perf_event_paranoid=1`. The run's `server_json` stores the note perf gave.
+
+**Web jobs fail with "web search needs a Brave API key".** Export `BRAVE_SEARCH_API_KEY` in the shell that runs A2E and run again with `--retry-failed`. If searches return errors, `cases.extra_json` holds the first few error messages, e.g., a 429 when the quota is used up.
 
 **The suite lock check fails.** A suite file or the expansion code changed. If the change was intended, run `uv run a2e suite-lock`.
 
