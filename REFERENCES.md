@@ -132,6 +132,29 @@ Where used: `MODEL_PARAMS_B` in `src/a2e/config.py` (parameter counts are approx
 - **Where used:** `src/a2e/metrics/power_mac.py`.
 - **Caveat recorded:** reports CPU+GPU+ANE package power; excludes DRAM, display and power-supply losses.
 
+### llama-bench
+- **Source:** part of llama.cpp (built by `scripts/setup_*.sh`).
+- **Status:** From memory. The `-o json` field names (`n_prompt`, `n_gen`, `avg_ts`, `stddev_ts`, `avg_ns`,
+  `n_threads`) and the options `-p`, `-n`, `-r`, `-ngl`, `-fa 0|1`, `-ctk`, `-ctv`, `-t` are checked by
+  `tests/hardware/test_real_bench.py`.
+- **Where used:** `src/a2e/bench.py` (bench jobs, `kernels` suite).
+
+### Linux perf
+- **Source:** Linux kernel tools (`linux-perf` package on Raspberry Pi OS).
+- **Status:** From memory. `perf record -F 999 -o FILE -- CMD` and `perf report --stdio --no-children --sort dso,sym
+  --percent-limit 0.5`; the report line format is checked on the Pi by `tests/hardware/test_real_bench.py`.
+- **Where used:** `src/a2e/bench.py` (top kernels, Pi only). Needs root or `kernel.perf_event_paranoid` <= 1.
+
+### Linux cpufreq governor
+- **Source:** `/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor` (Linux kernel cpufreq interface).
+- **Status:** From memory. **Where used:** `src/a2e/hardware.py` (stability suite). Needs root.
+
+### SQLite
+- **Version in the build environment:** 3.45.1 (Python `sqlite3`). Features used: WAL journal mode, `user_version`,
+  JSON functions (`json_extract`) for the analysis views.
+- **Status:** Verified in the build environment (tests exercise all of these).
+- **Where used:** `src/a2e/store.py`.
+
 ### Standards and formats
 - **JSON Schema** (draft 2020-12): validation of tool calls and the grammar-mode schema (`jsonschema` library).
   llama.cpp's converter is assumed to support only a subset of keywords (see `SUPPORTED_KEYWORDS` in
@@ -144,7 +167,8 @@ Where used: `MODEL_PARAMS_B` in `src/a2e/config.py` (parameter counts are approx
 
 Python 3.11+, managed with **uv**.
 `pydantic`, `httpx`, `psutil`, `typer`, `pandas`, `pyarrow`, `jsonschema`; optional extra `bfcl`: `mpmath` (needed by the
-vendored MathAPI backend); dev: `pytest`; build backend `hatchling`.
+vendored MathAPI backend); optional extra `tui`: `textual` (8.2.8 in the build environment); dev: `pytest`; build
+backend `hatchling`. Standard library `tomllib` reads all TOML configuration files.
 Exact versions are locked in `uv.lock`. Status: Verified (installed and exercised by the test suites).
 
 ---
@@ -171,6 +195,8 @@ Exact versions are locked in `uv.lock`. Status: Verified (installed and exercise
 ---
 
 ## Change log
+- 2026-10-28: Phase 5 added SQLite store v2, suites, runner, results, TUI, llama-bench/perf bench jobs; added
+  entries for llama-bench, Linux perf, cpufreq, SQLite and Textual.
 - 2026-10-28: BFCL subset vendored (pin above), runners/scoring/CLI added; user chose vendoring with a stubbed
   `model_config`, scope = single-turn + multi-turn (base, miss_func, miss_param) + relevance, fixed-seed subsample.
 - 2026-10-28: BFCL checker inspected; standalone import is not possible (imports all model handlers).

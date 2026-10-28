@@ -41,7 +41,8 @@ Log = Callable[[dict], None]
 
 
 class Stop(Exception):
-    """Raised inside a job when the caller asked the runner to stop (TUI stop button, Ctrl+C)."""
+    """Raised by an executor when its ctx carries a stop event that is set. The runner itself only checks its stop
+    event between jobs, so the TUI's stop button lets the current job finish; Ctrl+C stops at once."""
 
 
 @dataclass
@@ -317,7 +318,6 @@ class Runner:
                                   "cooler": self.settings.cooler, "instrument_notes": inst.notes}, default=str)
         total = job["warmup"] + job["measured"]
         for r in range(total):
-            _check_stop({"stop": self.stop})
             phase = "warmup" if r < job["warmup"] else "measured"
             self.log({"event": "run_start", "job_id": job["job_id"], "repeat": r, "phase": phase})
             try:
@@ -336,7 +336,7 @@ class Runner:
                 sampler.start()
             work = Path(self.settings.work_dir) / f"exp{self.exp_id}" / job["job_key"] / f"r{r}"
             try:
-                units = EXECUTORS[job["kind"]](client, job, {"work_dir": work, "stop": self.stop,
+                units = EXECUTORS[job["kind"]](client, job, {"work_dir": work,
                                                              "max_turns": self.suite.run.max_turns,
                                                              "max_steps": self.suite.run.max_steps})
             finally:
@@ -376,7 +376,6 @@ class Runner:
         cfg_json = json.dumps({k: v for k, v in job.items() if k not in ("job_id", "skip_reason")}, sort_keys=True)
         tests = [("pp", n, 0) for n in job["n_prompt"]] + [("tg", 0, n) for n in job["n_gen"]]
         for r in range(job["warmup"] + job["measured"]):
-            _check_stop({"stop": self.stop})
             phase = "warmup" if r < job["warmup"] else "measured"
             server_json = json.dumps({"bench": binary, "model_file": envmod.file_fingerprint(model_path),
                                       "cooldown_wait_s": waited, "governor_actual": read_governor(),
@@ -388,7 +387,6 @@ class Runner:
             t_run0 = time.perf_counter()
             bench_rows, kernel_rows, samples = [], [], []
             for test, p, g in tests:
-                _check_stop({"stop": self.stop})
                 holder: dict = {}
 
                 def on_start(pid, holder=holder):

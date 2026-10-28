@@ -87,12 +87,16 @@ Each entry adds one kind of task to every model load in the matrix.
 
 | Field | Applies to | Type | Default | Meaning |
 |---|---|---|---|---|
-| `kind` | all | string | required | `plain`, `custom` or `bfcl` |
+| `kind` | all | string | required | `plain`, `custom`, `bfcl` or `bench` |
 | `n` | all | integer, 1 or more | plain 6, custom 5, BFCL all cases | Prompts, chains or BFCL cases per run |
 | `family` | custom | list | required for custom | `calc`, `notes`, `retrieval` |
 | `depth` | custom | list | required for custom | Tool calls per chain. `calc` and `notes` take 1 to 5, `retrieval` takes 2 to 5. |
 | `n_args` | custom | list | `[2]` | Arguments per note, 1 to 5. Only changes the `notes` family. |
 | `category` | bfcl | list | required for bfcl | BFCL categories (see below) |
+| `n_prompt` | bench | list | empty | Prompt sizes for llama-bench prefill tests (`-p N -n 0`). |
+| `n_gen` | bench | list | empty | Token counts for llama-bench decode tests (`-p 0 -n N`). A bench task needs at least one of `n_prompt` and `n_gen`. |
+| `perf` | bench | boolean | `false` | Also record the top kernels with Linux perf. Pi only. |
+| `reps` | bench | integer, 1 or more | `5` | llama-bench repetitions per test (`-r`). |
 | `grammar`, `prefix_cache`, `decode_len`, `schema_len`, `governor` | see below | list | the `[axes]` value | Override the suite axis for this task only |
 
 The axes each kind uses are:
@@ -102,6 +106,7 @@ The axes each kind uses are:
 | `plain` | `prefix_cache`, `decode_len`, `governor` |
 | `custom` | `grammar`, `prefix_cache`, `decode_len`, `schema_len`, `governor` |
 | `bfcl` | `grammar`, `prefix_cache`, `decode_len`, `governor` |
+| `bench` | `governor` |
 
 An axis a kind does not use is not part of its jobs, so a plain job never runs twice just because the suite lists two grammar values.
 
@@ -117,6 +122,8 @@ A2E refuses a suite and prints the reason when:
 - a depth is outside the family's range
 - a BFCL task has no `category`, or names a category outside the scope
 - `family` or `depth` is set on a task that is not custom, or `category` on a task that is not BFCL
+- a bench task has neither `n_prompt` nor `n_gen`, or a size below 1
+- `n_prompt`, `n_gen` or `perf` is set on a task that is not bench
 - a BFCL multi-turn category is used with `[server] ctx` below 16384
 - `[matrix] model` names a model that is not in `configs/models.toml`
 
@@ -126,11 +133,11 @@ For each combination in `[matrix]`, for each task, A2E takes every combination o
 
 A job's settings are stored as JSON with these fields:
 
-- from the suite: `seed`, `warmup`, `measured`, `ctx`, `flash_attn`, `threads`
-- from the matrix: `device`, `model`, `quant`, `kv_quant`
-- the task kind: `kind`
-- the axes the kind uses, e.g., `grammar`, `decode_len`
-- the task's own fields: `n`, and `family`, `depth`, `n_args` or `category`
+- the suite fields `seed`, `warmup`, `measured`, `ctx`, `flash_attn` and `threads`
+- the matrix fields `device`, `model`, `quant` and `kv_quant`
+- the task kind, `kind`
+- the axes the kind uses, e.g., `grammar` and `decode_len`
+- the task's own fields, which are `n`, `family`, `depth` and `n_args` for custom tasks, `n` and `category` for BFCL tasks, and `n_prompt`, `n_gen`, `perf` and `reps` for bench tasks
 
 The job key is the first 16 hex characters of the SHA-256 hash of this JSON with sorted keys. Two task entries that produce the same job produce one job.
 
@@ -140,7 +147,9 @@ A job is skipped, with the reason stored, when:
 - the job sets a governor and the device is not `pi5` ("not run: governor settings apply to the Pi only")
 - at run time, a custom task's tools do not fit in `schema_len` tokens ("not run: core tools need ...")
 
-Jobs run in an order that groups them by device, model, quantization, KV cache type, context, flash attention and threads. Each model file therefore loads once per device. Within a model load, plain jobs run first, then custom jobs, then BFCL jobs.
+Jobs run in an order that groups them by device, model, quantization, KV cache type, context, flash attention and threads. Each model file therefore loads once per device. Within a model load, plain jobs run first, then custom jobs, then BFCL jobs, then bench jobs. Bench jobs stop llama-server before they start.
+
+A bench job passes these llama-bench options: `-m`, `-p`, `-n`, `-r`, `-o json`, `-ngl 99` on the Mac or `-ngl 0` on the Pi, `-fa 1` when `flash_attn` is `on` (otherwise `-fa 0`), `-ctk` and `-ctv` when `kv_quant` is not `f16`, and `-t` when threads are set. With perf, the command is `perf record -F 999 -o <file> -- llama-bench ...`, followed by `perf report --stdio --no-children --sort dso,sym --percent-limit 0.5`.
 
 The suite hash is the SHA-256 of the whole parsed suite, so comments and formatting do not change it. The experiment for a device is found by the suite name, the device and this hash.
 
@@ -171,6 +180,8 @@ Copy `configs/local.example.toml`. This file is merged over `models.toml`, so it
 | Field | Default | Meaning |
 |---|---|---|
 | `llama_server` | none | Path to the llama-server binary. Required for runs. |
+| `llama_bench` | `llama-bench` next to `llama_server` | Path to llama-bench. Only bench jobs need it. |
+| `perf` | `perf` on the PATH | Linux perf binary for kernel profiles on the Pi. |
 | `models_dir` | `<repo>/models` | Folder used by the model file templates. |
 | `db` | `<repo>/results/a2e.db` | Results database. |
 | `raw_dir` | `<repo>/results/raw` | BFCL raw outputs, one file per experiment. |
@@ -217,6 +228,7 @@ The hardware test group also reads these:
 | `A2E_CTX` | context size, default 4096. Multi-turn hardware tests need 16384. |
 | `A2E_THREADS` | llama-server `-t` |
 | `A2E_FLASH_ATTN` | value for `--flash-attn`, default `on` |
+| `A2E_LLAMA_BENCH` | llama-bench binary for the bench hardware tests, default next to `A2E_LLAMA_SERVER` |
 
 ## 5. `configs/tests.toml`
 

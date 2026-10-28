@@ -122,9 +122,11 @@ The doctor checks each of these and prints `ok`, `warn` or `FAIL`:
 - the Python version
 - that the device is a Pi 5 or a Mac
 - that the `llama-server` binary exists and can run
+- that the `llama-bench` binary exists (only bench jobs need it)
 - that each model file exists
 - that `vcgencmd` (Pi) or `powermetrics` and root (Mac) are available
 - that the CPU governor can be read (Pi)
+- that `perf` is installed for kernel profiles (Pi)
 - that the cooler setting is recorded (Pi)
 - that the BFCL and TUI extras are installed
 - that the database can be written and that there is free disk space
@@ -138,11 +140,13 @@ A `FAIL` line stops `scripts/run_suite.sh`. A `warn` line does not, e.g., a miss
 | Suite | What it runs | Runnable jobs | Skipped jobs | Runs | Model loads |
 |---|---|---|---|---|---|
 | `smoke` | One small job of each kind on Qwen3-4B Q4_0, one measured run. Use it to check a new machine. | 8 | 0 | 8 | 2 |
-| `pilot` | Qwen3-4B Q4_0 with KV cache f16 and q8_0. Plain generation, every custom task family, a slice of every BFCL category. | 104 | 0 | 416 | 4 |
+| `pilot` | Qwen3-4B Q4_0 with KV cache f16 and q8_0. Plain generation, every custom task family, a slice of every BFCL category, and one llama-bench test with kernel profiling. | 108 | 0 | 432 | 4 |
 | `baseline` | All five models at Q4_0 and Q8_0. Plain generation next to tool calling. | 108 | 12 | 432 | 18 |
+| `chains` | Chains of 2 to 5 tool calls for every family, and notes with 1, 3 or 5 arguments per call. | 720 | 80 | 2,880 | 18 |
 | `factorial` | The main sweep on custom chains over schema length, decode length, grammar and KV cache. | 1,296 | 144 | 5,184 | 36 |
 | `bfcl` | Accuracy and cost on every BFCL category in scope for every model, quantization and KV cache setting. | 720 | 80 | 1,440 | 36 |
 | `cache_ablation` | Prefix cache on and off, KV cache f16 and q8_0, over long chains and BFCL multi-turn. | 120 | 0 | 480 | 12 |
+| `kernels` | llama-bench prefill and decode tests for every model, quantization and KV cache setting, with the top kernels from Linux perf on the Pi. | 36 | 4 | 36 | 0 |
 | `stability` | 40 long chains back to back with no cooldown, with different CPU governors on the Pi. | 8 | 4 | 24 | 4 |
 
 The counts cover both devices together, so each device runs about half of them. They come from `uv run a2e plan <suite>`, which also prints the counts per device and per task kind. A run is one repeat of one job, so runs equal runnable jobs times warm-up plus measured repeats. Skipped jobs are the 8B models at Q8_0 on the Pi and, in the stability suite, governor jobs on the Mac. Some factorial jobs are also skipped at run time when the tools do not fit the schema length.
@@ -151,7 +155,7 @@ Run the suites in this order:
 
 1. `smoke` on each device, to check the setup.
 2. `pilot` on each device. Its timings tell you how long the larger suites will take. They also decide the BFCL subsample sizes, the Pi context size, the cooldown target, whether to fit the Pi cooler, and whether the extra benchmarks (API-Bank, ToolBench, tau-bench) are affordable.
-3. `baseline`, then `bfcl`, `factorial` and `cache_ablation`, in any order.
+3. `baseline`, then `bfcl`, `factorial`, `chains`, `cache_ablation` and `kernels`, in any order.
 4. `stability` last, because it heats the device on purpose.
 
 ### 6.2 What a suite file contains
@@ -163,7 +167,7 @@ A suite file has these parts:
 - `[server]` gives the llama-server context size, the flash attention setting and the thread count.
 - `[run]` gives the idle baseline length, the sampling rate, the cooldown target and the turn limits.
 - `[matrix]` lists the devices, models, quantizations and KV cache types. Every combination is one model load.
-- `[axes]` gives the default values for the settings tasks can vary: grammar, prefix cache, decode length, schema length and CPU governor.
+- `[axes]` gives the default values for grammar, prefix cache, decode length, schema length and CPU governor. Tasks can vary these settings.
 - Each `[[tasks]]` entry adds one kind of task. A task can override any axis.
 
 Here is the smoke suite in full:
@@ -213,7 +217,7 @@ category = ["simple_python", "irrelevance"]
 n = 3
 ```
 
-### 6.3 The three task kinds
+### 6.3 The four task kinds
 
 **Plain.** The model writes text for a fixed prompt with no tools. A2E asks llama-server to ignore the end of text token, so every run decodes exactly `decode_len` tokens. This is the baseline that the tool-calling numbers are compared against. The prompts are in `src/a2e/data/plain_prompts.json`.
 
@@ -227,11 +231,17 @@ The tool descriptions in the prompt are padded with extra, unused tools until th
 
 **BFCL.** The model answers test cases from the Berkeley Function Calling Leaderboard, version 4. A2E scores the answers with the official BFCL checker code, which is copied unchanged into `third_party/bfcl_eval/`. The categories in scope are:
 
-- single turn: `simple_python`, `multiple`, `parallel`, `parallel_multiple`
-- no call expected or call expected: `irrelevance`, `live_irrelevance`, `live_relevance`
-- multi-turn: `multi_turn_base`, `multi_turn_miss_func`, `multi_turn_miss_param`
+- the single turn categories `simple_python`, `multiple`, `parallel` and `parallel_multiple`
+- the categories that check whether the model calls at all, `irrelevance`, `live_irrelevance` and `live_relevance`
+- the multi-turn categories `multi_turn_base`, `multi_turn_miss_func` and `multi_turn_miss_param`
 
 `n` takes a fixed subsample of each category. The subsample is drawn with the suite seed and spread across the category in proportion to its strata, so the Pi and the Mac always run the same cases. Multi-turn categories need `[server] ctx` of at least 16384 because their tool descriptions are several thousand tokens long.
+
+**Bench.** A2E stops llama-server and runs llama.cpp's own `llama-bench` tool on the model file. It runs one prefill test per value in `n_prompt` and one decode test per value in `n_gen`, and records tokens per second for each. Prefill processes many tokens at once and is mostly limited by how fast the chip can compute. Decode produces one token at a time and reads every weight for each token, so it is mostly limited by memory bandwidth. A2E therefore also reports an estimated memory bandwidth for decode, which is decode tokens per second times the model file size.
+
+When `perf = true` and the device is the Pi, A2E runs each test under Linux `perf record` and stores the functions that used the most CPU time. These are mostly ggml kernels, e.g., `ggml_vec_dot_q4_0_q8_0`, which is the dot product for Q4_0 weights. This answers which operations dominate prefill and which dominate decode. Kernel profiling is not implemented on the Mac. A2E records a note instead.
+
+`perf` needs root, or the kernel setting `kernel.perf_event_paranoid` at 1 or lower. Without it, A2E still stores the throughput numbers and records a note that the profile is empty.
 
 ### 6.4 Writing your own suite
 
@@ -293,6 +303,8 @@ For each job, A2E does these steps in order:
 2. If the model file or server settings differ from the previous job, A2E stops the old llama-server and starts a new one. It records the load time and then measures idle power for `idle_seconds` while the model is loaded but not working.
 3. If `cooldown_c` is set, A2E waits until the chip is cooler than that temperature, up to `cooldown_timeout_s`.
 4. For each repeat, A2E clears the prompt cache, starts sampling at `sample_hz`, runs the task, stops sampling, and writes all turns, cases and samples to the database in one transaction.
+
+Bench jobs are different. They stop llama-server, because llama-bench loads its own copy of the model and two copies may not fit in the Pi's memory. They then run llama-bench once per test size and sample the llama-bench process instead.
 5. When all repeats are written, the job is marked done.
 
 If a job fails, e.g., because a model file is missing, A2E records the error and continues with the next job. If llama-server crashed, the next job starts a new server.
@@ -326,6 +338,8 @@ uv run a2e results summary --exp 1            # one row per configuration
 uv run a2e results summary --by device,model,quant --csv out.csv
 uv run a2e results stages --exp 1             # share of time in each stage
 uv run a2e results stability --exp 3          # speed drift over long sessions
+uv run a2e results bench --exp 5              # llama-bench prefill/decode speed and decode bandwidth
+uv run a2e results kernels --exp 5 --top 10   # top perf kernels per test (Pi)
 uv run a2e results timeline 42                # power, temperature, memory over one run
 uv run a2e results report 1 --out report.md   # a markdown report with all of the above
 uv run a2e results export out/ --fmt parquet  # every table and view as files
@@ -433,6 +447,8 @@ If a hardware test fails, its message names the part of the interface that did n
 **Multi-turn BFCL jobs fail with a server error.** The prompt grew past the context size. Raise `[server] ctx`. On the Pi, use `kv_quant = "q8_0"` for large contexts so the KV cache fits in memory.
 
 **Qwen3 answers are empty or cut off.** Qwen3 can spend its whole decode budget on its thinking text before it writes a tool call. A2E strips thinking text before parsing, so a cut-off answer counts as no call. Use a larger `decode_len` if this happens often. The pilot shows how often it happens.
+
+**The kernel profile is empty.** Run the kernels suite as root, or lower `kernel.perf_event_paranoid` with `sudo sysctl kernel.perf_event_paranoid=1`. The run's `server_json` stores the note perf gave.
 
 **The suite lock check fails.** A suite file or the expansion code changed. If the change was intended, run `uv run a2e suite-lock`.
 

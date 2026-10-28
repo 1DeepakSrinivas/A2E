@@ -18,7 +18,7 @@ A server database would only be needed if many machines had to write to one shar
 
 ## 2. Schema versions
 
-The schema version is stored in SQLite's `user_version`. `Store` upgrades an older file on open by applying the entries of `MIGRATIONS` in order, and refuses to open a file that is newer than the code. The current version is 1. A change to the schema must add a new entry to `MIGRATIONS` and must not edit an old one.
+The schema version is stored in SQLite's `user_version`. `Store` upgrades an older file on open by applying the entries of `MIGRATIONS` in order, and refuses to open a file that is newer than the code. The current version is 2. Version 1 created the experiment, job, run, turn, case and sample tables and the views. Version 2 added the `bench` and `kernels` tables. A change to the schema must add a new entry to `MIGRATIONS` and must not edit an old one.
 
 The connection settings are `foreign_keys = ON`, `busy_timeout = 10000` ms, `journal_mode = WAL` and `synchronous = NORMAL`.
 
@@ -27,7 +27,9 @@ The connection settings are `foreign_keys = ON`, `busy_timeout = 10000` ms, `jou
 ```text
 experiments 1──n jobs 1──n runs 1──n turns
                               │──n cases
-                              └──n samples
+                              │──n samples
+                              │──n bench     (bench jobs)
+                              └──n kernels   (bench jobs with perf, Pi)
 ```
 
 An experiment is one suite on one device. A job is one configuration. A run is one repeat of a job. Turns, cases and samples belong to a run.
@@ -152,7 +154,35 @@ One row per scored task in a run.
 | `throttled` | 0 or 1 | Pi `get_throttled` current-condition bits (under-voltage, frequency capped, throttled, soft temperature limit). |
 | `pressure` | text | Mac thermal pressure level from `powermetrics`, e.g., `Nominal`. |
 
-### 4.7 `env_json` fields
+### 4.7 `bench`
+
+One row per llama-bench test in a bench run.
+
+| Column | Unit | Meaning |
+|---|---|---|
+| `bench_id`, `run_id` | | Key and run. |
+| `test` | | `pp` for prefill (prompt processing) or `tg` for decode (text generation). |
+| `n_prompt`, `n_gen` | tokens | Test size. A prefill test has `n_gen = 0` and a decode test has `n_prompt = 0`. |
+| `n_threads` | | Threads llama-bench used. |
+| `avg_tok_s`, `sd_tok_s` | tokens/s | Mean and standard deviation over llama-bench's repetitions (`avg_ts`, `stddev_ts`). |
+| `avg_ms` | ms | Mean time per repetition (`avg_ns` / 1e6). |
+| `raw_json` | | The full llama-bench result object. |
+
+### 4.8 `kernels`
+
+One row per function in the perf profile of a bench test (Pi only).
+
+| Column | Unit | Meaning |
+|---|---|---|
+| `run_id` | | Run. |
+| `test` | | `pp` or `tg`. |
+| `n_tokens` | tokens | The test size. |
+| `rank` | | 1 for the function with the most samples. The top 15 are kept. |
+| `pct` | % | Share of CPU samples spent in this function. |
+| `symbol` | | Function name, e.g., `ggml_vec_dot_q4_0_q8_0`. |
+| `dso` | | Library or binary the function is in, e.g., `libggml-cpu.so`. `[kernel.kallsyms]` means the operating system kernel. |
+
+### 4.9 `env_json` fields
 
 `captured_at`, `hostname`, `os`, `machine`, `hardware` (e.g., "Raspberry Pi 5 Model B Rev 1.0" or the Mac CPU name), `device_detected`, `device_configured`, `cpu_count`, `ram_gb`, `python`, `a2e_commit`, `a2e_dirty`, `llama_server`, `llama_server_version`, `governor`, `cooler`, `power_setting`, `vcgencmd`, `powermetrics` and `is_root`.
 
@@ -209,5 +239,9 @@ Within one run, with sums over the run's turns:
 | `j_per_success` | Σ energy_j over all turns / n_valid |
 
 `a2e results stages` divides each stage's total time by the total turn time. The stages are `prefill`, `decode`, `parse`, `validate`, `tool_wait`, `template` and `harness`. `unattributed` is the rest, which is time inside the HTTP call that llama-server did not report as prefill or decode.
+
+`a2e results bench` averages each llama-bench test over measured runs per configuration (`tok_s`, `tok_s_sd`). For decode tests it adds `est_bandwidth_gbs`, which is `tok_s` × model file size in GB. Decode reads every weight once per generated token, so this is an estimate of the memory bandwidth decode uses. Comparing it with the device's memory bandwidth shows how close decode is to the memory limit. Prefill numbers have no bandwidth column, because prefill is mostly limited by compute.
+
+`a2e results kernels` averages each function's share over measured runs and ranks the functions per configuration and test.
 
 `a2e results stability` takes each job's tasks in order and computes decode tokens per second per task. It reports the mean of the first 3 tasks, the mean of the last 3, and the first task (from the fourth on) whose speed is below 90% of the first 3. This marks where thermal throttling starts to slow decoding. It also reports the highest temperature and the number of tasks during which the Pi reported throttling.
