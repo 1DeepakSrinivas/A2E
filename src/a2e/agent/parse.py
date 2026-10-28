@@ -44,25 +44,30 @@ def _first_json(block: str) -> tuple[Any, str | None]:
         return None, "malformed_json"
 
 
-def parse_calls(text: str) -> ParseResult:
+def parse_calls(text: str, allow_empty: bool = False) -> ParseResult:
     """Extract tool calls from model output.
 
     Thinking blocks are removed first (a truncated one removes everything after it). Each <tool_call> block
     contributes its own JSON value; without tags the first JSON array/object in the text is used. A value is
     one call (object) or several (array). Errors: empty | no_json | malformed_json | bad_shape.
+    With allow_empty, an empty JSON array is a valid "no call" answer (ParseResult with no calls and no error).
     """
     t = _UNCLOSED_THINK.sub("", _THINK.sub("", text)).strip()
     if not t:
         return ParseResult(error="empty")
     blocks = re.findall(r"<tool_call>(.*?)(?:</tool_call>|\Z)", t, re.S) or [t]
     calls: list[ToolCall] = []
+    saw_empty = False
     for b in blocks:
         obj, err = _first_json(b)
         if err:
             return ParseResult(error=err)
+        saw_empty |= obj == []
         for item in obj if isinstance(obj, list) else [obj]:
             c = _as_call(item)
             if c is None:
                 return ParseResult(error="bad_shape")
             calls.append(c)
-    return ParseResult(calls) if calls else ParseResult(error="bad_shape")
+    if calls or (allow_empty and saw_empty):
+        return ParseResult(calls)
+    return ParseResult(error="bad_shape")

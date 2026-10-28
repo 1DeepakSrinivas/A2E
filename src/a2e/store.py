@@ -22,6 +22,13 @@ CREATE TABLE IF NOT EXISTS turns (
   energy_j REAL, peak_rss_mb REAL, max_temp_c REAL, throttled INTEGER,
   correct INTEGER
 );
+CREATE TABLE IF NOT EXISTS cases (
+  case_row_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id INTEGER NOT NULL REFERENCES runs(run_id),
+  case_id TEXT NOT NULL, category TEXT NOT NULL,
+  valid INTEGER, error_type TEXT, status TEXT,
+  n_user_turns INTEGER, n_model_calls INTEGER, schema_tokens INTEGER, wall_ms REAL, extra_json TEXT
+);
 CREATE TABLE IF NOT EXISTS samples (
   run_id INTEGER NOT NULL REFERENCES runs(run_id),
   t REAL NOT NULL, rss_mb REAL, cpu_pct REAL, temp_c REAL, freq_mhz REAL, power_w REAL
@@ -46,5 +53,5 @@ class Store:
 
         out = Path(outdir)
         out.mkdir(parents=True, exist_ok=True)
-        for t in ("runs", "turns", "samples"):
+        for t in ("runs", "turns", "cases", "samples"):
             pd.read_sql(f"SELECT * FROM {t}", self.db).to_parquet(out / f"{t}.parquet")

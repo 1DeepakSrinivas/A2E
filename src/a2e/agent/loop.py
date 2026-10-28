@@ -30,6 +30,16 @@ class TurnRecord:
     windows: dict[str, tuple[float, float]] = field(default_factory=dict)  # perf_counter, for energy integration
     error: str | None = None
 
+    def finalize(self, t0: float, t1: float, t2: float, t3: float, t4: float, t5: float) -> None:
+        """Derive stage durations and windows from perf_counter stamps taken at: turn start (t0), after the
+        chat template (t1), after the model call (t2), after parsing (t3), after validation (t4), after tool
+        execution (t5). Prefill/decode windows are approximate: the server reports durations, not stamps."""
+        c = self.completion
+        self.template_ms, self.parse_ms = (t1 - t0) * 1000, (t3 - t2) * 1000
+        self.validate_ms, self.tool_wait_ms, self.wall_ms = (t4 - t3) * 1000, (t5 - t4) * 1000, (t5 - t0) * 1000
+        self.windows = {"prefill": (t1, t1 + c.prefill_ms / 1000), "decode": (t1 + c.prefill_ms / 1000, t2),
+                        "parse": (t2, t3), "validate": (t3, t4), "tool": (t4, t5)}
+
     @property
     def harness_ms(self) -> float:
         model = self.completion.wall_ms if self.completion else 0.0
@@ -66,6 +76,29 @@ class Trace:
         return out
 
 
+def model_step(client, messages: list[dict], step: int, n_predict: int, cache_prompt: bool,
+               schema: dict | None, allow_empty: bool = False) -> tuple[TurnRecord, tuple | None]:
+    """Template + model call + parse for one turn. Returns (turn, (t0, t1, t2, t3)); the stamps are None when
+    the server call failed (turn.error is set and wall_ms covers the attempt). The caller validates/executes
+    the calls and then calls turn.finalize with the remaining stamps."""
+    turn = TurnRecord(step)
+    t0 = time.perf_counter()
+    try:
+        prompt = client.apply_template(messages)
+        t1 = time.perf_counter()
+        turn.completion = client.complete(prompt, n_predict, json_schema=schema, cache_prompt=cache_prompt)
+    except httpx.HTTPError as e:
+        turn.error = f"{type(e).__name__}: {e}"
+        turn.wall_ms = (time.perf_counter() - t0) * 1000
+        return turn, None
+    t2 = time.perf_counter()
+    turn.text = turn.completion.text
+    parsed = parse_calls(turn.text, allow_empty=allow_empty)
+    t3 = time.perf_counter()
+    turn.calls, turn.parse_error = parsed.calls, parsed.error
+    return turn, (t0, t1, t2, t3)
+
+
 class AgentLoop:
     """Multi-turn tool-calling loop that times every stage of every turn.
 
@@ -84,36 +117,18 @@ class AgentLoop:
         messages = [system_message(self.specs), {"role": "user", "content": user_prompt}]
         trace = Trace(status="max_turns")
         for step in range(max_turns):
-            turn = TurnRecord(step)
+            turn, stamps = model_step(self.client, messages, step, self.n_predict, self.cache_prompt, self.schema)
             trace.turns.append(turn)
-            t0 = time.perf_counter()
-            try:
-                prompt = self.client.apply_template(messages)
-                t1 = time.perf_counter()
-                turn.completion = self.client.complete(prompt, self.n_predict, json_schema=self.schema,
-                                                       cache_prompt=self.cache_prompt)
-            except httpx.HTTPError as e:
-                turn.error = f"{type(e).__name__}: {e}"
-                turn.wall_ms = (time.perf_counter() - t0) * 1000
+            if stamps is None:
                 trace.status = "server_error"
                 return trace
-            t2 = time.perf_counter()
-            turn.template_ms = (t1 - t0) * 1000
-            turn.text = turn.completion.text
-            parsed = parse_calls(turn.text)
-            t3 = time.perf_counter()
-            turn.calls, turn.parse_error = parsed.calls, parsed.error
+            t0, t1, t2, t3 = stamps
             turn.validation_errors = [self.registry.validate(c.name, c.arguments) for c in turn.calls]
             t4 = time.perf_counter()
             for c, err in zip(turn.calls, turn.validation_errors):
                 turn.results.append(ToolResult(False, f"error: invalid call: {err}") if err
                                     else self.registry.execute(c.name, c.arguments))
-            t5 = time.perf_counter()
-            turn.parse_ms, turn.validate_ms, turn.tool_wait_ms = (t3 - t2) * 1000, (t4 - t3) * 1000, (t5 - t4) * 1000
-            turn.wall_ms = (t5 - t0) * 1000
-            c = turn.completion
-            turn.windows = {"prefill": (t1, t1 + c.prefill_ms / 1000), "decode": (t1 + c.prefill_ms / 1000, t2),
-                            "parse": (t2, t3), "validate": (t3, t4), "tool": (t4, t5)}
+            turn.finalize(t0, t1, t2, t3, t4, time.perf_counter())
             if turn.parse_error:
                 trace.status = "parse_error"
                 return trace

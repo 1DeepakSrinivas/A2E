@@ -16,6 +16,11 @@ dependencies = [
 [project.scripts]
 a2e = "a2e.cli:app"
 
+[project.optional-dependencies]
+bfcl = [
+    "mpmath>=1.4.1",
+]
+
 [dependency-groups]
 dev = ["pytest>=8"]
 
