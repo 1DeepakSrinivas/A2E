@@ -10,9 +10,9 @@
     "suite_hash": "56512908e4d8055f"
   },
   "bfcl_mini": {
-    "job_keys_sha": "f05c82982326643c",
-    "jobs": 8,
-    "suite_hash": "6c40261f02a2f0cb"
+    "job_keys_sha": "9a930284f12164d1",
+    "jobs": 48,
+    "suite_hash": "02a6c31e9966d42f"
   },
   "cache_ablation": {
     "job_keys_sha": "030e610de6ff366c",

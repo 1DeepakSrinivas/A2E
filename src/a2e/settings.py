@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 REPO = Path(__file__).resolve().parents[2]
 CONFIG_DIR = Path(os.environ.get("A2E_CONFIG_DIR", REPO / "configs"))
-QUANTS = ("q4_0", "q8_0")
+QUANTS = ("q4_0", "q8_0", "q3_k_m")
 
 
 class ModelEntry(BaseModel):

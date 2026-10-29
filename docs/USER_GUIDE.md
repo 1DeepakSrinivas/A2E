@@ -79,7 +79,7 @@ Energy readings on the Mac come from `powermetrics`, which only works as root. T
 
 ### 3.3 Model files
 
-A2E reads GGUF model files. The models in the study are listed in `configs/models.toml`. For each model you need one file per quantization, `q4_0` and `q8_0`. By default A2E looks for a file named like this:
+A2E reads GGUF model files. The models in the study are listed in `configs/models.toml`. For each model you need one file per quantization you plan to run: `q4_0`, `q8_0` and `q3_k_m`. By default A2E looks for a file named like this:
 
 ```text
 <models_dir>/<model>/<model>-<quant>.gguf
