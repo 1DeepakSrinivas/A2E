@@ -195,7 +195,7 @@ A leading `~` is expanded. A relative path is read from the repository folder.
 |---|---|---|
 | `device` | detected | `pi5` or `mac`. Set it when detection fails. Detection reads `/proc/device-tree/model` on Linux and checks for macOS on arm64. |
 | `cooler` | unset | Whether the Pi's active cooler is fitted. Stored with every run. |
-| `power` | `"auto"` | `auto` records energy where possible. `none` turns energy off. |
+| `power` | `"auto"` | `auto` records energy where possible and prints a warning when it cannot (on the Mac, energy needs `sudo -E`). `none` turns energy off. `required` stops the run with an error when energy cannot be recorded. |
 | `threads` | unset | llama-server `-t` when the suite's `threads` is 0. |
 
 ### 3.3 Per-model overrides

@@ -11,6 +11,7 @@ import os
 import platform
 import tomllib
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -43,7 +44,7 @@ class Settings(BaseModel):
     work_dir: str = str(REPO / "results" / "work")
     device: str | None = None  # pi5 | mac; detected when unset
     cooler: bool | None = None  # Pi: is the active cooler fitted? recorded with every run
-    power: str = "auto"  # auto | none
+    power: Literal["auto", "none", "required"] = "auto"  # required: refuse to run without energy data
     threads: int | None = None
     models: dict[str, ModelEntry] = Field(default_factory=dict)
 

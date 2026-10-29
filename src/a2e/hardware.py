@@ -15,6 +15,10 @@ from a2e.settings import Settings
 GOV_GLOB = "/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor"
 
 
+class PowerUnavailable(RuntimeError):
+    """`power = "required"` is set but this machine cannot record energy."""
+
+
 @dataclass
 class Instruments:
     power: PowerSource | None = None
@@ -29,7 +33,16 @@ class Instruments:
 
 
 def make_instruments(device: str, settings: Settings) -> Instruments:
-    """The best power/thermal sources available on this device. Missing pieces are noted, not fatal."""
+    """The best power/thermal sources available on this device. Missing pieces are noted, not fatal,
+    unless `power = "required"`, which raises PowerUnavailable instead of running without energy data."""
+    ins = _make_instruments(device, settings)
+    if settings.power == "required" and ins.power is None:
+        raise PowerUnavailable("power = \"required\" but no energy data is available: "
+                               + "; ".join(ins.notes or ["no power source"]))
+    return ins
+
+
+def _make_instruments(device: str, settings: Settings) -> Instruments:
     if device == "pi5":
         if not shutil.which("vcgencmd"):
             return Instruments(notes=["vcgencmd not found: no power or thermal data"])

@@ -53,7 +53,10 @@ def format_event(e: dict) -> str | None:
     if ev == "resume":
         return f"resuming experiment {e['exp_id']}"
     if ev == "instruments":
-        return f"instruments: power scope '{e['scope']}'; " + "; ".join(e["notes"])
+        msg = f"instruments: power scope '{e['scope']}'; " + "; ".join(e["notes"])
+        if e["scope"] == "none":
+            msg = f"WARNING: no energy will be recorded for this run. {msg}"
+        return msg
     if ev == "server_start":
         return f"  loading {e['model']} {e['quant']} kv={e['kv_quant']} ..."
     if ev == "server_ready":
@@ -131,6 +134,7 @@ def run(suite: str,
         limit: int = typer.Option(None, help="run at most this many jobs, then stop (resume later)"),
         retry_failed: bool = typer.Option(False, help="also re-run jobs that failed before")) -> None:
     """Run (or resume) a suite on this machine and store everything in the results database."""
+    from a2e.hardware import PowerUnavailable
     from a2e.runner import Runner
     from a2e.suite import ConfigError
     try:
@@ -140,6 +144,9 @@ def run(suite: str,
         raise typer.Exit(2)
     try:
         out = r.run(new=new, limit=limit, retry_failed=retry_failed)
+    except PowerUnavailable as e:
+        typer.echo(f"error: {e}")
+        raise typer.Exit(2)
     except KeyboardInterrupt:
         typer.echo("interrupted; run the same command again to resume")
         raise typer.Exit(130)
