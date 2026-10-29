@@ -1,0 +1,28 @@
+# Copy to configs/local.toml on each machine (it is git-ignored) and edit.
+
+[paths]
+llama_server = "~/a2e-deps/llama.cpp/build/bin/llama-server"   # built by scripts/setup_pi.sh or setup_mac.sh
+# llama_bench = "~/a2e-deps/llama.cpp/build/bin/llama-bench"   # default: llama-bench next to llama-server
+# perf = "/usr/bin/perf"                                       # Pi kernel profiles; default: perf on PATH
+models_dir = "~/models"                                          # GGUF files, see configs/models.toml
+db = "results/a2e.db"                                            # one SQLite file for all runs on this machine
+raw_dir = "results/raw"
+work_dir = "results/work"
+
+[machine]
+# device = "pi5"      # pi5 or mac; detected automatically when unset
+# cooler = true       # Pi only: is the active cooler fitted? stored with every run
+power = "auto"        # auto: PMIC on the Pi, powermetrics on the Mac (needs sudo); none: no energy data
+# threads = 4         # llama-server -t; unset lets llama.cpp choose
+
+# Exact file paths when your downloads do not follow the default naming:
+# [models.qwen3-4b.files]
+# q4_0 = "~/models/Qwen3-4B-Q4_0.gguf"
+# q8_0 = "~/models/Qwen3-4B-Q8_0.gguf"
+
+# Live web search for the `web` task family (Brave Search API). The key is read from the environment only:
+#   export BRAVE_SEARCH_API_KEY=...
+[web]
+api_key_env = "BRAVE_SEARCH_API_KEY"
+# timeout_s = 15
+# max_page_chars = 4000

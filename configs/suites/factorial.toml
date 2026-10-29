@@ -1,0 +1,38 @@
+# Factorial sweep (study design B): Model x Quantization x KV cache x SeqLen x Grammar x Device on the custom chains.
+# This is the large one. Use `a2e plan factorial` for the job count and the pilot timings to estimate run time.
+# Retrieval chains (6 tools) may not fit a 256-token schema; those jobs are skipped with a reason.
+[suite]
+name = "factorial"
+description = "Custom chains over schema length 256/1024/2048, decode length 128/512, grammar off/on, KV f16/q8_0."
+seed = 0
+
+[repeats]
+warmup = 1
+measured = 3
+
+[server]
+ctx = 8192
+
+[run]
+idle_seconds = 30
+cooldown_c = 55
+cooldown_timeout_s = 900
+
+[matrix]
+device = ["pi5", "mac"]
+model = ["qwen3-4b", "qwen3-8b", "xlam2-3b", "xlam2-8b", "phi4-mini"]
+quant = ["q4_0", "q8_0"]
+kv_quant = ["f16", "q8_0"]
+
+[axes]
+grammar = [false, true]
+prefix_cache = [true]
+decode_len = [128, 512]
+schema_len = [256, 1024, 2048]
+
+[[tasks]]
+kind = "custom"
+family = ["calc", "notes", "retrieval"]
+depth = 3
+n_args = 2
+n = 5

@@ -1,0 +1,62 @@
+{
+  "baseline": {
+    "job_keys_sha": "fab83b4bf43eaf85",
+    "jobs": 120,
+    "suite_hash": "0392aad12552c183"
+  },
+  "bfcl": {
+    "job_keys_sha": "f43e7e3dd8668084",
+    "jobs": 800,
+    "suite_hash": "56512908e4d8055f"
+  },
+  "bfcl_mini": {
+    "job_keys_sha": "f05c82982326643c",
+    "jobs": 8,
+    "suite_hash": "6c40261f02a2f0cb"
+  },
+  "cache_ablation": {
+    "job_keys_sha": "030e610de6ff366c",
+    "jobs": 120,
+    "suite_hash": "d29ef4ad4b2f3017"
+  },
+  "chains": {
+    "job_keys_sha": "5bc1cd91dfad20da",
+    "jobs": 800,
+    "suite_hash": "30b71052ea88e257"
+  },
+  "factorial": {
+    "job_keys_sha": "42ff06184f21ea13",
+    "jobs": 1440,
+    "suite_hash": "d2590c79132c7333"
+  },
+  "kernels": {
+    "job_keys_sha": "8a61707bf261838e",
+    "jobs": 40,
+    "suite_hash": "d148ec75a2b4c46c"
+  },
+  "local_tools": {
+    "job_keys_sha": "71e0fabf3eb0dcb0",
+    "jobs": 1200,
+    "suite_hash": "d845d3397398d813"
+  },
+  "pilot": {
+    "job_keys_sha": "420c3b5069c476cf",
+    "jobs": 140,
+    "suite_hash": "281fe8a0a28387aa"
+  },
+  "smoke": {
+    "job_keys_sha": "597dcda0ede08a76",
+    "jobs": 8,
+    "suite_hash": "b0a6cecae8d5006e"
+  },
+  "stability": {
+    "job_keys_sha": "e5c92d0b53f69ce7",
+    "jobs": 12,
+    "suite_hash": "6e383c602a827461"
+  },
+  "web_live": {
+    "job_keys_sha": "445c57bb19662d24",
+    "jobs": 24,
+    "suite_hash": "ffc77f97a8dd7331"
+  }
+}

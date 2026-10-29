@@ -42,3 +42,11 @@ htmlcov/
 .vscode/
 .idea/
 .DS_Store
+
+# harness outputs
+a2e.db
+bfcl_raw.jsonl
+*.db
+configs/local.toml
+results/
+models/

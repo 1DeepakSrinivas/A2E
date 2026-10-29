@@ -1,0 +1,8 @@
+This directory vendors a subset of the Berkeley Function Calling Leaderboard (BFCL) evaluator and data.
+Source:  https://github.com/ShishirPatil/gorilla  (berkeley-function-call-leaderboard/bfcl_eval)
+Commit:  6ea57973c7a6097fd7c5915698c54c17c5b1b6c8
+License: Apache License 2.0 (see LICENSE). Copyright holders: the Gorilla / BFCL authors (UC Berkeley Sky Lab).
+
+All files listed in MANIFEST.sha256 are copied unmodified from that commit.
+The single file that is NOT upstream is constants/model_config.py (a stub); it is not in the manifest.
+Regenerate with scripts/sync_bfcl.sh. Do not edit vendored files by hand.

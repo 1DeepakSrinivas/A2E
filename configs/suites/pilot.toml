@@ -1,0 +1,67 @@
+# Pilot (study design step 1). Run first on both devices. Its numbers set subsample sizes, the Pi context size,
+# the cooldown target and whether to fit the cooler, and tell us if API-Bank / ToolBench / tau-bench are affordable.
+[suite]
+name = "pilot"
+description = "Qwen3-4B Q4_0: plain vs tool calling, every task family, a slice of every BFCL category in scope."
+seed = 0
+
+[repeats]
+warmup = 1
+measured = 3
+
+[server]
+ctx = 16384            # BFCL multi-turn schemas are several thousand tokens
+
+[run]
+idle_seconds = 30
+sample_hz = 2
+cooldown_c = 55        # Pi: start each job below 55 C so jobs do not inherit heat (ignored where no temperature)
+cooldown_timeout_s = 900
+
+[matrix]
+device = ["pi5", "mac"]
+model = ["qwen3-4b"]
+quant = ["q4_0"]
+kv_quant = ["f16", "q8_0"]
+
+[axes]
+grammar = [false, true]
+prefix_cache = [true]
+decode_len = [256]
+schema_len = [1024]
+
+[[tasks]]
+kind = "plain"
+n = 6
+decode_len = [128, 512]
+
+[[tasks]]
+kind = "custom"
+family = ["calc", "notes", "retrieval"]
+depth = 3
+n_args = 2
+n = 5
+
+[[tasks]]
+kind = "bfcl"
+category = ["simple_python", "multiple", "parallel", "parallel_multiple", "irrelevance", "live_relevance"]
+n = 10
+
+[[tasks]]
+kind = "bfcl"
+category = ["multi_turn_base", "multi_turn_miss_func", "multi_turn_miss_param"]
+n = 3
+decode_len = [512]
+
+[[tasks]]
+kind = "bench"
+n_prompt = [512]
+n_gen = [128]
+perf = true
+reps = 3
+
+[[tasks]]
+kind = "custom"
+family = ["fs_search", "fs_organize", "math", "fs_math"]
+depth = 3
+n = 3

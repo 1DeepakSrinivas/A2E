@@ -1,0 +1,37 @@
+# Live web search through the Brave Search API (needs BRAVE_SEARCH_API_KEY and network access).
+# Results change over time, so these jobs are scored on the tool path only and are not exactly repeatable.
+# Network latency is part of tool wait. Keep n small: every task uses at least one search of your quota.
+[suite]
+name = "web_live"
+description = "Web search -> open a result -> save a note, on Qwen3-4B and Phi-4-mini Q4_0; scored on the tool path."
+seed = 0
+
+[repeats]
+warmup = 0
+measured = 2
+
+[server]
+ctx = 8192
+
+[run]
+idle_seconds = 30
+cooldown_c = 55
+cooldown_timeout_s = 900
+
+[matrix]
+device = ["pi5", "mac"]
+model = ["qwen3-4b", "phi4-mini"]
+quant = ["q4_0"]
+kv_quant = ["f16"]
+
+[axes]
+grammar = [false, true]
+prefix_cache = [true]
+decode_len = [256]
+schema_len = [2048]
+
+[[tasks]]
+kind = "custom"
+family = "web"
+depth = [2, 3, 4]
+n = 4
