@@ -9,6 +9,11 @@
     "jobs": 800,
     "suite_hash": "3f3668c71587781b"
   },
+  "bfcl_mini": {
+    "job_keys_sha": "f05c82982326643c",
+    "jobs": 8,
+    "suite_hash": "c9773f62a925fe58"
+  },
   "cache_ablation": {
     "job_keys_sha": "1f046481ef0b9c51",
     "jobs": 120,

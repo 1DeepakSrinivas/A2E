@@ -1,0 +1,32 @@
+# Small BFCL accuracy and cost check on one model. A few minutes. Not used for analysis.
+[suite]
+name = "bfcl_mini"
+description = "Qwen3-4B Q4_0 on the Mac, four single turn BFCL categories, grammar off and on."
+seed = 0
+
+[repeats]
+warmup = 0
+measured = 1
+
+[server]
+ctx = 16384
+
+[run]
+idle_seconds = 5
+cooldown_c = 0
+
+[matrix]
+device = ["mac"]
+model = ["qwen3-4b"]
+quant = ["q4_0"]
+kv_quant = ["f16"]
+
+[axes]
+grammar = [false, true]
+prefix_cache = [true]
+decode_len = [512]
+
+[[tasks]]
+kind = "bfcl"
+category = ["simple_python", "multiple", "parallel", "irrelevance"]
+n = 10
