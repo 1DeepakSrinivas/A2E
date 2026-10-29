@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 Device = Literal["pi5", "mac"]
-Quant = Literal["q8_0", "q4_0"]
+Quant = Literal["q8_0", "q4_0", "q3_k_m"]
 KVQuant = Literal["f16", "q8_0"]
 
 # Approximate parameter counts (billions), used for the Pi memory-feasibility rule.

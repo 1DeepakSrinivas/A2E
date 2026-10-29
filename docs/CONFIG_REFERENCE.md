@@ -64,7 +64,7 @@ Every combination of these four lists is one model load.
 |---|---|---|---|
 | `device` | list | required | `pi5`, `mac` |
 | `model` | list | required | names from `configs/models.toml` |
-| `quant` | list | required | `q4_0`, `q8_0` |
+| `quant` | list | required | `q4_0`, `q8_0`, `q3_k_m` |
 | `kv_quant` | list | `["f16"]` | `f16`, `q8_0` |
 
 A2E only runs the jobs whose device matches the machine it runs on. The other device's jobs are not loaded into this machine's experiment.

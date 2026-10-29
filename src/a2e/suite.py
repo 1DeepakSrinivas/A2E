@@ -73,7 +73,7 @@ class RunOpts(_Strict):
 class Matrix(_Strict):
     device: list[Literal["pi5", "mac"]]
     model: list[str]
-    quant: list[Literal["q4_0", "q8_0"]]
+    quant: list[Literal["q4_0", "q8_0", "q3_k_m"]]
     kv_quant: list[Literal["f16", "q8_0"]] = ["f16"]
 
     _l = field_validator("device", "model", "quant", "kv_quant", mode="before")(_listify)
