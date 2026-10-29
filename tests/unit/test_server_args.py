@@ -32,3 +32,9 @@ def test_stop_without_start_is_safe(tmp_path):
     s = LlamaServer(["true"], log_path=tmp_path / "x.log")
     s.stop()
     s.stop()
+
+
+def test_slot_save_path_enables_slot_actions():
+    a = build_args(cfg(), "bin", "m.gguf", slot_save_path="/tmp/slots")
+    assert a[a.index("--slot-save-path") + 1] == "/tmp/slots"
+    assert "--slot-save-path" not in build_args(cfg(), "bin", "m.gguf")

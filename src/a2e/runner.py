@@ -266,10 +266,13 @@ class Runner:
             raise RuntimeError("llama_server is not set in configs/local.toml")
         port = _free_port()
         cfg = RunConfig(model=job["model"], quant=job["quant"], kv_quant=job["kv_quant"], device=job["device"])
-        args = build_args(cfg, self.settings.llama_server, str(model_path), port=port, ctx=job["ctx"],
-                          threads=job["threads"] or self.settings.threads, flash_attn=job["flash_attn"])
         log_dir = Path(self.settings.work_dir) / f"exp{self.exp_id}"
         log_dir.mkdir(parents=True, exist_ok=True)
+        slot_dir = log_dir / "slots"
+        slot_dir.mkdir(exist_ok=True)
+        args = build_args(cfg, self.settings.llama_server, str(model_path), port=port, ctx=job["ctx"],
+                          threads=job["threads"] or self.settings.threads, flash_attn=job["flash_attn"],
+                          slot_save_path=str(slot_dir))
         srv = LlamaServer(args, port=port, log_path=log_dir / f"llama-server-{job['model']}-{job['quant']}.log")
         load_s = srv.start(timeout=900)
         info = {"args": args, "model_file": envmod.file_fingerprint(model_path)}

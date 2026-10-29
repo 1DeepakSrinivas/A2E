@@ -32,7 +32,8 @@ def real_server(tmp_path_factory, free_port):
         args = build_args(cfg, os.environ["A2E_LLAMA_SERVER"], os.environ["A2E_GGUF"], port=free_port,
                           ctx=int(os.environ.get("A2E_CTX", 4096)),
                           threads=int(os.environ["A2E_THREADS"]) if os.environ.get("A2E_THREADS") else None,
-                          flash_attn=os.environ.get("A2E_FLASH_ATTN", "on"))
+                          flash_attn=os.environ.get("A2E_FLASH_ATTN", "on"),
+                          slot_save_path=str(tmp_path_factory.mktemp("slots")))
         srv = LlamaServer(args, port=free_port, log_path=tmp_path_factory.mktemp("srv") / "llama.log")
         started.append(srv)
         srv.start(timeout=600)
