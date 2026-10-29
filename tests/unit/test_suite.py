@@ -13,7 +13,7 @@ SUITES = sorted((REPO / "configs" / "suites").glob("*.toml"))
 
 def settings():
     return Settings(models={k: ModelEntry(name=k, params_b=v) for k, v in
-                            {"qwen3-4b": 4.0, "qwen3-8b": 8.0, "xlam2-3b": 3.0, "xlam2-8b": 8.0, "phi4-mini": 3.8}.items()})
+                            {"qwen3-4b": 4.0, "gemma3-4b": 4.0, "big-8b": 8.0}.items()})
 
 
 def suite(tmp_path, body, name="t"):
@@ -25,7 +25,7 @@ def suite(tmp_path, body, name="t"):
 BASE = """
 [matrix]
 device = ["pi5", "mac"]
-model = ["qwen3-4b", "qwen3-8b"]
+model = ["qwen3-4b", "big-8b"]
 quant = ["q4_0", "q8_0"]
 [axes]
 grammar = [false, true]
@@ -135,7 +135,7 @@ def test_feasibility_rules(tmp_path):
     s = suite(tmp_path, BASE + '[[tasks]]\nkind = "plain"\ngovernor = ["", "performance"]\n')
     jobs = expand(s, settings())
     mem = [j for j in jobs if j["skip_reason"] and "memory" in j["skip_reason"]]
-    assert mem and all(j["device"] == "pi5" and j["quant"] == "q8_0" and j["model"] == "qwen3-8b" for j in mem)
+    assert mem and all(j["device"] == "pi5" and j["quant"] == "q8_0" and j["model"] == "big-8b" for j in mem)
     gov = [j for j in jobs if j["skip_reason"] and "governor" in j["skip_reason"]]
     assert gov and all(j["device"] == "mac" and j["governor"] for j in gov)
     assert not any(j["skip_reason"] for j in jobs if j["device"] == "pi5" and j["model"] == "qwen3-4b"
@@ -143,7 +143,7 @@ def test_feasibility_rules(tmp_path):
 
 
 def test_unknown_model_fails_at_expansion(tmp_path):
-    s = suite(tmp_path, BASE.replace('"qwen3-8b"', '"mystery"') + '[[tasks]]\nkind = "plain"\n')
+    s = suite(tmp_path, BASE.replace('"big-8b"', '"mystery"') + '[[tasks]]\nkind = "plain"\n')
     with pytest.raises(KeyError, match="mystery"):
         expand(s, settings())
 

@@ -12,10 +12,7 @@ KVQuant = Literal["f16", "q8_0"]
 # Approximate parameter counts (billions), used for the Pi memory-feasibility rule.
 MODEL_PARAMS_B: dict[str, float] = {
     "qwen3-4b": 4.0,
-    "qwen3-8b": 8.0,
-    "xlam2-3b": 3.0,
-    "xlam2-8b": 8.0,
-    "phi4-mini": 3.8,
+    "gemma3-4b": 4.0,
 }
 
 

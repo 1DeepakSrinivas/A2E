@@ -97,15 +97,14 @@ for, and where in the repo.
 
 ---
 
-## 2. Models (4 to 8B tool-calling class)
+## 2. Models (4B tool-calling class)
 
 All **Pending verification** of exact checkpoint, license, GGUF source and tool-call format. None downloaded yet.
 
 | Model | Planned sizes | Notes |
 |---|---|---|
-| Qwen3 | 4B, 8B | Has a thinking mode that can consume the decode budget before a call is emitted. |
-| xLAM-2 (Salesforce) | 3B, 8B | Function-calling specialist. |
-| Phi-4-mini (Microsoft) | 3.8B | |
+| Qwen3 | 4B | Has a thinking mode that can consume the decode budget before a call is emitted. |
+| Gemma 3 (Google) | 4B | Same size class as Qwen3 4B. GGUF from `unsloth/gemma-3-4b-it-GGUF` (Q3_K_M, Q4_0, Q8_0). |
 | Z.ai GLM small model | TBD | Needs user sign-off; research current release first. |
 
 Where used: `MODEL_PARAMS_B` in `src/a2e/config.py` (parameter counts are approximate, from memory).
