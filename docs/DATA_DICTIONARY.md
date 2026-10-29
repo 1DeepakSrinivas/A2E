@@ -85,7 +85,7 @@ A job becomes `done` only after all of its runs are written. A job that was `run
 | `idle_power_w` | real | Mean idle power measured after the model load, in watts. Subtracted from all energy numbers of the run. |
 | `power_scope` | text | What the power readings cover, e.g., "sum of Pi 5 PMIC rail V*I; excludes PSU losses and peripherals (estimate)". `none` when no power was recorded. |
 | `load_time_s` | real | Seconds from starting llama-server to its health check passing. |
-| `server_json` | text | Server arguments, the model file fingerprint (size, modification time, SHA-256 of the first MiB), cooldown wait, the actual governor, the cooler setting and notes about the instruments. |
+| `server_json` | text | Server arguments, the model file fingerprint (size, modification time, SHA-256 of the first MiB), cooldown wait, the actual governor, the cooler setting, notes about the instruments, and `cache_reset`: how the prefix cache was cleared before the run (`erase` is the server's slot erase; `flush` means the erase failed and one unrelated prompt replaced the cached prefix). A job with the prefix cache on is failed, not run, when neither works. Runs made before this field existed have none, and the report marks them as not recorded. |
 
 Every run of a job that did not finish is marked `aborted`, including repeats that had completed, because a job's runs only count as a set.
 

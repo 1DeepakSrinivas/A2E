@@ -249,6 +249,8 @@ scripts/report_full_eval.sh 1              # writes results/full_eval_1/
 
 `report.md` has every table. The CSV files in the same folder cut the numbers by model, BFCL category, and custom family and depth, and hold the success-per-joule, Pareto, grammar-effect, energy-by-stage and energy-budget views. Set `OUT_DIR=somewhere` to write the folder elsewhere. The run can be stopped and resumed.
 
+The report starts with a warning when any measured run may have begun with a warm prefix cache (a `flush`, a `failed` reset, or a run made before the reset was recorded). Prefill, cache hit and energy of such runs look lower than they are, so compare them with care.
+
 ### 6.3 The four task kinds
 
 **Plain.** The model writes text for a fixed prompt with no tools. A2E asks llama-server to ignore the end of text token, so every run decodes exactly `decode_len` tokens. This is the baseline that the tool-calling numbers are compared against. The prompts are in `src/a2e/data/plain_prompts.json`.

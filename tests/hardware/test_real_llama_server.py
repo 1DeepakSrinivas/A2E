@@ -44,7 +44,7 @@ def test_cache_prompt_false_disables_reuse(real_server):
 def test_slot_erase_endpoint(real_server):
     c = Client(real_server().url)
     c.complete(SCHEMA + "Q:", 4)
-    c.reset_cache()
+    assert c.reset_cache() == "erase", "POST /slots/0?action=erase failed on this build (the flush fallback was used)"
     assert c.complete(SCHEMA + "Q:", 4).cached_tokens == 0, "POST /slots/0?action=erase did not clear cache"
 
 

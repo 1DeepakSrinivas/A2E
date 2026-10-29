@@ -309,6 +309,24 @@ def md_table(df: pd.DataFrame, digits: int = 3, max_rows: int = 200) -> str:
     return "\n".join(lines) + "\n"
 
 
+def cache_reset_warning(store: Store, exp_id: int) -> str:
+    """A warning when a measured run may have started with a warm prefix cache. Empty when every run's cache was
+    erased. A run stores how its cache was reset: `erase` (fine), `flush` (the erase failed, an unrelated prompt
+    replaced the cached prefix), `failed`, or nothing at all (a run made before the reset was checked)."""
+    rows = store.query(
+        "SELECT coalesce(json_extract(server_json, '$.cache_reset'), 'not recorded') AS how, count(*) AS runs "
+        "FROM v_runs WHERE exp_id = ? AND phase = 'measured' AND task_kind != 'bench' AND coalesce(prefix_cache, 1) = 1 GROUP BY how", [exp_id])
+    bad = [r for r in rows if r["how"] not in ("erase", "unsupported")]
+    if not bad:
+        return ""
+    detail = "; ".join(f"{r['runs']} run(s): {r['how']}" for r in bad)
+    return ("## Warning: prefix cache\n\n"
+            "Some runs may have started with prompts left in the prefix cache by an earlier job, which makes prefill "
+            "and energy look lower than they are. Affected: " + detail + ". `flush` means the server's cache erase "
+            "failed and an unrelated prompt was used instead; `not recorded` means the run was made before this check "
+            "existed. Compare prefill, cache hit and energy of such runs with care.\n")
+
+
 def report_markdown(store: Store, exp_id: int) -> str:
     exp = store.query("SELECT * FROM experiments WHERE exp_id = ?", [exp_id])
     if not exp:
@@ -316,8 +334,11 @@ def report_markdown(store: Store, exp_id: int) -> str:
     e = exp[0]
     env = json.loads(e["env_json"] or "{}")
     parts = [f"# Results for experiment {exp_id}: {e['name']}\n",
-             "This report is generated from the results database. It contains measured repeats only.\n",
-             "## Experiment\n",
+             "This report is generated from the results database. It contains measured repeats only.\n"]
+    warn = cache_reset_warning(store, exp_id)
+    if warn:
+        parts.append(warn)
+    parts += ["## Experiment\n",
              md_table(pd.DataFrame([{
                  "status": e["status"], "started": _ts(e["started_at"]), "finished": _ts(e["finished_at"]),
                  "suite hash": e["suite_hash"], "a2e commit": (e["git_commit"] or "")[:12],

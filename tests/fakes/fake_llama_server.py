@@ -2,7 +2,7 @@
 """Stand-in for llama-server: /health, /completion (with timings + prefix cache), /slots.
 
 Accepts and ignores real llama-server flags so it can be launched through a2e.server.LlamaServer.
-Failure injection: --health-delay, --exit-code, --fail-completion, --bad-json, --no-timings.
+Failure injection: --health-delay, --exit-code, --fail-completion, --bad-json, --no-timings, --reject-erase.
 """
 import argparse
 import json
@@ -20,6 +20,7 @@ def main() -> None:
     ap.add_argument("--ms-per-gen-token", type=float, default=1.0)
     ap.add_argument("--grammar-overhead", type=float, default=1.25, help="decode slowdown with grammar")
     ap.add_argument("--no-timings", action="store_true")
+    ap.add_argument("--reject-erase", action="store_true", help="answer POST /slots/0?action=erase with HTTP 501")
     ap.add_argument("--bad-json", action="store_true")
     ap.add_argument("--rss-mb", type=int, default=0)
     args, _ = ap.parse_known_args()
@@ -59,6 +60,8 @@ def main() -> None:
             if self.path == "/tokenize":
                 return self._send(200, {"tokens": [0] * len(body.get("content", "").split())})
             if self.path.startswith("/slots/0"):
+                if args.reject_erase:
+                    return self._send(501, {"error": "slot erase not supported"})
                 state["last"] = []
                 return self._send(200, {"id_slot": 0})
             if args.fail_completion:

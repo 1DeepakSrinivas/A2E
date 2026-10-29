@@ -25,7 +25,7 @@ from a2e.bench import bench_args, perf_available, run_bench
 from a2e.agent.harness import Harness
 from a2e.agent.loop import AgentLoop, TurnRecord
 from a2e.agent.schema_gen import SchemaTooLarge, pad_tools
-from a2e.client import Client
+from a2e.client import CacheResetError, Client
 from a2e.config import RunConfig
 from a2e.hardware import Instruments, make_instruments, read_governor, set_governor, wait_for_cooldown
 from a2e.metrics.power_base import integrate_energy
@@ -344,15 +344,23 @@ class Runner:
         for r in range(total):
             phase = "warmup" if r < job["warmup"] else "measured"
             self.log({"event": "run_start", "job_id": job["job_id"], "repeat": r, "phase": phase})
+            # every repeat starts with a cold prefix cache, and how that was done is stored with the run
+            reset = getattr(client, "reset_cache", None)
             try:
-                client.reset_cache()  # every repeat starts with a cold prefix cache
-            except Exception:  # noqa: BLE001 - older servers or stubs without the endpoint
-                pass
+                how = (reset() or "unknown") if reset else "unsupported"  # stubs may have no such method
+            except CacheResetError as e:
+                how = "failed"
+                self.log({"event": "cache_reset", "how": how, "error": str(e)})
+                if job.get("prefix_cache", True):
+                    raise RuntimeError(f"no cold prefix cache: {e}") from e
+            if how not in ("erase", "unknown", "unsupported"):
+                self.log({"event": "cache_reset", "how": how})
             run_id = st.insert("runs", {
                 "exp_id": self.exp_id, "job_id": job["job_id"], "config_json": cfg_json, "device": job["device"],
                 "phase": phase, "repeat_idx": r, "task_kind": job["kind"], "status": "running",
                 "started_at": time.time(), "idle_power_w": info["idle_power_w"], "power_scope": inst.scope,
-                "load_time_s": info["load_time_s"], "server_json": server_json})
+                "load_time_s": info["load_time_s"],
+                "server_json": json.dumps({**json.loads(server_json), "cache_reset": how})})
             sampler = Sampler(info["pid"], inst.power, inst.thermal, hz=self.suite.run.sample_hz) if info["pid"] \
                 else None
             t_run0 = time.perf_counter()
