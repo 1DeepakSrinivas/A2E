@@ -31,7 +31,7 @@ from a2e.hardware import Instruments, make_instruments, read_governor, set_gover
 from a2e.metrics.power_base import integrate_energy
 from a2e.metrics.sampler import Sampler, measure_idle_power
 from a2e.plain import plain_prompts, run_plain
-from a2e.server import LlamaServer, build_args
+from a2e.server import THINKING_OFF, LlamaServer, build_args
 from a2e.settings import Settings, resolve_device
 from a2e.store import Store
 from a2e.suite import Suite, expand, load_suite, server_key
@@ -293,7 +293,7 @@ class Runner:
         slot_dir.mkdir(exist_ok=True)
         args = build_args(cfg, self.settings.llama_server, str(model_path), port=port, ctx=job["ctx"],
                           threads=job["threads"] or self.settings.threads, flash_attn=job["flash_attn"],
-                          slot_save_path=str(slot_dir))
+                          slot_save_path=str(slot_dir), thinking=job.get("thinking", "default"))
         srv = LlamaServer(args, port=port, log_path=log_dir / f"llama-server-{job['model']}-{job['quant']}.log")
         load_s = srv.start(timeout=900)
         info = {"args": args, "model_file": envmod.file_fingerprint(model_path)}
@@ -308,6 +308,8 @@ class Runner:
         srv, url, pid, load_s, info = self._start_server(job)
         self._server, self._server_key = srv, key
         client = (self.hooks.make_client or Client)(url)
+        if job.get("thinking") == "off":
+            client.template_kwargs = dict(THINKING_OFF)
         idle = None
         if inst.power and self.suite.run.idle_seconds > 0:
             idle = measure_idle_power(inst.power, self.suite.run.idle_seconds)

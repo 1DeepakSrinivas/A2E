@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import time
 from pathlib import Path
@@ -8,10 +9,12 @@ import httpx
 
 from a2e.config import RunConfig
 
+THINKING_OFF = {"enable_thinking": False}  # the Qwen3 chat template variable; other templates ignore it
+
 
 def build_args(cfg: RunConfig, bin_path: str, model_path: str, port: int = 8080,
                ctx: int = 8192, threads: int | None = None, flash_attn: str = "on",
-               slot_save_path: str | None = None) -> list[str]:
+               slot_save_path: str | None = None, thinking: str = "default") -> list[str]:
     """llama-server command line for a RunConfig.
 
     KV-cache quantization needs flash attention. `flash_attn` is passed as the value of
@@ -19,6 +22,8 @@ def build_args(cfg: RunConfig, bin_path: str, model_path: str, port: int = 8080,
     Metal is used on Mac via full GPU offload; the Pi runs CPU only.
     `slot_save_path` is required for `POST /slots/0?action=erase`: without `--slot-save-path` the
     server answers 501 to every slot action, so the cache could not be reset between repeats.
+    `thinking = "off"` passes `--chat-template-kwargs` so reasoning models (Qwen3) answer directly instead of
+    spending the token budget on a thinking block. Templates that ignore the variable are not affected.
     """
     args = [bin_path, "-m", model_path, "--port", str(port), "-c", str(ctx), "--jinja",
             "--flash-attn", flash_attn]
@@ -29,6 +34,8 @@ def build_args(cfg: RunConfig, bin_path: str, model_path: str, port: int = 8080,
         args += ["--cache-type-k", cfg.kv_quant, "--cache-type-v", cfg.kv_quant]
     if slot_save_path:
         args += ["--slot-save-path", slot_save_path]
+    if thinking == "off":
+        args += ["--chat-template-kwargs", json.dumps(THINKING_OFF)]
     return args
 
 

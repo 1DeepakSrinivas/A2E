@@ -42,6 +42,7 @@ These settings are passed to llama-server. Jobs that differ in any of them use a
 | `ctx` | integer, 512 or more | `8192` | Context size in tokens (`-c`). BFCL multi-turn categories need 16384 or more. |
 | `flash_attn` | string | `"on"` | Value for `--flash-attn`. Newer llama.cpp builds take `on`, `off` or `auto`. KV cache quantization needs flash attention. |
 | `threads` | integer, 0 or more | `0` | Value for `-t`. 0 means use `[machine] threads` from `local.toml`, or llama.cpp's own default if that is unset. |
+| `thinking` | string | `"default"` | `"off"` starts llama-server with `--chat-template-kwargs '{"enable_thinking": false}'` and also sends that variable with every chat template request, so reasoning models such as Qwen3 answer directly instead of spending the token budget on a thinking block. Chat templates without that variable (Gemma 3, for one) are not affected. Only `"off"` is stored in a job's settings, so suites written before this field keep their job keys. A suite uses one value, and a different value starts a separate server. |
 
 A2E always passes `--jinja`, and passes `-ngl 99` on the Mac (all layers on the GPU) and `-ngl 0` on the Pi (CPU only). It adds `--cache-type-k` and `--cache-type-v` when `kv_quant` is not `f16`.
 

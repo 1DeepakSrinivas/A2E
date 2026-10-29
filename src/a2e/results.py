@@ -17,9 +17,9 @@ import pandas as pd
 from a2e.store import Store
 
 CONFIG_FIELDS = ["device", "model", "quant", "kv_quant", "task_kind", "family", "depth", "n_args", "category",
-                 "grammar", "prefix_cache", "decode_len", "schema_len", "governor", "harness"]
+                 "grammar", "prefix_cache", "decode_len", "schema_len", "governor", "harness", "thinking"]
 DEFAULT_BY = ["device", "model", "quant", "kv_quant", "task_kind", "family", "category", "grammar", "prefix_cache",
-              "decode_len", "schema_len", "harness"]
+              "decode_len", "schema_len", "harness", "thinking"]
 STAGES = ["prefill_ms", "decode_ms", "parse_ms", "validate_ms", "tool_wait_ms", "template_ms", "harness_ms"]
 
 
@@ -250,7 +250,7 @@ def case_resources(store: Store, exp_id=None, phase: str = "measured") -> pd.Dat
     per_task = t.groupby(["run_id", "task_id"]).apply(agg, include_groups=False).reset_index()
     out = c.merge(per_task, left_on=["run_id", "case_id"], right_on=["run_id", "task_id"], how="left")
     keep = ["exp_id", "run_id", "repeat_idx", "device", "model", "quant", "kv_quant", "task_kind", "family", "depth",
-            "n_args", "grammar", "prefix_cache", "decode_len", "schema_len", "harness", "category", "case_id",
+            "n_args", "grammar", "prefix_cache", "decode_len", "schema_len", "harness", "thinking", "category", "case_id",
             "valid", "turns", "wall_ms", "energy_j", "avg_power_w", "peak_rss_mb", "max_temp_c"]
     out = out[[k for k in keep if k in out.columns]]
     return out.sort_values(["exp_id", "run_id", "case_id"]).reset_index(drop=True)

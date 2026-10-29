@@ -17,7 +17,7 @@ def test_results_from_before_harness_variants_read_as_baseline(tmp_path):
     db.commit()
     db.close()
     s = Store(p)
-    assert s.version == 3
+    assert s.version == len(MIGRATIONS)
     run = s.query("SELECT harness, prompt_format, context, recovery, stopping FROM v_runs")[0]
     assert run == {"harness": "baseline", "prompt_format": "json_schema", "context": "full", "recovery": "none",
                    "stopping": "fixed"}
@@ -36,3 +36,17 @@ def test_variant_fields_in_the_config_show_up_in_every_view():
     cols = "harness, prompt_format, context, recovery, stopping"
     for view in ("v_runs", "v_turns", "v_cases"):
         assert tuple(s.query(f"SELECT {cols} FROM {view}")[0].values()) == want
+
+
+def test_thinking_reads_as_default_for_older_runs_and_shows_the_stored_value():
+    s = Store(":memory:")
+    old = s.insert("runs", {"config_json": json.dumps({"model": "m"}), "device": "mac", "phase": "measured",
+                            "started_at": 0.0})
+    new = s.insert("runs", {"config_json": json.dumps({"model": "m", "thinking": "off"}), "device": "mac",
+                            "phase": "measured", "started_at": 0.0})
+    for rid in (old, new):
+        s.insert("turns", {"run_id": rid, "task_id": "a"})
+        s.insert("cases", {"run_id": rid, "case_id": "a", "category": "c", "valid": 1})
+    for view in ("v_runs", "v_turns", "v_cases"):
+        got = {r["thinking"] for r in s.query(f"SELECT thinking FROM {view}")}
+        assert got == {"default", "off"}, view

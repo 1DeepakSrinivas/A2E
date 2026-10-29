@@ -239,7 +239,7 @@ n = 3
 | BFCL multi turn | 9 | `multi_turn_base` 4, `multi_turn_miss_func` 2, `multi_turn_miss_param` 3: state across user turns, tools revealed later, missing arguments |
 | Custom chains | 26 | `calc` (2 and 4 calls), `notes` (3), `retrieval` and `fs_search` (2 and 4), `fs_organize`, `math` and `fs_math` (3 and 5): longer horizons with real tools |
 
-The two `# EDIT` lines in `configs/suites/full_eval.toml` set the two models and the two quants. Use names from `configs/models.toml`. The suite runs once per job and has no warm-up, so there is no repeat-to-repeat spread. Read the report by category and family totals, because a single cell has only 2 to 4 tasks. The live `web` family is left out because live results change.
+The two `# EDIT` lines in `configs/suites/full_eval.toml` set the two models and the two quants. The suite sets `thinking = "off"`, so reasoning models such as Qwen3 answer directly and their token budget goes to the tool call. Use names from `configs/models.toml`. The suite runs once per job and has no warm-up, so there is no repeat-to-repeat spread. Read the report by category and family totals, because a single cell has only 2 to 4 tasks. The live `web` family is left out because live results change.
 
 ```bash
 scripts/run_suite.sh full_eval

@@ -208,7 +208,7 @@ Power sources:
 
 The views drop runs whose status is not `complete`.
 
-`v_runs` is `runs` plus these columns read from `config_json`: `model`, `quant`, `kv_quant`, `grammar`, `prefix_cache`, `decode_len`, `schema_len`, `family`, `depth`, `n_args`, `category` and `governor`. Booleans read from JSON appear as 1 or 0. It also has `harness` (the name of the harness setting, `baseline` when none), `prompt_format`, `context`, `recovery` and `stopping`. Runs stored before harness variants existed read as `baseline`, `json_schema`, `full`, `none` and `fixed`.
+`v_runs` is `runs` plus these columns read from `config_json`: `model`, `quant`, `kv_quant`, `grammar`, `prefix_cache`, `decode_len`, `schema_len`, `family`, `depth`, `n_args`, `category` and `governor`. Booleans read from JSON appear as 1 or 0. It also has `harness` (the name of the harness setting, `baseline` when none), `prompt_format`, `context`, `recovery`, `stopping` and `thinking` (`off` when the suite switched thinking off, otherwise `default`). Runs stored before harness variants existed read as `baseline`, `json_schema`, `full`, `none` and `fixed`.
 
 `v_turns` is `turns` plus `exp_id`, `job_id`, `phase`, `repeat_idx`, `task_kind`, `device`, `idle_power_w` and the `v_runs` setting columns.
 

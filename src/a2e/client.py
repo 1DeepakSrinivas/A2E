@@ -58,6 +58,10 @@ FLUSH_PROMPT = "a2e cache flush 0x7f3a9c21 zebra quartz lantern 4417 unrelated f
 class Client:
     def __init__(self, base_url: str, timeout: float = 600.0):
         self.http = httpx.Client(base_url=base_url, timeout=timeout)
+        # Extra chat template variables sent with every /apply-template call (the runner sets
+        # {"enable_thinking": False} when a suite turns thinking off). The server's own
+        # --chat-template-kwargs option may not reach this endpoint on every build, so both are set.
+        self.template_kwargs: dict | None = None
 
     def complete(self, prompt: str, n_predict: int, grammar: str | None = None,
                  cache_prompt: bool = True, temperature: float = 0.0, seed: int = 0,
@@ -96,7 +100,10 @@ class Client:
 
     def apply_template(self, messages: list[dict]) -> str:
         """Render messages with the model's own chat template (role markup only, no tools)."""
-        r = self.http.post("/apply-template", json={"messages": messages})
+        body: dict = {"messages": messages}
+        if self.template_kwargs:
+            body["chat_template_kwargs"] = self.template_kwargs
+        r = self.http.post("/apply-template", json=body)
         r.raise_for_status()
         return r.json()["prompt"]
 

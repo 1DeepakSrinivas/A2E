@@ -32,7 +32,7 @@ AXES_FOR_KIND = {
 }
 HARNESS_KINDS = ("custom", "bfcl")  # the kinds that call tools; plain prompts and bench jobs have no harness
 KIND_ORDER = {"plain": 0, "custom": 1, "bfcl": 2, "bench": 3}  # bench last: it needs the server stopped
-SERVER_FIELDS = ("device", "model", "quant", "kv_quant", "ctx", "flash_attn", "threads")
+SERVER_FIELDS = ("device", "model", "quant", "kv_quant", "ctx", "flash_attn", "threads", "thinking")
 
 
 class ConfigError(ValueError):
@@ -62,6 +62,10 @@ class Server(_Strict):
     ctx: int = Field(8192, ge=512)
     flash_attn: str = "on"
     threads: int = Field(0, ge=0)  # 0 = use [machine] threads from local.toml, or llama.cpp's default
+    # "off" starts llama-server with --chat-template-kwargs {"enable_thinking": false}, so reasoning models such as
+    # Qwen3 answer directly instead of spending the token budget on a thinking block. Models whose chat template has
+    # no such variable are unaffected.
+    thinking: Literal["default", "off"] = "default"
 
 
 class RunOpts(_Strict):
@@ -191,6 +195,8 @@ class Suite(_Strict):
         d = json.loads(self.model_dump_json())
         if not d["harness"]:  # keeps the hash of every suite written before harness variants existed
             del d["harness"]
+        if d["server"]["thinking"] == "default":  # likewise for suites written before the thinking switch
+            del d["server"]["thinking"]
         return d
 
     @property
@@ -219,7 +225,7 @@ def job_key(cfg: dict) -> str:
 
 
 def server_key(cfg: dict) -> tuple:
-    return tuple(cfg[k] for k in SERVER_FIELDS)
+    return tuple(cfg.get(k, "default" if k == "thinking" else None) for k in SERVER_FIELDS)
 
 
 def feasibility(cfg: dict, settings: Settings) -> str | None:
@@ -241,6 +247,8 @@ def expand(suite: Suite, settings: Settings) -> list[dict]:
     base = {"seed": suite.suite.seed, "warmup": suite.repeats.warmup, "measured": suite.repeats.measured,
             "ctx": suite.server.ctx, "flash_attn": suite.server.flash_attn,
             "threads": suite.server.threads}  # 0 = machine default; local.toml threads apply at launch only
+    if suite.server.thinking != "default":
+        base["thinking"] = suite.server.thinking  # stored only when set, so old jobs keep their keys
     for dev, model, quant, kv in itertools.product(m.device, m.model, m.quant, m.kv_quant):
         cell = {**base, "device": dev, "model": model, "quant": quant, "kv_quant": kv}
         for task in suite.tasks:

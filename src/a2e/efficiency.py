@@ -22,12 +22,12 @@ from a2e import results as R
 from a2e.store import Store
 
 EFFICIENCY_BY = ["device", "model", "quant", "kv_quant", "task_kind", "family", "depth", "category", "harness",
-                 "grammar"]
-PAIR_BY = ["device", "model", "quant", "kv_quant", "task_kind", "family", "depth", "category", "harness"]
+                 "thinking", "grammar"]
+PAIR_BY = ["device", "model", "quant", "kv_quant", "task_kind", "family", "depth", "category", "harness", "thinking"]
 # Everything that defines the task and the server setting except the harness. Two runs with the same cell are the
 # same work done under different harnesses, so they can be compared task by task.
 CELL_FIELDS = ["device", "model", "quant", "kv_quant", "task_kind", "family", "depth", "n_args", "category",
-               "grammar", "prefix_cache", "decode_len", "schema_len"]
+               "grammar", "prefix_cache", "decode_len", "schema_len", "thinking"]
 # The task part of the cell. Variance shares are computed after removing the mean of each task cell, so that
 # "easy and hard tasks use different energy" is not counted as an effect of the model or the harness.
 TASK_FIELDS = ["task_kind", "family", "depth", "n_args", "category", "grammar", "prefix_cache", "decode_len",

@@ -166,6 +166,46 @@ MIGRATIONS: list[str] = [
              v.harness, v.prompt_format, v.context, v.recovery, v.stopping
         FROM cases c JOIN v_runs v ON v.run_id = c.run_id;
     """,
+    # ---- version 4: thinking switch -----------------------------------------------------------------
+    # Runs made before it read as "default", the model's own thinking behavior.
+    """
+    DROP VIEW v_cases;
+    DROP VIEW v_turns;
+    DROP VIEW v_runs;
+    CREATE VIEW v_runs AS
+      SELECT r.*,
+             json_extract(r.config_json, '$.model') AS model,
+             json_extract(r.config_json, '$.quant') AS quant,
+             json_extract(r.config_json, '$.kv_quant') AS kv_quant,
+             json_extract(r.config_json, '$.grammar') AS grammar,
+             json_extract(r.config_json, '$.prefix_cache') AS prefix_cache,
+             json_extract(r.config_json, '$.decode_len') AS decode_len,
+             json_extract(r.config_json, '$.schema_len') AS schema_len,
+             json_extract(r.config_json, '$.family') AS family,
+             json_extract(r.config_json, '$.depth') AS depth,
+             json_extract(r.config_json, '$.n_args') AS n_args,
+             json_extract(r.config_json, '$.category') AS category,
+             json_extract(r.config_json, '$.governor') AS governor,
+             COALESCE(json_extract(r.config_json, '$.harness'), 'baseline') AS harness,
+             COALESCE(json_extract(r.config_json, '$.prompt_format'), 'json_schema') AS prompt_format,
+             COALESCE(json_extract(r.config_json, '$.context'), 'full') AS context,
+             COALESCE(json_extract(r.config_json, '$.recovery'), 'none') AS recovery,
+             COALESCE(json_extract(r.config_json, '$.stopping'), 'fixed') AS stopping,
+             COALESCE(json_extract(r.config_json, '$.thinking'), 'default') AS thinking
+        FROM runs r WHERE r.status = 'complete';
+    CREATE VIEW v_turns AS
+      SELECT t.*, v.exp_id, v.job_id, v.phase, v.repeat_idx, v.task_kind, v.device, v.idle_power_w,
+             v.model, v.quant, v.kv_quant, v.grammar, v.prefix_cache, v.decode_len, v.schema_len,
+             v.family, v.depth, v.n_args, v.category, v.governor,
+             v.harness, v.prompt_format, v.context, v.recovery, v.stopping, v.thinking
+        FROM turns t JOIN v_runs v ON v.run_id = t.run_id;
+    CREATE VIEW v_cases AS
+      SELECT c.*, v.exp_id, v.job_id, v.phase, v.repeat_idx, v.task_kind, v.device,
+             v.model, v.quant, v.kv_quant, v.grammar, v.prefix_cache, v.decode_len, v.schema_len,
+             v.family, v.depth, v.n_args, v.governor,
+             v.harness, v.prompt_format, v.context, v.recovery, v.stopping, v.thinking
+        FROM cases c JOIN v_runs v ON v.run_id = c.run_id;
+    """,
 ]
 
 TABLES = ("experiments", "jobs", "runs", "turns", "cases", "samples", "bench", "kernels")

@@ -56,7 +56,10 @@ def main() -> None:
             body = json.loads(self.rfile.read(n) or b"{}")
             if self.path == "/apply-template":
                 text = "".join(f"<|im_start|>{m['role']}\n{m['content']}<|im_end|>\n" for m in body["messages"])
-                return self._send(200, {"prompt": text + "<|im_start|>assistant\n"})
+                # like Qwen3's template: with enable_thinking false the assistant turn starts with an empty think block
+                think_off = (body.get("chat_template_kwargs") or {}).get("enable_thinking") is False
+                return self._send(200, {"prompt": text + "<|im_start|>assistant\n"
+                                        + ("<think>\n\n</think>\n\n" if think_off else "")})
             if self.path == "/tokenize":
                 return self._send(200, {"tokens": [0] * len(body.get("content", "").split())})
             if self.path.startswith("/slots/0"):

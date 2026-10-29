@@ -4,6 +4,8 @@
 #   scripts/report_full_eval.sh <experiment id>
 # One measured run and no warm-up, so there is no repeat-to-repeat spread. Read results by category and family
 # totals, not by single cells (a cell is 2 to 4 tasks). The `web` family is left out because live results change.
+# Thinking is switched off for every model (see [server] thinking below): Qwen3 otherwise spends the whole 256-token
+# budget on a thinking block, the reply is cut off, and the tool call is lost.
 [suite]
 name = "full_eval"
 description = "50 tasks per model, quant and grammar setting: BFCL single and multi-turn plus custom chains of 2 to 5 calls."
@@ -15,6 +17,7 @@ measured = 1
 
 [server]
 ctx = 16384  # BFCL multi-turn needs 16384 or more
+thinking = "off"  # llama-server --chat-template-kwargs {"enable_thinking": false}; templates without it are unaffected
 
 [run]
 idle_seconds = 20

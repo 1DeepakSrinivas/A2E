@@ -163,3 +163,17 @@ uv run a2e results plots figures/             # the six figures with their table
   shows up.
 - The tasks come from the custom local-tool families and curated BFCL categories. A harness result does not carry
   over to other tasks without a new run.
+
+## Amendment 2 (2026-10-29): thinking is switched off in `full_eval`
+
+Added after the first `full_eval` run on the Mac, before any pre-registered sweep. With the 256-token `decode_len`,
+Qwen3 used the whole budget on its thinking block when grammar was off. Replies were cut off before the tool call, so
+custom chains scored 0% for a reason that has nothing to do with tool calling. Gemma 3 has no thinking block and was
+not affected. The `[server] thinking = "off"` setting turns thinking off for every model that has the template
+variable. `full_eval` now uses it, and runs record it (`thinking` in the run's settings, `default` for older runs).
+
+- Results from runs made before this amendment, and runs with `thinking = "default"`, are not comparable with runs
+  that have `thinking = "off"` for models with a thinking mode. The report and the efficiency views keep them apart.
+- `harness_ablation` is unchanged and still uses the model's default behavior. If thinking should be off there too,
+  that is a further dated amendment before its sweep, because it changes the baseline every harness is compared with.
+- The fixed 10% margin and all decision rules of Amendment 1 are unchanged.
