@@ -262,4 +262,20 @@ Power and energy columns are empty, never zero, when the run had no power source
 
 `a2e results kernels` averages each function's share over measured runs and ranks the functions per configuration and test.
 
+`a2e results efficiency` measures how much energy an agent spends per completed task. It uses the scored tasks of measured runs, with each task's energy from `task-resources`. Everything is computed per run and then averaged over the measured runs of a configuration. Rows without energy stay empty.
+
+| Column | Meaning |
+|---|---|
+| `tasks`, `successes` | Scored tasks in a run, and how many passed |
+| `success_rate` | `successes` / `tasks` |
+| `energy_j` | Energy over all scored tasks of the run, failures included |
+| `j_per_task` | `energy_j` / `tasks` |
+| `j_per_success` | `energy_j` / `successes`. Empty when nothing passed. A failed attempt counts against the configuration. |
+| `waste_share` | Energy of failed tasks / `energy_j` |
+| `_sd` columns | Standard deviation across the measured runs |
+| `on_front` | (`frontier` view) True when no other row on the same device, task kind and category has lower or equal `j_per_task` and higher or equal `success_rate`, with one strict |
+| `budget_j`, `tasks_done`, `successes` | (`budget` view) Tasks the budget buys when the suite runs in order. A task that would overshoot is not counted. Without a given budget list, ten values up to the median full-suite energy of each device are used. |
+| `*_delta`, `*_ratio` | (`grammar` view) Grammar on minus off, and on divided by off. A `j_per_gen_token_ratio` above 1 means grammar made each generated token cost more. |
+| `prefill_share`, `decode_share`, `tool_wait_share`, `other_share` | (`stages` view) Shares of attributed energy. `other_share` is parsing, validation, templating and harness time. |
+
 `a2e results stability` takes each job's tasks in order and computes decode tokens per second per task. It reports the mean of the first 3 tasks, the mean of the last 3, and the first task (from the fourth on) whose speed is below 90% of the first 3. This marks where thermal throttling starts to slow decoding. It also reports the highest temperature and the number of tasks during which the Pi reported throttling.

@@ -206,7 +206,34 @@ Exact versions are locked in `uv.lock`. Status: Verified (installed and exercise
 
 ---
 
+## 7. Related work for the success-per-joule study
+
+All entries below were found by web search on 2026-10-29 and only their summaries were read. Status: **From
+summary**. Read each paper in full before citing it.
+
+- **TinyLLM** (arXiv 2511.22138): small models on BFCL for agentic tasks on edge devices. Closest prior work.
+  Check whether it reports energy.
+- **SWEnergy** (ICSE 2026 AGENT workshop): energy of agent frameworks with small models on SWE-bench Verified Mini.
+- **Token Arena** (arXiv 2605.00300): joules per correct answer for inference endpoints.
+- **Towards Sustainable Web Agents** (arXiv 2502.17903): argues for energy metrics for agents.
+- **Where Does the Energy Go? Profiling LLM Agent Inference on Blackwell GPUs** (arXiv 2609.29707): context growth
+  and tool idle time on GPUs.
+- **Agentic AI Workload Characteristics** (arXiv 2605.26297) and **TokenPowerBench** (arXiv 2512.03024).
+- **AI Agents That Matter** (arXiv 2407.01502, https://agents.cs.princeton.edu/): cost-controlled agent
+  evaluation. **What Moves the Pareto Frontier in Tool-Using Agents?** (ACL SRW 2026): token-budget Pareto study.
+- **Sustainable LLM Inference for Edge AI** (arXiv 2504.03360): accuracy against energy per response on edge devices.
+- **Flat Score, Amplified Failures** (arXiv 2607.27275) and **Which Decisions Low-Bit Quantization Breaks**
+  (arXiv 2608.06564): quantization damage to agents and tool calling.
+- **Constrained Decoding Eliminates Structural Failures in Small LLMs** (arXiv 2609.23742), **Alignment Tax of
+  Constrained Decoding** (arXiv 2604.06066), **JSONSchemaBench** (arXiv 2501.10868): accuracy effects of
+  constrained decoding.
+- **GreenBench** (arXiv 2608.28667): notes that `powermetrics` excludes DRAM.
+- **RPi5-power** (https://github.com/jfikar/RPi5-power): community Pi 5 PMIC calibration against a USB-C meter.
+
+---
+
 ## Change log
+- 2026-10-29: added section 7, related work for the success-per-joule study.
 - 2026-10-28: BFCL file system and math tools, curated small file systems, Brave Search API for live web search.
 - 2026-10-28: Phase 5 added SQLite store v2, suites, runner, results, TUI, llama-bench/perf bench jobs; added
   entries for llama-bench, Linux perf, cpufreq, SQLite and Textual.
