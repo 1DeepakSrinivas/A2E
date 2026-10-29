@@ -230,9 +230,24 @@ summary**. Read each paper in full before citing it.
 - **GreenBench** (arXiv 2608.28667): notes that `powermetrics` excludes DRAM.
 - **RPi5-power** (https://github.com/jfikar/RPi5-power): community Pi 5 PMIC calibration against a USB-C meter.
 
+### Harness effects (searched 2026-10-29; status From summary)
+- **Stop Comparing LLM Agents Without Disclosing the Harness** (arXiv 2605.23950, ICML 2026): harness choice moves
+  scores; proposes a variance-decomposition protocol.
+- **AgencyBench** (arXiv 2601.11044): a model gains 20.5% in its native harness.
+- **SWE-Serve** (arXiv 2609.26777) and **From Question Answering to Task Completion** (survey, arXiv 2606.20683):
+  model-specific harnesses and richer scaffolds did not always help.
+- **The Scaffold Effect in Coding Agents** (arXiv 2607.22585): up to 40x tokens per solved task with small pass-rate
+  differences. **BankerToolBench** (arXiv 2604.11304): modest accuracy effect, large runtime effect.
+- **SWEnergy** (arXiv 2512.09543): framework design drove up to 9.4x energy with small models.
+- **The Complexity Trap** (arXiv 2508.21433): observation masking as good as LLM summarization. **Less Context,
+  Better Agents** (arXiv 2606.10209): pruning plus a running summary cut tokens about 60%.
+- **Small Reasoning Models are Instruction Followers in Function Calling** (arXiv 2608.22472): rigid schemas and
+  small-model function calling; contested.
+
 ---
 
 ## Change log
+- 2026-10-29: added harness-effect references to section 7.
 - 2026-10-29: added section 7, related work for the success-per-joule study.
 - 2026-10-28: BFCL file system and math tools, curated small file systems, Brave Search API for live web search.
 - 2026-10-28: Phase 5 added SQLite store v2, suites, runner, results, TUI, llama-bench/perf bench jobs; added

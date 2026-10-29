@@ -368,6 +368,11 @@ uv run a2e results efficiency frontier        # the same with the Pareto front m
 uv run a2e results efficiency budget          # tasks completed on a fixed energy budget
 uv run a2e results efficiency grammar         # grammar off against on for the same configuration
 uv run a2e results efficiency stages          # share of energy in prefill, decode, tool wait and the rest
+uv run a2e results efficiency harness         # does the harness change joules per success? ratios, intervals, verdict
+uv run a2e results efficiency decomposition   # calls per task, joules per call and success rate behind a harness effect
+uv run a2e results efficiency noise           # run-to-run noise of the baseline harness and the margin check
+uv run a2e results efficiency variance        # share of variance from device, model, quantization and harness
+uv run a2e results plots figures/             # the harness figures as PNG with their tables (needs `uv sync --extra plots`)
 uv run a2e results stability --exp 3          # speed drift over long sessions
 uv run a2e results bench --exp 5              # llama-bench prefill/decode speed and decode bandwidth
 uv run a2e results kernels --exp 5 --top 10   # top perf kernels per test (Pi)

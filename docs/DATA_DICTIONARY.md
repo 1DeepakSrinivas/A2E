@@ -279,4 +279,16 @@ Power and energy columns are empty, never zero, when the run had no power source
 | `*_delta`, `*_ratio` | (`grammar` view) Grammar on minus off, and on divided by off. A `j_per_gen_token_ratio` above 1 means grammar made each generated token cost more. |
 | `prefill_share`, `decode_share`, `tool_wait_share`, `other_share` | (`stages` view) Shares of attributed energy. `other_share` is parsing, validation, templating and harness time. |
 
+`a2e results efficiency harness` compares each harness with the baseline harness on the same tasks. The ratio is of joules per success, as the geometric mean over cells (one cell is one device, model, quantization, task family or category and server setting) of the variant's value divided by the baseline's. The interval is a bootstrap percentile interval over tasks.
+
+| Column | Meaning |
+|---|---|
+| `cells`, `tasks` | Cells compared and tasks in them. Only tasks run under both harnesses count. |
+| `cells_undefined`, `cells_lost` | Cells that could not be compared, and cells where the baseline passed some tasks but the variant passed none |
+| `ratio`, `lo`, `hi` | Variant over baseline, with the 90% interval. Above 1 is costlier. `inf` when the variant never succeeds. |
+| `lower_bound`, `upper_bound` | The equivalence bounds, 1 / (1 + margin) and 1 + margin |
+| `verdict` | `equivalent` (interval inside the bounds), `differs` (outside them) or `inconclusive` |
+
+`decomposition` splits a change into `d_log_turns` (model calls per task), `d_log_j_per_turn` (joules per call) and `d_log_success` (success rate), all as natural-log ratios against the baseline, averaged over cells. `d_log_total = d_log_turns + d_log_j_per_turn − d_log_success`. `turns_share` is the share of the absolute change that comes from the first term. `noise` lists, for each baseline cell, `sd_log` (the standard deviation of log joules per success over the repeats) and `max_ratio` (the largest gap between two repeats). `variance` gives `eta2` and `omega2` for each factor, with `omega2_lo` and `omega2_hi` as the 90% interval. `stages` adds `harness_code_share`, the share of energy in the harness's own code, when `energy_harness_j` was recorded.
+
 `a2e results stability` takes each job's tasks in order and computes decode tokens per second per task. It reports the mean of the first 3 tasks, the mean of the last 3, and the first task (from the fourth on) whose speed is below 90% of the first 3. This marks where thermal throttling starts to slow decoding. It also reports the highest temperature and the number of tasks during which the Pi reported throttling.
