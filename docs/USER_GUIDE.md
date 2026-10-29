@@ -153,6 +153,7 @@ A `FAIL` line stops `scripts/run_suite.sh`. A `warn` line does not, e.g., a miss
 | `bfcl` | Accuracy and cost on every BFCL category in scope for every model, quantization and KV cache setting. | 720 | 80 | 1,440 | 36 |
 | `cache_ablation` | Prefix cache on and off, KV cache f16 and q8_0, over long chains and BFCL multi-turn. | 120 | 0 | 480 | 12 |
 | `local_tools` | File search, file organizing, math and file plus math chains of 2 to 5 calls, on small BFCL file systems, for every model at Q4_0 and Q8_0. | 1,080 | 120 | 4,320 | 18 |
+| `full_eval` | One broad report: 50 tasks per model, quant and grammar setting, from single BFCL calls and multi-turn BFCL to custom chains of 2 to 5 calls. One measured run, no warm-up. Edit the two marked lines for your models and quants. | 336 | 0 | 336 | 8 |
 | `harness_ablation` | Eleven harness settings (prompt format, context management, error recovery, stopping rules, and two combinations) against the baseline on the same tasks, for Qwen3-4B and xLAM-2 3B at Q4_0. | 572 | 0 | 2,288 | 4 |
 | `web_live` | Live web search through the Brave Search API on Qwen3-4B and Phi-4-mini. Needs a key and network access. | 24 | 0 | 48 | 4 |
 | `kernels` | llama-bench prefill and decode tests for every model, quantization and KV cache setting, with the top kernels from Linux perf on the Pi. | 36 | 4 | 36 | 0 |
@@ -227,6 +228,26 @@ kind = "bfcl"
 category = ["simple_python", "irrelevance"]
 n = 3
 ```
+
+### 6.2a The full evaluation
+
+`full_eval` is the suite to run when you want one clean report across difficulty levels. It has 50 tasks for each combination of device, model, quant and grammar setting (grammar off and on):
+
+| Group | Tasks | What it shows |
+|---|---|---|
+| BFCL single turn | 15 | `simple_python` 4, `multiple` 3, `parallel` 3, `parallel_multiple` 2, `irrelevance` 3: one call, choosing a tool, several calls, declining |
+| BFCL multi turn | 9 | `multi_turn_base` 4, `multi_turn_miss_func` 2, `multi_turn_miss_param` 3: state across user turns, tools revealed later, missing arguments |
+| Custom chains | 26 | `calc` (2 and 4 calls), `notes` (3), `retrieval` and `fs_search` (2 and 4), `fs_organize`, `math` and `fs_math` (3 and 5): longer horizons with real tools |
+
+The two `# EDIT` lines in `configs/suites/full_eval.toml` set the two models and the two quants. Use names from `configs/models.toml`. The suite runs once per job and has no warm-up, so there is no repeat-to-repeat spread. Read the report by category and family totals, because a single cell has only 2 to 4 tasks. The live `web` family is left out because live results change.
+
+```bash
+scripts/run_suite.sh full_eval
+uv run a2e results list                    # find the experiment id
+scripts/report_full_eval.sh 1              # writes results/full_eval_1/
+```
+
+`report.md` has every table. The CSV files in the same folder cut the numbers by model, BFCL category, and custom family and depth, and hold the success-per-joule, Pareto, grammar-effect, energy-by-stage and energy-budget views. Set `OUT_DIR=somewhere` to write the folder elsewhere. The run can be stopped and resumed.
 
 ### 6.3 The four task kinds
 

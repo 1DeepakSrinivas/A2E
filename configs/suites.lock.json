@@ -29,6 +29,11 @@
     "jobs": 1440,
     "suite_hash": "d2590c79132c7333"
   },
+  "full_eval": {
+    "job_keys_sha": "554b1b35ad5f5821",
+    "jobs": 336,
+    "suite_hash": "5171762a7d8406c1"
+  },
   "harness_ablation": {
     "job_keys_sha": "80e5ad691b174f7b",
     "jobs": 572,

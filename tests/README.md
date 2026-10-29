@@ -26,6 +26,8 @@ Helpers:
 - `tests/oracle.py` and `tests/bfcl_oracle.py` turn expected answers into model output. `oracle_outputs_any` works for every custom family.
 - `tests/fakes/fake_brave.py` is a local stand-in for the Brave Search API and the pages its results point to.
 
+The full evaluation suite is checked by `tests/unit/test_full_eval_suite.py` (50 tasks per configuration, coverage of every category and horizon) and `tests/integration/test_full_eval_runner.py` (one model and quant run end to end, then the report script).
+
 The harness statistics are tested in `tests/unit/test_harness_effect.py` (equivalence verdicts against known effects, decomposition identity, noise floor, variance shares) and the figures in `tests/unit/test_harness_plots.py` (needs `uv sync --extra plots`).
 
 The tests for harness variants are `tests/unit/test_harness_variants.py` (prompt formats, context views, budgets, stop rules, suite expansion and job-key stability), `tests/unit/test_store_v3.py` (the migration), `tests/integration/test_harness_loop.py`, `tests/integration/test_harness_bfcl.py` and `tests/integration/test_harness_runner.py` (the loop, BFCL runners and a whole runner pass under each variant).
