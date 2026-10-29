@@ -78,3 +78,22 @@ def test_test_group_commands_are_well_formed():
     files = [p for p in g["runner"].command() if p.endswith(".py")]
     assert len(files) == 4 and all(p.startswith(str(__import__("a2e.settings").settings.REPO)) for p in files)
     assert g["hardware"].env == ["A2E_LLAMA_SERVER", "A2E_GGUF"]
+
+
+def test_run_stops_when_power_is_required_but_missing(env, monkeypatch):
+    import os
+
+    import a2e.cli
+    from a2e import hardware
+    real = a2e.cli._settings
+
+    def required(db=None, device=None):
+        s = real(db, device)
+        s.power = "required"
+        return s
+
+    monkeypatch.setattr(a2e.cli, "_settings", required)
+    monkeypatch.setattr(os, "geteuid", lambda: 501, raising=False)
+    monkeypatch.setattr(hardware.shutil, "which", lambda name: "/usr/bin/" + name)
+    r = runner.invoke(app, ["run", "smoke"])
+    assert r.exit_code == 2 and "required" in r.output and "root" in r.output

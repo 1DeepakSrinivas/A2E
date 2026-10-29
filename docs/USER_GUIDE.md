@@ -75,7 +75,7 @@ LLAMA_COMMIT=<sha> scripts/setup_mac.sh
 uv sync --extra bfcl --extra tui
 ```
 
-Energy readings on the Mac come from `powermetrics`, which only works as root. To record energy you run A2E with `sudo -E`. Without root, A2E still runs and records everything except power and thermal pressure.
+Energy readings on the Mac come from `powermetrics`, which only works as root. To record energy you run A2E with `sudo -E`. Without root, A2E still runs and records everything except power and thermal pressure, and it prints a line that starts with `WARNING: no energy will be recorded`. To make such a run stop instead, set `power = "required"` in `configs/local.toml`.
 
 ### 3.3 Model files
 
@@ -105,7 +105,7 @@ The important fields are:
 - `db`, which is the results database file (the default is `results/a2e.db`)
 - `device`, which you only set if automatic detection fails (`pi5` or `mac`)
 - `cooler`, which records whether the Pi has its active cooler fitted
-- `power`, which is `auto` to record energy or `none` to skip it
+- `power`, which is `auto` to record energy when possible, `none` to skip it, or `required` to stop with an error when energy cannot be recorded
 
 The `web` task family also needs a Brave Search API key in the environment. A2E never reads the key from a file.
 
@@ -462,7 +462,7 @@ If a hardware test fails, its message names the part of the interface that did n
 
 **A job was skipped with "core tools need ... tokens".** The task's tool descriptions do not fit in the requested schema length, e.g., the retrieval family at 256 tokens. This is expected in the factorial suite.
 
-**No energy columns in the summary.** On the Mac, run with `sudo -E`. On the Pi, check that `vcgencmd pmic_read_adc` prints rail readings. Check `power = "auto"` in `configs/local.toml`. `a2e results report` prints the power scope that was recorded.
+**No energy columns in the summary.** On the Mac, run with `sudo -E`. On the Pi, check that `vcgencmd pmic_read_adc` prints rail readings. Check `power = "auto"` in `configs/local.toml`, and look for the `WARNING: no energy will be recorded` line at the start of the run. Use `power = "required"` to make such a run fail early. `a2e results report` prints the power scope that was recorded.
 
 **llama-server does not start.** A2E writes the server's own log to `results/work/exp<N>/llama-server-<model>-<quant>.log`. Older llama.cpp builds may not accept `--flash-attn on`. In that case set `flash_attn` in the suite's `[server]` table to the value your build accepts.
 
