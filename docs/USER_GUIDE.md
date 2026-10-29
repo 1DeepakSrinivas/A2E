@@ -384,6 +384,7 @@ uv run a2e results jobs 1 --status failed     # jobs of experiment 1, with reaso
 uv run a2e results summary --exp 1            # one row per configuration
 uv run a2e results summary --by device,model,quant --csv out.csv
 uv run a2e results stages --exp 1             # share of time in each stage
+uv run a2e results failures --exp 1           # why tasks failed: failed tasks per reason
 uv run a2e results resources --exp 1          # power min, median, p95, max, memory and thermal envelope
 uv run a2e results task-resources --exp 1     # energy, power and peak memory of every task
 uv run a2e results efficiency summary --exp 1 # success rate, joules per task, joules per success, waste share

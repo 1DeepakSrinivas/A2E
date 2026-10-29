@@ -18,6 +18,7 @@ a2e results jobs "$exp" --status failed ${db[@]+"${db[@]}"} > "$out/failed_jobs.
 a2e results summary --exp "$exp" --by device,model,quant,grammar ${db[@]+"${db[@]}"} --csv "$out/by_model.csv" > /dev/null
 a2e results summary --exp "$exp" --by device,model,quant,grammar,task_kind,category ${db[@]+"${db[@]}"} --csv "$out/by_category.csv" > /dev/null
 a2e results summary --exp "$exp" --by device,model,quant,grammar,family,depth ${db[@]+"${db[@]}"} --csv "$out/by_family_depth.csv" > /dev/null
+a2e results failures --exp "$exp" ${db[@]+"${db[@]}"} --csv "$out/failure_reasons.csv" > /dev/null
 a2e results stages --exp "$exp" ${db[@]+"${db[@]}"} > "$out/stages.txt"
 a2e results resources --exp "$exp" ${db[@]+"${db[@]}"} --csv "$out/resources.csv" > /dev/null
 a2e results task-resources --exp "$exp" ${db[@]+"${db[@]}"} --csv "$out/per_task.csv" > /dev/null
@@ -42,6 +43,7 @@ by_family_depth.csv ... plus custom family and chain depth
 success_per_joule.csv, pareto.csv, grammar_effect.csv, energy_by_stage.csv, energy_budget.csv
 resources.csv      power, memory, CPU and thermal envelope per configuration
 per_task.csv       energy and time of every task
+failure_reasons.csv  why tasks failed, by model, category and reason
 failed_jobs.txt, stability.txt, stages.txt
 TXT
 echo "wrote $out/"

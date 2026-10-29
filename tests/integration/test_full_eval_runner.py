@@ -50,7 +50,7 @@ def test_the_report_script_writes_every_file(ran, tmp_path):
     assert r.returncode == 0, r.stderr
     names = {p.name for p in out.iterdir()}
     for want in ("report.md", "by_model.csv", "by_category.csv", "by_family_depth.csv", "success_per_joule.csv",
-                 "grammar_effect.csv", "energy_by_stage.csv", "pareto.csv", "per_task.csv", "README.txt"):
+                 "grammar_effect.csv", "energy_by_stage.csv", "failure_reasons.csv", "pareto.csv", "per_task.csv", "README.txt"):
         assert want in names, want
     text = (out / "report.md").read_text()
     assert "## Accuracy" in text and "## Energy" in text

@@ -278,6 +278,18 @@ def results_plots(out: Path = typer.Argument(..., help="folder for the PNG figur
     typer.echo("\n".join(str(p) for p in made) if made else "Nothing to plot: no measured runs with energy and scores.")
 
 
+@results_app.command("failures")
+def results_failures(exp: list[int] = typer.Option(None, help="experiment id(s); default all"),
+                     by: str = typer.Option("", help="comma-separated grouping fields"),
+                     db: Path = typer.Option(None), csv: Path = typer.Option(None, help="also write to this csv")) -> None:
+    """Why tasks failed: failed tasks per reason, with the number of tasks run."""
+    from a2e import results as R
+    df = R.failures(_store(db), exp or None, [b for b in by.split(",") if b] or None)
+    _print_df(df, "No failed tasks.")
+    if csv is not None and not df.empty:
+        df.to_csv(csv, index=False)
+
+
 @results_app.command("stability")
 def results_stability(exp: list[int] = typer.Option(None), db: Path = typer.Option(None)) -> None:
     """Decode speed drift over long sessions and the first task where it drops (thermal knee)."""

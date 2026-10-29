@@ -256,6 +256,24 @@ def case_resources(store: Store, exp_id=None, phase: str = "measured") -> pd.Dat
     return out.sort_values(["exp_id", "run_id", "case_id"]).reset_index(drop=True)
 
 
+def failures(store: Store, exp_id=None, by: list[str] | None = None, phase: str = "measured") -> pd.DataFrame:
+    """Why tasks failed: the number of failed tasks per reason, with the number of tasks run. `error_type` is the
+    official BFCL checker's error type for BFCL, or for a custom chain `wrong_step`, `wrong_state`, `parse_error`,
+    `max_turns`, `early_stop` or `server_error`. Tasks that passed are not listed."""
+    by = by or ["device", "model", "quant", "grammar", "category"]
+    where, params = _where(exp_id, phase)
+    cols = ", ".join(dict.fromkeys(by))
+    df = store.df(f"SELECT {cols}, coalesce(error_type, 'unknown') AS reason, count(*) AS tasks FROM v_cases"
+                  f"{where}{' AND' if where else ' WHERE'} valid = 0 GROUP BY {cols}, reason", params)
+    if df.empty:
+        return df
+    ran = store.df(f"SELECT {cols}, count(*) AS tasks_run FROM v_cases{where}{' AND' if where else ' WHERE'} "
+                   f"valid IS NOT NULL GROUP BY {cols}", params)
+    out = df.merge(ran, on=list(dict.fromkeys(by)), how="left")
+    return out.sort_values(list(dict.fromkeys(by)) + ["tasks"], ascending=[True] * len(dict.fromkeys(by)) + [False]
+                           ).reset_index(drop=True)
+
+
 def bench_summary(store: Store, exp_id=None, phase: str = "measured") -> pd.DataFrame:
     """llama-bench throughput per configuration and test size. For decode (tg) the estimated memory bandwidth is
     tokens/s x model file size: every weight is read once per generated token, so decode speed is bounded by it."""
@@ -289,6 +307,23 @@ def kernels(store: Store, exp_id=None, top: int = 10, phase: str = "measured") -
 
 
 # ------------------------------------------------------------------------------------------- report
+def plain_number(v: float, digits: int = 3) -> str:
+    """A float with `digits` significant digits and no scientific notation: 1.23, 12.3, 123, 1234, 0.0000188.
+    Very small or large values (outside 1e-8 to 1e15) and infinities fall back to the short forms."""
+    if v == 0:
+        return "0"
+    if math.isinf(v):
+        return "inf" if v > 0 else "-inf"
+    a = abs(v)
+    if a < 1e-8 or a >= 1e15:
+        return f"{v:.{digits - 1}e}"
+    if a >= 10 ** (digits - 1):
+        return f"{v:.0f}"
+    dec = digits - 1 - math.floor(math.log10(a))
+    text = f"{v:.{dec}f}"
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
 def md_table(df: pd.DataFrame, digits: int = 3, max_rows: int = 200) -> str:
     if df is None or df.empty:
         return "_No rows._\n"
@@ -297,7 +332,7 @@ def md_table(df: pd.DataFrame, digits: int = 3, max_rows: int = 200) -> str:
         if v is None or (isinstance(v, float) and math.isnan(v)):
             return ""
         if isinstance(v, float):
-            return f"{v:.{digits}g}"
+            return plain_number(v, digits)
         return str(v).replace("|", "/")
 
     cols = list(df.columns)
@@ -378,6 +413,13 @@ def report_markdown(store: Store, exp_id: int) -> str:
         parts += ["## Accuracy\n", "Success is the share of scored cases that passed (BFCL official checker, or "
                   "every step correct for custom chains).\n",
                   md_table(s[id_cols + [c for c in ("n_scored", "success", "success_sd") if c in s]])]
+        f = failures(store, exp_id)
+        if not f.empty:
+            parts += ["## Why tasks failed\n",
+                      "Failed tasks per reason. For BFCL the reason is the official checker's error type; for custom "
+                      "chains it is `wrong_step`, `wrong_state`, `parse_error` (the reply could not be read), "
+                      "`max_turns`, `early_stop` or `server_error`. `tasks_run` is all scored tasks in the group.\n",
+                      md_table(f)]
     if "j_per_turn" in s:
         scope = store.df("SELECT DISTINCT power_scope FROM runs WHERE exp_id = ?", [exp_id])
         parts += ["## Energy\n",
@@ -385,6 +427,14 @@ def report_markdown(store: Store, exp_id: int) -> str:
                   + "; ".join(str(x) for x in scope["power_scope"]) + "\n",
                   md_table(s[id_cols + [c for c in ("j_per_turn", "j_per_prompt_token", "j_per_gen_token",
                                                     "tokens_per_joule", "j_per_success", "avg_power_w") if c in s]])]
+    if "j_per_turn" not in s:
+        scopes = store.df("SELECT DISTINCT power_scope FROM runs WHERE exp_id = ?", [exp_id])
+        parts += ["## Energy\n",
+                  "No energy was recorded for this experiment (power scope: "
+                  + "; ".join(str(x) for x in scopes["power_scope"]) + "). On the Mac `powermetrics` needs root; "
+                  "run with `sudo -E env \"PATH=$PATH\" .venv/bin/a2e run <suite>` and set `power = \"required\"` in "
+                  "`configs/local.toml` so a run without a power source fails at the start. Energy columns, "
+                  "joules per success and the efficiency views are empty without it.\n"]
     parts += ["## Memory and thermals\n",
               md_table(s[id_cols + [c for c in ("peak_rss_mb", "max_temp_c", "throttled_turns") if c in s]])]
     res = resources(store, exp_id)
