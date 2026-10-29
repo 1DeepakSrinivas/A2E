@@ -61,8 +61,8 @@ Section 7.4 maps each item to the result table that answers it.
 |---|---|
 | Devices | Raspberry Pi 5 with 8 GB (CPU only). Apple Silicon Mac (Metal GPU). Both are measured. |
 | Runtime | llama.cpp with GGUF model files, driven through `llama-server` over HTTP, and `llama-bench` for microbenchmarks. One llama.cpp commit for the whole study. |
-| Models | Qwen3-4B, Qwen3-8B, xLAM-2 3B, xLAM-2 8B, Phi-4-mini 3.8B. One Z.ai GLM small model is planned but not chosen. |
-| Quantization | Q8_0 and Q4_0 weights. KV cache at f16 or q8_0. |
+| Models | Qwen3-4B-Instruct-2507 and IBM Granite 3.1 2B Instruct. The earlier five-model set is deprecated. |
+| Quantization | Qwen3: Q5_K_M and IQ3_M. Granite: Q6_K and IQ3_M. KV cache at f16 or q8_0. |
 | Sequence lengths | Tool schema of 256, 1024 or 2048 tokens. Decode length of 128 or 512 tokens. Agent chains of 2 to 5 tool calls. |
 | Workloads | Plain generation, custom tool chains on A2E's own local tools, on BFCL's simulated file system and math tools, and on live web search, BFCL v4 single-turn, relevance and multi-turn categories, llama-bench prefill and decode tests. |
 | Measurements | Stage timing, token counts, prefix cache use, energy, memory, temperature, clock, throttling, CPU use, accuracy, top kernels (Pi). |
@@ -112,7 +112,7 @@ Counts cover both devices. A run is one repeat of one job. Bench jobs use llama-
 - **Axes per task kind.** Plain tasks use prefix cache, decode length and governor. Custom tasks also use grammar and schema length. BFCL tasks use grammar, prefix cache, decode length and governor. Bench tasks use governor only. An axis a kind does not use is not part of its jobs, so a setting that cannot change a task's result never multiplies its jobs.
 - **Job keys.** A job's settings are written as canonical JSON with sorted keys. The key is the first 16 hex characters of its SHA-256 hash.
 - **Order.** Jobs are sorted by device, model, quantization, KV cache type, context, flash attention and threads, so each model file loads once per device. Within a load the order is plain, custom, BFCL, bench.
-- **Feasibility.** A job is skipped with a stored reason when it would run Q8_0 on the Pi for a model above 4 billion parameters, or set a CPU governor on the Mac. A custom job whose tools do not fit the schema length is skipped when it runs.
+- **Feasibility.** A job is skipped with a stored reason when it would set a CPU governor on the Mac. A custom job whose tools do not fit the schema length is skipped when it runs.
 - **Machine settings.** `configs/models.toml` (committed) lists the models and their parameter counts. `configs/local.toml` (not committed) holds one machine's paths and facts. Environment variables override both.
 
 ### 3.3 Why
@@ -120,7 +120,7 @@ Counts cover both devices. A run is one repeat of one job. Bench jobs use llama-
 - A declarative file can be reviewed, versioned and run again. The same file always gives the same jobs, so "run the pilot" means the same thing in every session.
 - Expanding only the axes a task uses keeps the suites small enough to run. The factorial suite alone is 1,296 jobs.
 - Grouping jobs by model file avoids reloading a model several gigabytes in size between jobs.
-- The Pi memory rule follows from the Pi's 8 GB. An 8B model at Q8_0 is about 8.5 GB of weights, so it cannot load. Recording the skip with a reason keeps the factorial grid complete and honest.
+- The earlier Pi memory rule (no Q8_0 for models above 4B) is removed. Both current models are under 4 GB at every quant, so everything fits in the Pi's 8 GB.
 
 ## 4. Model serving
 
@@ -253,8 +253,8 @@ Prefill processes many tokens in one batch and is mostly limited by compute. Dec
 
 ### 6.1 Steps
 
-1. **Pilot** (`pilot`). Qwen3-4B Q4_0 on both devices, with KV cache f16 and q8_0. It runs every task kind and a slice of every BFCL category, plus one bench job with kernel profiling. The pilot decides the BFCL subsample sizes, the Pi context size, the cooldown target, whether to fit the Pi cooler and which CPU governor to use as the default. It also shows whether API-Bank, ToolBench and tau-bench are affordable.
-2. **Baseline** (`baseline`). Every model at Q4_0 and Q8_0 on the standard prompt set. 1 warm-up run and 3 measured runs per job, with plain generation next to custom chains and BFCL single-turn.
+1. **Pilot** (`pilot`). Qwen3-4B-Instruct-2507 Q5_K_M on both devices, with KV cache f16 and q8_0. It runs every task kind and a slice of every BFCL category, plus one bench job with kernel profiling. The pilot decides the BFCL subsample sizes, the Pi context size, the cooldown target, whether to fit the Pi cooler and which CPU governor to use as the default. It also shows whether API-Bank, ToolBench and tau-bench are affordable.
+2. **Baseline** (`baseline`). Both models at both of their quants on the standard prompt set. 1 warm-up run and 3 measured runs per job, with plain generation next to custom chains and BFCL single-turn.
 3. **Factorial sweep** (`factorial`, `chains`, `bfcl`). Model × quantization × KV cache × schema length × decode length × grammar × device on custom chains, chain depth 2 to 5 and argument count 1, 3 and 5, and the BFCL categories in scope.
 4. **Bottleneck analysis** (`kernels`, and the stage breakdown of every run). Stage shares per configuration, llama-bench prefill and decode, top kernels on the Pi.
 5. **Stability** (`stability`). 40 depth-5 retrieval chains per run, 3 runs back to back with no cooldown, under the `ondemand` and `performance` governors on the Pi. This looks for thermal throttling and the point where decode speed drops.
@@ -399,7 +399,7 @@ The hardware test group checks each of these on a real device, and each failure 
 
 **Prompt format.** The fixed prompt makes models comparable with each other, but their accuracy is not comparable with BFCL leaderboard numbers, which use other prompt modes.
 
-**Reasoning models.** Qwen3 can spend its whole decode budget on thinking text before it writes a call. Such answers count as no call. The pilot measures how often this happens at each decode length.
+**Reasoning models.** A reasoning model can spend its whole decode budget on thinking text before it writes a call. Such answers count as no call. The pilot measures how often this happens at each decode length.
 
 **Thermal state.** The cooldown target reduces carry-over heat between jobs, but room temperature and airflow are not controlled. The cooler setting and the actual governor are stored with every run.
 
@@ -478,9 +478,9 @@ The vendored BFCL files are Apache 2.0. Their license and a NOTICE with the sour
 | Runtime | llama.cpp only, Metal on the Mac | MLC LLM, Ollama, MLX | One runtime keeps the comparison about hardware and models | User |
 | Server interface | llama-server over HTTP | Python bindings, the CLI tools | Process isolation, server-side timings, same on both devices | User (recommended) |
 | Energy | Software estimates with stated scope | USB power meter | No meter available. The power source interface allows adding one later. | User |
-| Models | Qwen3 4B/8B, xLAM-2 3B/8B, Phi-4-mini, one Z.ai GLM | | Tool-calling models of the 4B to 8B class | User |
-| Pi memory rule | 8B models at Q4_0 only on the Pi | Skip silently, record as out of memory | Q8_0 8B does not fit in 8 GB | User |
-| Quantization formats | Q8_0 and Q4_0 | Q4_K_M, adding Q5 or Q6 | llama.cpp's basic 8-bit and 4-bit formats, chosen to stand for INT8 and INT4 | User |
+| Models | Qwen3-4B-Instruct-2507, Granite 3.1 2B Instruct | Qwen3 4B/8B, xLAM-2, Phi-4-mini, Gemma 3 (deprecated) | Two small instruct models under 4 GB per quant | User |
+| Pi memory rule | None; every model and quant fits | 8B models at Q4_0 only on the Pi | The new models are under 4 GB at every quant | User |
+| Quantization formats | Q5_K_M or Q6_K, and IQ3_M | Q8_0 and Q4_0, Q3_K_M | A higher-quality baseline and an aggressive 3-bit quant per model, from the bartowski GGUF repos | User |
 | Benchmarks | BFCL v4 plus custom chains. Others after the pilot. | API-Bank, ToolBench, tau-bench now | Cost unknown before the pilot | User |
 | Tool execution | Real local tools | Mock tools with set delays | Realistic tool wait | User |
 | Constrained decoding | Grammar on vs off as an axis | Always on, native templates only | Isolates the cost and accuracy effect of the grammar | User |

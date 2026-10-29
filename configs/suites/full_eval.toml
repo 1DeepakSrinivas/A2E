@@ -1,11 +1,11 @@
 # One broad report: 50 tasks per model, quant and grammar setting, from single BFCL calls to multi-step agent chains.
-# Edit the two lines marked EDIT to the models and quants you have on this machine, then run:
+# Edit the two lines marked EDIT if you want other models or quants; pairs a model does not have are left out, then run:
 #   scripts/run_suite.sh full_eval
 #   scripts/report_full_eval.sh <experiment id>
 # One measured run and no warm-up, so there is no repeat-to-repeat spread. Read results by category and family
 # totals, not by single cells (a cell is 2 to 4 tasks). The `web` family is left out because live results change.
-# Thinking is switched off for every model (see [server] thinking below): Qwen3 otherwise spends the whole 256-token
-# budget on a thinking block, the reply is cut off, and the tool call is lost.
+# Thinking is switched off for every model (see [server] thinking below) so a reasoning model cannot spend the whole
+# 256-token budget on a thinking block. Neither current model has a thinking mode, so the setting changes nothing.
 [suite]
 name = "full_eval"
 description = "50 tasks per model, quant and grammar setting: BFCL single and multi-turn plus custom chains of 2 to 5 calls."
@@ -26,8 +26,8 @@ cooldown_timeout_s = 900
 
 [matrix]
 device = ["mac", "pi5"]  # a machine runs only its own device's jobs
-model = ["qwen3-4b", "gemma3-4b"]  # EDIT: the two models (names from configs/models.toml)
-quant = ["q4_0", "q8_0"]  # EDIT: the two quants
+model = ["qwen3-4b-instruct-2507", "granite-3-1-2b-instruct"]  # EDIT: the two models (names from configs/models.toml)
+quant = ["q5_k_m", "q6_k", "iq3_m"]  # EDIT: qwen has q5_k_m and iq3_m, granite has q6_k and iq3_m, so the grid is 4 cells
 kv_quant = ["f16"]
 
 [axes]

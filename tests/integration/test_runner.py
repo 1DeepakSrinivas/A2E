@@ -111,9 +111,10 @@ def test_process_death_leaves_running_rows_that_the_next_start_recovers(tmp_path
 
 
 def test_missing_model_fails_only_its_jobs_and_retry_failed_reruns_them(tmp_path):
-    body = SMALL.replace('model = ["qwen3-4b"]', 'model = ["qwen3-4b", "qwen3-8b"]')
+    body = SMALL.replace('model = ["qwen3-4b-instruct-2507"]', 'model = ["qwen3-4b-instruct-2507", "granite-3-1-2b-instruct"]').replace(
+        'quant = ["q5_k_m"]', 'quant = ["q5_k_m", "q6_k"]')
     r = make(tmp_path, body=body)
-    missing = tmp_path / "models" / "qwen3-8b" / "qwen3-8b-q4_0.gguf"
+    missing = tmp_path / "models" / "granite-3-1-2b-instruct" / "granite-3-1-2b-instruct-q6_k.gguf"
     missing.unlink()
     out = r.run()
     assert out["counts"] == {"done": 4, "failed": 4}
@@ -125,13 +126,7 @@ def test_missing_model_fails_only_its_jobs_and_retry_failed_reruns_them(tmp_path
     assert r.store.scalar("SELECT max(attempts) FROM jobs") == 2
 
 
-def test_pi_memory_rule_and_mac_governor_are_skipped_with_reasons(tmp_path):
-    body = SMALL.replace('model = ["qwen3-4b"]', 'model = ["qwen3-8b"]').replace('quant = ["q4_0"]',
-                                                                               'quant = ["q8_0"]')
-    r = make(tmp_path, body=body, device="pi5")
-    out = r.run()
-    assert out["counts"] == {"skipped": 4}
-    assert "not run: memory" in r.store.scalar("SELECT reason FROM jobs LIMIT 1")
+def test_mac_governor_is_skipped_with_a_reason(tmp_path):
     body2 = SMALL + '\n[[tasks]]\nkind = "plain"\nn = 1\ngovernor = ["performance"]\n'
     r2 = make(tmp_path / "b", body=body2) if (tmp_path / "b").mkdir() is None else None
     out2 = r2.run()
@@ -174,11 +169,11 @@ def test_new_flag_and_edited_suite_start_new_experiments(tmp_path):
 
 def test_jobs_with_different_server_settings_load_the_model_again(tmp_path):
     events = []
-    body = SMALL.replace('quant = ["q4_0"]', 'quant = ["q4_0", "q8_0"]')
+    body = SMALL.replace('quant = ["q5_k_m"]', 'quant = ["q5_k_m", "iq3_m"]')
     r = make(tmp_path, body=body, events=events)
     r.run()
     starts = [(e["quant"]) for e in events if e["event"] == "server_start"]
-    assert starts == ["q4_0", "q8_0"]  # grouped: each model file loads once
+    assert starts == ["iq3_m", "q5_k_m"]  # grouped: each model file loads once
 
 
 def test_custom_turn_correctness_is_recorded(tmp_path):
@@ -190,6 +185,6 @@ def test_custom_turn_correctness_is_recorded(tmp_path):
 
 
 def test_job_label_is_readable():
-    j = {"model": "qwen3-4b", "quant": "q4_0", "kv_quant": "f16", "kind": "custom", "family": "calc", "depth": 3,
+    j = {"model": "qwen3-4b-instruct-2507", "quant": "q5_k_m", "kv_quant": "f16", "kind": "custom", "family": "calc", "depth": 3,
          "grammar": True, "governor": ""}
-    assert job_label(j) == "qwen3-4b q4_0 kv=f16 custom family=calc depth=3 grammar=True"
+    assert job_label(j) == "qwen3-4b-instruct-2507 q5_k_m kv=f16 custom family=calc depth=3 grammar=True"

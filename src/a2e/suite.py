@@ -23,7 +23,6 @@ from a2e.settings import CONFIG_DIR, Settings
 from a2e.tasks.custom import FAMILY_DEPTH, FAMILY_TOOLS
 
 MIN_CTX_MULTI_TURN = 16384
-PI_Q8_MAX_PARAMS_B = 4.0
 AXES_FOR_KIND = {
     "plain": ("prefix_cache", "decode_len", "governor"),
     "custom": ("grammar", "prefix_cache", "decode_len", "schema_len", "governor"),
@@ -62,9 +61,9 @@ class Server(_Strict):
     ctx: int = Field(8192, ge=512)
     flash_attn: str = "on"
     threads: int = Field(0, ge=0)  # 0 = use [machine] threads from local.toml, or llama.cpp's default
-    # "off" starts llama-server with --chat-template-kwargs {"enable_thinking": false}, so reasoning models such as
-    # Qwen3 answer directly instead of spending the token budget on a thinking block. Models whose chat template has
-    # no such variable are unaffected.
+    # "off" starts llama-server with --chat-template-kwargs {"enable_thinking": false}, so reasoning models answer
+    # directly instead of spending the token budget on a thinking block. Models whose chat template has no such
+    # variable (both current models) are unaffected.
     thinking: Literal["default", "off"] = "default"
 
 
@@ -80,7 +79,7 @@ class RunOpts(_Strict):
 class Matrix(_Strict):
     device: list[Literal["pi5", "mac"]]
     model: list[str]
-    quant: list[Literal["q4_0", "q8_0", "q3_k_m"]]
+    quant: list[Literal["q5_k_m", "q6_k", "iq3_m"]]
     kv_quant: list[Literal["f16", "q8_0"]] = ["f16"]
 
     _l = field_validator("device", "model", "quant", "kv_quant", mode="before")(_listify)
@@ -230,9 +229,6 @@ def server_key(cfg: dict) -> tuple:
 
 def feasibility(cfg: dict, settings: Settings) -> str | None:
     """None if the job can run; otherwise the reason it is skipped (stored with the job)."""
-    params = settings.model(cfg["model"]).params_b
-    if cfg["device"] == "pi5" and cfg["quant"] == "q8_0" and params > PI_Q8_MAX_PARAMS_B:
-        return "not run: memory (Pi 5 8GB runs Q8_0 only for models <= 4B)"
     if cfg.get("governor") and cfg["device"] != "pi5":
         return "not run: governor settings apply to the Pi only"
     return None
@@ -242,6 +238,9 @@ def expand(suite: Suite, settings: Settings) -> list[dict]:
     """All jobs of a suite, in run order (grouped so each model loads once per device)."""
     for m in suite.matrix.model:
         settings.model(m)  # unknown models fail early with a clear message
+    for q in suite.matrix.quant:
+        if not any(q in settings.model(m).available_quants() for m in suite.matrix.model):
+            raise ConfigError(f"quant {q!r} is not available for any model in the matrix")
     jobs = []
     m = suite.matrix
     base = {"seed": suite.suite.seed, "warmup": suite.repeats.warmup, "measured": suite.repeats.measured,
@@ -250,6 +249,8 @@ def expand(suite: Suite, settings: Settings) -> list[dict]:
     if suite.server.thinking != "default":
         base["thinking"] = suite.server.thinking  # stored only when set, so old jobs keep their keys
     for dev, model, quant, kv in itertools.product(m.device, m.model, m.quant, m.kv_quant):
+        if quant not in settings.model(model).available_quants():
+            continue  # each model has its own quants; pairs it does not have are not part of the grid
         cell = {**base, "device": dev, "model": model, "quant": quant, "kv_quant": kv}
         for task in suite.tasks:
             axes = AXES_FOR_KIND[task.kind]

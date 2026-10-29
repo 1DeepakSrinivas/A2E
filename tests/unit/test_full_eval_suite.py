@@ -30,7 +30,7 @@ def by_config(jobs):
 
 def test_every_configuration_gets_exactly_50_tasks(jobs):
     groups = by_config(jobs)
-    assert len(groups) == 2 * 2 * 2 * 2  # devices x models x quants x grammar
+    assert len(groups) == 2 * 4 * 2  # devices x (model, quant) pairs x grammar
     assert {sum(j["n"] for j in g) for g in groups.values()} == {50}
 
 
@@ -46,15 +46,15 @@ def test_job_counts(jobs):
 
 def test_both_grammar_settings_and_both_quants_and_two_models(suite):
     assert suite.axes.grammar == [False, True]
-    assert len(suite.matrix.model) == 2 and len(suite.matrix.quant) == 2
+    assert len(suite.matrix.model) == 2 and len(suite.matrix.quant) == 3  # 3 quants in all, 2 per model
 
 
 def test_bfcl_covers_single_and_multi_turn_and_irrelevance(jobs):
     cats = {j["category"] for j in jobs if j["kind"] == "bfcl"}
     assert {"simple_python", "multiple", "parallel", "parallel_multiple", "irrelevance"} <= cats
     assert set(MULTI_TURN_CATEGORIES) <= cats
-    assert sum(j["n"] for j in jobs if j["kind"] == "bfcl" and j["device"] == "mac" and j["model"] == "qwen3-4b"
-               and j["quant"] == "q4_0" and j["grammar"] is False) == 24
+    assert sum(j["n"] for j in jobs if j["kind"] == "bfcl" and j["device"] == "mac" and j["model"] == "qwen3-4b-instruct-2507"
+               and j["quant"] == "q5_k_m" and j["grammar"] is False) == 24
 
 
 def test_custom_chains_cover_horizons_2_to_5_and_every_offline_family(jobs):

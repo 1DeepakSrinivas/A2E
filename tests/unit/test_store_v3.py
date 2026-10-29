@@ -10,7 +10,7 @@ def test_results_from_before_harness_variants_read_as_baseline(tmp_path):
     db = sqlite3.connect(p)
     for i, script in enumerate(MIGRATIONS[:2]):  # a database as version 2 left it
         db.executescript("BEGIN;\n" + script + f"\nPRAGMA user_version = {i + 1};\nCOMMIT;")
-    cfg = {"model": "qwen3-4b", "quant": "q4_0", "kv_quant": "f16", "grammar": False}
+    cfg = {"model": "qwen3-4b-instruct-2507", "quant": "q5_k_m", "kv_quant": "f16", "grammar": False}
     db.execute("INSERT INTO runs (config_json, device, phase, started_at) VALUES (?, 'mac', 'measured', 1.0)",
                [json.dumps(cfg)])
     db.execute("INSERT INTO turns (run_id, task_id, energy_j) VALUES (1, 't', 2.5)")

@@ -67,8 +67,8 @@ def test_plan_and_suites_and_lock_check(env):
 
 
 def test_doctor_runs_and_reports(env):
-    r = runner.invoke(app, ["doctor", "--models", "qwen3-4b"])
-    assert "llama-server binary" in r.output and "model qwen3-4b q4_0" in r.output
+    r = runner.invoke(app, ["doctor", "--models", "qwen3-4b-instruct-2507"])
+    assert "llama-server binary" in r.output and "model qwen3-4b-instruct-2507 q5_k_m" in r.output
 
 
 def test_test_command_lists_groups_and_rejects_unknown():

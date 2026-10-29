@@ -37,11 +37,20 @@ Energy is the software estimate with the idle baseline subtracted. On the Pi it 
 from `powermetrics`, which leaves out DRAM, the display and the power supply. Every energy result is reported with
 its power scope.
 
+## Amendment 3 (2026-10-29): the model set and the quants change
+
+The study now uses two models: Qwen3-4B-Instruct-2507 (Q5_K_M and IQ3_M) and IBM Granite 3.1 2B Instruct (Q6_K and
+IQ3_M). The earlier set (Qwen3 4B and 8B, xLAM-2 3B and 8B, Phi-4-mini, Gemma 3 4B) and the earlier weight quants
+(q4_0, q8_0, q3_k_m) are deprecated and no longer run. The Pi memory rule is removed because both models are under
+4 GB at every quant. Amendment 2 above describes the old Qwen3 model and is kept as history: the new Qwen3 model has
+no thinking mode, so `thinking = "off"` no longer changes anything for it. H3 now compares the higher-quality quant
+with IQ3_M.
+
 ## Factors
 
 - Device: Raspberry Pi 5 (8 GB) and Apple Silicon Mac.
 - Model: the registered models that fit each device.
-- Quantization: q3_k_m, q4_0 and q8_0 (q8_0 on the Pi only for models of 4B parameters or fewer).
+- Quantization: each model has two weight quants, a higher-quality one and IQ3_M (see Amendment 3).
 - Grammar: off and on, for the same model, quantization and tasks.
 - Tasks: curated BFCL categories and the custom local-tool families.
 
@@ -57,7 +66,7 @@ Each can be shown wrong by the data.
   grammar-off `success_rate` is below a threshold. The threshold is not set in advance. It is estimated from the
   data, and the claim is refuted if grammar lowers `j_per_success` for the strongest models as often as for the
   weakest.
-- **H3, quantization acts through failures.** Moving from q8_0 to q4_0 changes `j_per_success` mostly through
+- **H3, quantization acts through failures.** Moving from the higher-quality quant to IQ3_M changes `j_per_success` mostly through
   `success_rate` and `waste_share`, not through `j_per_gen_token`. Refuted if the change in joules per generated
   token explains more than half of the change in joules per success.
 - **H4, tool wait is a larger share on the Pi.** The tool-wait share of energy is higher on the Pi than on the Mac

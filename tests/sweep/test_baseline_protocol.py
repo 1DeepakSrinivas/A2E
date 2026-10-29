@@ -56,7 +56,7 @@ def rig(fake_server, tmp_path):
 
 
 def cfg(**kw):
-    return RunConfig(**{"model": "qwen3-4b", "quant": "q4_0", "device": "mac", **kw})
+    return RunConfig(**{"model": "qwen3-4b-instruct-2507", "quant": "q5_k_m", "device": "mac", **kw})
 
 
 def test_one_warmup_plus_three_measured_runs(rig):

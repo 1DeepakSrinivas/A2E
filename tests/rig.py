@@ -29,19 +29,22 @@ class ConstPower(PowerSource):
         return self.w
 
 
-def make_settings(tmp: Path, models=("qwen3-4b", "qwen3-8b"), quants=("q4_0", "q8_0"), device="mac") -> Settings:
+def make_settings(tmp: Path, models=("qwen3-4b-instruct-2507", "granite-3-1-2b-instruct"), quants=("q5_k_m", "q6_k", "iq3_m"),
+                  device="mac") -> Settings:
     bin_ = Path(_wrapper(tmp / "llama-server", FAKE))
     _wrapper(tmp / "llama-bench", FAKES / "fake_llama_bench.py")  # found next to llama-server
     perf = _wrapper(tmp / "perf", FAKES / "fake_perf.py")
-    reg = {"qwen3-4b": 4.0, "gemma3-4b": 4.0, "qwen3-8b": 8.0, "xlam2-3b": 3.0, "xlam2-8b": 8.0, "phi4-mini": 3.8}
+    reg = {"qwen3-4b-instruct-2507": (4.0, ["q5_k_m", "iq3_m"]), "granite-3-1-2b-instruct": (2.0, ["q6_k", "iq3_m"])}
     for m in models:
         for q in quants:
+            if q not in reg[m][1]:
+                continue
             p = tmp / "models" / m / f"{m}-{q}.gguf"
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_bytes(b"GGUF" + b"\0" * 64)
     return Settings(llama_server=str(bin_), perf=perf, models_dir=str(tmp / "models"), db=str(tmp / "a2e.db"),
                     raw_dir=str(tmp / "raw"), work_dir=str(tmp / "work"), device=device, power="auto",
-                    models={k: ModelEntry(name=k, params_b=v) for k, v in reg.items()})
+                    models={k: ModelEntry(name=k, params_b=p, quants=q) for k, (p, q) in reg.items()})
 
 
 def instruments(w: float = 5.0, temp: float = 50.0):
@@ -64,8 +67,8 @@ idle_seconds = 0
 sample_hz = 50
 [matrix]
 device = ["mac", "pi5"]
-model = ["qwen3-4b"]
-quant = ["q4_0"]
+model = ["qwen3-4b-instruct-2507"]
+quant = ["q5_k_m"]
 [axes]
 decode_len = [16]
 schema_len = [512]

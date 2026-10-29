@@ -9,7 +9,7 @@ import httpx
 
 from a2e.config import RunConfig
 
-THINKING_OFF = {"enable_thinking": False}  # the Qwen3 chat template variable; other templates ignore it
+THINKING_OFF = {"enable_thinking": False}  # chat template variable that turns thinking off; others ignore it
 
 
 def build_args(cfg: RunConfig, bin_path: str, model_path: str, port: int = 8080,

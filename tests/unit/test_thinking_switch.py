@@ -20,8 +20,8 @@ measured = 1
 idle_seconds = 0
 [matrix]
 device = ["mac"]
-model = ["qwen3-4b"]
-quant = ["q4_0"]
+model = ["qwen3-4b-instruct-2507"]
+quant = ["q5_k_m"]
 [axes]
 decode_len = [16]
 schema_len = [512]
@@ -67,7 +67,7 @@ def test_bad_values_are_rejected(tmp_path):
 
 
 def test_build_args_adds_the_template_kwargs_only_when_off():
-    cfg = RunConfig(model="qwen3-4b", quant="q4_0", kv_quant="f16", device="mac")
+    cfg = RunConfig(model="qwen3-4b-instruct-2507", quant="q5_k_m", kv_quant="f16", device="mac")
     on = build_args(cfg, "llama-server", "m.gguf")
     off = build_args(cfg, "llama-server", "m.gguf", thinking="off")
     assert "--chat-template-kwargs" not in on and "--jinja" in on

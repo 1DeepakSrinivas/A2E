@@ -3,7 +3,7 @@ from a2e.server import LlamaServer, build_args
 
 
 def cfg(**kw):
-    return RunConfig(**{"model": "qwen3-4b", "quant": "q4_0", "device": "mac", **kw})
+    return RunConfig(**{"model": "qwen3-4b-instruct-2507", "quant": "q5_k_m", "device": "mac", **kw})
 
 
 def test_flash_attn_default_and_override():

@@ -15,8 +15,9 @@ def write(p: Path, text: str) -> Path:
 
 def test_committed_registry_loads_and_has_study_models():
     s = load_settings(REPO / "configs", local=REPO / "configs" / "does-not-exist.toml")
-    assert {"qwen3-4b", "qwen3-8b", "xlam2-3b", "xlam2-8b", "phi4-mini"} <= set(s.models)
-    assert s.model("qwen3-8b").params_b == 8.0
+    assert set(s.models) == {"qwen3-4b-instruct-2507", "granite-3-1-2b-instruct"}
+    assert s.model("qwen3-4b-instruct-2507").available_quants() == ("q5_k_m", "iq3_m")
+    assert s.model("granite-3-1-2b-instruct").available_quants() == ("q6_k", "iq3_m")
 
 
 def test_default_file_template_and_local_overrides(tmp_path, monkeypatch):
@@ -26,9 +27,9 @@ def test_default_file_template_and_local_overrides(tmp_path, monkeypatch):
     local = write(tmp_path / "local.toml", '[paths]\nmodels_dir = "/mm"\nllama_server = "/bin/ls"\n'
                   '[machine]\ndevice = "pi5"\ncooler = true\n[models.m1.files]\nq8_0 = "/exact/m1.gguf"\n')
     s = load_settings(tmp_path, local)
-    assert s.model_path("m1", "q4_0") == Path("/mm/m1/m1-q4_0.gguf")
+    assert s.model_path("m1", "q5_k_m") == Path("/mm/m1/m1-q5_k_m.gguf")
     assert s.model_path("m1", "q8_0") == Path("/exact/m1.gguf")
-    assert s.model_path("m2", "q4_0") == Path("/mm/x/Q4_0.gguf")
+    assert s.model_path("m2", "q5_k_m") == Path("/mm/x/Q5_K_M.gguf")
     assert s.device == "pi5" and s.cooler is True and s.llama_server == "/bin/ls"
 
 
@@ -77,7 +78,9 @@ def test_doctor_reports_missing_pieces(tmp_path):
     s.models = load_settings(REPO / "configs", local=tmp_path / "none.toml").models
     checks = {c.name: c for c in doctor.run_checks(s)}
     assert not checks["llama-server binary"].ok and checks["llama-server binary"].critical
-    assert not checks["model qwen3-4b q4_0"].ok and not checks["model qwen3-4b q4_0"].critical
+    assert not checks["model qwen3-4b-instruct-2507 q5_k_m"].ok and not checks["model qwen3-4b-instruct-2507 q5_k_m"].critical
+    assert "model qwen3-4b-instruct-2507 q6_k" not in checks  # doctor checks only the quants a model has
+    assert "model granite-3-1-2b-instruct q6_k" in checks
     assert checks["results database writable"].ok and checks["device known (pi5 or mac)"].ok
     assert "powermetrics available" in checks
 
@@ -87,7 +90,7 @@ def test_doctor_passes_with_a_complete_setup(tmp_path):
     srv.write_text("#!/bin/sh\n")
     srv.chmod(0o755)
     (tmp_path / "m1").mkdir()
-    for q in ("q4_0", "q8_0"):
+    for q in ("q5_k_m", "q6_k"):
         (tmp_path / "m1" / f"m1-{q}.gguf").write_bytes(b"x")
     s = Settings(llama_server=str(srv), device="pi5", db=str(tmp_path / "a.db"), models_dir=str(tmp_path), power="none")
     from a2e.settings import ModelEntry

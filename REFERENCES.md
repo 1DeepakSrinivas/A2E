@@ -97,18 +97,16 @@ for, and where in the repo.
 
 ---
 
-## 2. Models (4 to 8B tool-calling class)
+## 2. Models (small instruct models, under 4 GB per GGUF)
 
-All **Pending verification** of exact checkpoint, license, GGUF source and tool-call format. None downloaded yet.
+The earlier set (Qwen3 4B/8B, xLAM-2 3B/8B, Phi-4-mini, Gemma 3 4B) is deprecated and removed. Exact checkpoint, license and tool-call format are still **pending verification**.
 
-| Model | Planned sizes | Notes |
+| Model | Quants (size) | GGUF repository |
 |---|---|---|
-| Qwen3 | 4B, 8B | Has a thinking mode that can consume the decode budget before a call is emitted. |
-| xLAM-2 (Salesforce) | 3B, 8B | Function-calling specialist. |
-| Phi-4-mini (Microsoft) | 3.8B | |
-| Z.ai GLM small model | TBD | Needs user sign-off; research current release first. |
+| Qwen3-4B-Instruct-2507 | Q5_K_M (2.89 GB), IQ3_M (1.96 GB) | https://huggingface.co/bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF |
+| IBM Granite-3.1-2B-Instruct | Q6_K (2.08 GB), IQ3_M (1.17 GB) | https://huggingface.co/bartowski/granite-3.1-2b-instruct-GGUF |
 
-Where used: `MODEL_PARAMS_B` in `src/a2e/config.py` (parameter counts are approximate, from memory).
+Where used: `configs/models.toml` (the `quants` and `source` fields). `scripts/download_models.sh` downloads the four files.
 
 ---
 
@@ -123,7 +121,7 @@ Where used: `MODEL_PARAMS_B` in `src/a2e/config.py` (parameter counts are approx
   `--flash-attn`, `--cache-type-k`, `--cache-type-v`, `-ngl`, `-c`, `-t`.
 - **Where used:** `src/a2e/server.py`, `src/a2e/client.py`, `tests/fakes/fake_llama_server.py` (a stand-in written
   from these assumptions), `tests/hardware/` (the check that the assumptions hold).
-- **Also used:** GGUF model format and Q8_0 / Q4_0 quantization types; KV-cache quantization (`q8_0`).
+- **Also used:** GGUF model format and the Q5_K_M, Q6_K and IQ3_M quantization types; KV-cache quantization (`q8_0`).
 
 ### Raspberry Pi `vcgencmd`
 - **Commands used:** `pmic_read_adc`, `measure_temp`, `measure_clock arm`, `get_throttled`

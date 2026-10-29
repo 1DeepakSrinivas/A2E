@@ -28,7 +28,7 @@ def real_server(tmp_path_factory, free_port):
 
     def make(thinking: str = "default", **cfg_kw) -> LlamaServer:
         device = os.environ.get("A2E_DEVICE") or ("mac" if platform.system() == "Darwin" else "pi5")
-        cfg = RunConfig(**{"model": "qwen3-4b", "quant": "q4_0", "device": device, **cfg_kw})
+        cfg = RunConfig(**{"model": "qwen3-4b-instruct-2507", "quant": "q5_k_m", "device": device, **cfg_kw})
         args = build_args(cfg, os.environ["A2E_LLAMA_SERVER"], os.environ["A2E_GGUF"], port=free_port,
                           ctx=int(os.environ.get("A2E_CTX", 4096)),
                           threads=int(os.environ["A2E_THREADS"]) if os.environ.get("A2E_THREADS") else None,

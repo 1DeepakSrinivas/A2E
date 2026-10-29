@@ -22,7 +22,7 @@ def store(tmp_path):
         for model in ("a", "b"):
             for name, (em, cm) in HARNESSES.items():
                 for rep in range(3):
-                    cfg = {"model": model, "quant": "q4_0", "kv_quant": "f16", "family": "math", "depth": 3}
+                    cfg = {"model": model, "quant": "q5_k_m", "kv_quant": "f16", "family": "math", "depth": 3}
                     if name != "baseline":
                         cfg["harness"] = name
                     run = st.insert("runs", {"config_json": json.dumps(cfg), "device": device, "phase": "measured",

@@ -28,7 +28,7 @@ def test_tables_never_use_scientific_notation_for_everyday_numbers():
 def fill(st, cases, model="m", grammar=False, with_energy=False):
     if not st.scalar("SELECT count(*) FROM experiments"):
         st.insert("experiments", {"name": "e", "started_at": 0.0, "status": "complete"})
-    cfg = {"model": model, "quant": "q4_0", "kv_quant": "f16", "grammar": grammar, "decode_len": 256}
+    cfg = {"model": model, "quant": "q5_k_m", "kv_quant": "f16", "grammar": grammar, "decode_len": 256}
     run = st.insert("runs", {"exp_id": 1, "config_json": json.dumps(cfg), "device": "mac", "phase": "measured",
                              "repeat_idx": 0, "task_kind": "custom", "status": "complete", "started_at": 0.0,
                              "power_scope": "none" if not with_energy else "package",

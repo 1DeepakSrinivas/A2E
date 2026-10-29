@@ -42,7 +42,7 @@ These settings are passed to llama-server. Jobs that differ in any of them use a
 | `ctx` | integer, 512 or more | `8192` | Context size in tokens (`-c`). BFCL multi-turn categories need 16384 or more. |
 | `flash_attn` | string | `"on"` | Value for `--flash-attn`. Newer llama.cpp builds take `on`, `off` or `auto`. KV cache quantization needs flash attention. |
 | `threads` | integer, 0 or more | `0` | Value for `-t`. 0 means use `[machine] threads` from `local.toml`, or llama.cpp's own default if that is unset. |
-| `thinking` | string | `"default"` | `"off"` starts llama-server with `--chat-template-kwargs '{"enable_thinking": false}'` and also sends that variable with every chat template request, so reasoning models such as Qwen3 answer directly instead of spending the token budget on a thinking block. Chat templates without that variable (Gemma 3, for one) are not affected. Only `"off"` is stored in a job's settings, so suites written before this field keep their job keys. A suite uses one value, and a different value starts a separate server. |
+| `thinking` | string | `"default"` | `"off"` starts llama-server with `--chat-template-kwargs '{"enable_thinking": false}'` and also sends that variable with every chat template request, so reasoning models answer directly instead of spending the token budget on a thinking block. Chat templates without that variable (both current models) are not affected. Only `"off"` is stored in a job's settings, so suites written before this field keep their job keys. A suite uses one value, and a different value starts a separate server. |
 
 A2E always passes `--jinja`, and passes `-ngl 99` on the Mac (all layers on the GPU) and `-ngl 0` on the Pi (CPU only). It adds `--cache-type-k` and `--cache-type-v` when `kv_quant` is not `f16`.
 
@@ -65,7 +65,7 @@ Every combination of these four lists is one model load.
 |---|---|---|---|
 | `device` | list | required | `pi5`, `mac` |
 | `model` | list | required | names from `configs/models.toml` |
-| `quant` | list | required | `q4_0`, `q8_0`, `q3_k_m` |
+| `quant` | list | required | `q5_k_m`, `q6_k`, `iq3_m`. A model only gets the quants it lists in `configs/models.toml`; other pairs are left out of the grid. A quant that no listed model has is an error. |
 | `kv_quant` | list | `["f16"]` | `f16`, `q8_0` |
 
 A2E only runs the jobs whose device matches the machine it runs on. The other device's jobs are not loaded into this machine's experiment.
@@ -160,7 +160,6 @@ The job key is the first 16 hex characters of the SHA-256 hash of this JSON with
 
 A job is skipped, with the reason stored, when:
 
-- the device is `pi5`, the quantization is `q8_0` and the model has more than 4 billion parameters ("not run: memory")
 - the job sets a governor and the device is not `pi5` ("not run: governor settings apply to the Pi only")
 - at run time, a custom task's tools do not fit in `schema_len` tokens ("not run: core tools need ...")
 
@@ -173,20 +172,23 @@ The suite hash is the SHA-256 of the whole parsed suite, so comments and formatt
 ## 2. `configs/models.toml`
 
 ```toml
-[models.qwen3-4b]
+[models.qwen3-4b-instruct-2507]
 params_b = 4.0
-notes = "Qwen3 4B. Has a thinking mode; see docs for the decode budget."
+quants = ["q5_k_m", "iq3_m"]
+source = "bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF"
+notes = "Qwen3 4B Instruct 2507. Non-thinking model."
 ```
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `params_b` | number | required | Parameter count in billions. Used for the Pi memory rule. |
-| `file` | string | `"{models_dir}/{name}/{name}-{quant}.gguf"` | Template for the GGUF path. Placeholders are `{models_dir}`, `{name}`, `{quant}` (`q4_0`) and `{QUANT}` (`Q4_0`). |
-| `files` | table | empty | Exact path per quantization, e.g., `q4_0 = "/data/Qwen3-4B-Q4_0.gguf"`. Wins over `file`. |
+| `params_b` | number | required | Parameter count in billions. Recorded for reference. |
+| `quants` | list | all of `q5_k_m`, `q6_k`, `iq3_m` | The weight quants this model has. Suites expand only these, and `a2e doctor` checks only these files. |
+| `file` | string | `"{models_dir}/{name}/{name}-{quant}.gguf"` | Template for the GGUF path. Placeholders are `{models_dir}`, `{name}`, `{quant}` (`q5_k_m`) and `{QUANT}` (`Q5_K_M`). |
+| `files` | table | empty | Exact path per quantization, e.g., `q5_k_m = "/data/Qwen_Qwen3-4B-Instruct-2507-Q5_K_M.gguf"`. Wins over `file`. |
 | `source` | string | `""` | Where the GGUF came from. Fill it in when you download a model. |
 | `notes` | string | `""` | Free text. |
 
-The committed registry has `qwen3-4b` (4.0), `qwen3-8b` (8.0), `xlam2-3b` (3.0), `xlam2-8b` (8.0) and `phi4-mini` (3.8). The Z.ai GLM model is not chosen yet, and the file has a commented placeholder for it.
+The committed registry has `qwen3-4b-instruct-2507` (4.0; `q5_k_m`, `iq3_m`) and `granite-3-1-2b-instruct` (2.0; `q6_k`, `iq3_m`). Model names avoid dots because TOML reads a dot in a table name as a nested table.
 
 ## 3. `configs/local.toml`
 
@@ -230,9 +232,9 @@ Settings for the `web` task family, which uses the Brave Search API.
 ### 3.4 Per-model overrides
 
 ```toml
-[models.qwen3-4b.files]
-q4_0 = "~/models/Qwen3-4B-Q4_0.gguf"
-q8_0 = "~/models/Qwen3-4B-Q8_0.gguf"
+[models.qwen3-4b-instruct-2507.files]
+q5_k_m = "~/models/Qwen_Qwen3-4B-Instruct-2507-Q5_K_M.gguf"
+iq3_m = "~/models/Qwen_Qwen3-4B-Instruct-2507-IQ3_M.gguf"
 ```
 
 ## 4. Environment variables

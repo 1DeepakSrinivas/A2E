@@ -20,8 +20,8 @@ cooldown_timeout_s = 900
 
 [matrix]
 device = ["pi5", "mac"]
-model = ["qwen3-4b", "xlam2-3b"]
-quant = ["q4_0"]
+model = ["qwen3-4b-instruct-2507", "granite-3-1-2b-instruct"]
+quant = ["q5_k_m", "q6_k"]
 kv_quant = ["f16"]
 
 [axes]

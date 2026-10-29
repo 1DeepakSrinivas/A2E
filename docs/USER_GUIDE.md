@@ -79,16 +79,16 @@ Energy readings on the Mac come from `powermetrics`, which only works as root. T
 
 ### 3.3 Model files
 
-A2E reads GGUF model files. The models in the study are listed in `configs/models.toml`. For each model you need one file per quantization you plan to run: `q4_0`, `q8_0` and `q3_k_m`. By default A2E looks for a file named like this:
+A2E reads GGUF model files. The models in the study are listed in `configs/models.toml`. For each model you need one file per quantization it lists in `quants`: `q5_k_m` and `iq3_m` for Qwen3-4B-Instruct-2507, `q6_k` and `iq3_m` for Granite 3.1 2B. `scripts/download_models.sh` downloads all four. By default A2E looks for a file named like this:
 
 ```text
 <models_dir>/<model>/<model>-<quant>.gguf
-e.g. ~/models/qwen3-4b/qwen3-4b-q4_0.gguf
+e.g. ~/models/qwen3-4b-instruct-2507/qwen3-4b-instruct-2507-q5_k_m.gguf
 ```
 
 If your files have other names, give their exact paths in `configs/local.toml` (see section 4). When you download a model, write down where it came from in the `source` field of `configs/models.toml` and add it to `REFERENCES.md`.
 
-The Pi has 8 GB of memory, so A2E only runs Q8_0 files on the Pi for models of 4 billion parameters or fewer. The 8B models run at Q4_0 on the Pi. Jobs that break this rule are listed as skipped with the reason "not run: memory".
+Every model and quant is under 4 GB, so all of them fit in the Pi's 8 GB of memory. A suite may list all three quants; each model only runs the quants it has.
 
 ## 4. Configure the machine
 
@@ -145,21 +145,21 @@ A `FAIL` line stops `scripts/run_suite.sh`. A `warn` line does not, e.g., a miss
 
 | Suite | What it runs | Runnable jobs | Skipped jobs | Runs | Model loads |
 |---|---|---|---|---|---|
-| `smoke` | One small job of each kind on Qwen3-4B Q4_0, one measured run. Use it to check a new machine. | 8 | 0 | 8 | 2 |
-| `pilot` | Qwen3-4B Q4_0 with KV cache f16 and q8_0. Plain generation, every offline custom task family, a slice of every BFCL category, and one llama-bench test with kernel profiling. | 140 | 0 | 560 | 4 |
-| `baseline` | All five models at Q4_0 and Q8_0. Plain generation next to tool calling. | 108 | 12 | 432 | 18 |
-| `chains` | Chains of 2 to 5 tool calls for every family, and notes with 1, 3 or 5 arguments per call. | 720 | 80 | 2,880 | 18 |
-| `factorial` | The main sweep on custom chains over schema length, decode length, grammar and KV cache. | 1,296 | 144 | 5,184 | 36 |
-| `bfcl` | Accuracy and cost on every BFCL category in scope for every model, quantization and KV cache setting. | 720 | 80 | 1,440 | 36 |
-| `cache_ablation` | Prefix cache on and off, KV cache f16 and q8_0, over long chains and BFCL multi-turn. | 120 | 0 | 480 | 12 |
-| `local_tools` | File search, file organizing, math and file plus math chains of 2 to 5 calls, on small BFCL file systems, for every model at Q4_0 and Q8_0. | 1,080 | 120 | 4,320 | 18 |
+| `smoke` | One small job of each kind on Qwen3-4B-Instruct-2507 Q5_K_M, one measured run. Use it to check a new machine. | 8 | 0 | 8 | 2 |
+| `pilot` | Qwen3-4B-Instruct-2507 Q5_K_M with KV cache f16 and q8_0. Plain generation, every offline custom task family, a slice of every BFCL category, and one llama-bench test with kernel profiling. | 140 | 0 | 560 | 4 |
+| `baseline` | Both models at both of their quants. Plain generation next to tool calling. | 48 | 0 | 192 | 8 |
+| `chains` | Chains of 2 to 5 tool calls for every family, and notes with 1, 3 or 5 arguments per call. | 320 | 0 | 1,280 | 8 |
+| `factorial` | The main sweep on custom chains over schema length, decode length, grammar and KV cache. | 576 | 0 | 2,304 | 16 |
+| `bfcl` | Accuracy and cost on every BFCL category in scope for every model, quantization and KV cache setting. | 320 | 0 | 640 | 16 |
+| `cache_ablation` | Prefix cache on and off, KV cache f16 and q8_0, over long chains and BFCL multi-turn. | 80 | 0 | 320 | 8 |
+| `local_tools` | File search, file organizing, math and file plus math chains of 2 to 5 calls, on small BFCL file systems, for both models at both quants. | 480 | 0 | 1,920 | 8 |
 | `full_eval` | One broad report: 50 tasks per model, quant and grammar setting, from single BFCL calls and multi-turn BFCL to custom chains of 2 to 5 calls. One measured run, no warm-up. Edit the two marked lines for your models and quants. | 336 | 0 | 336 | 8 |
-| `harness_ablation` | Eleven harness settings (prompt format, context management, error recovery, stopping rules, and two combinations) against the baseline on the same tasks, for Qwen3-4B and xLAM-2 3B at Q4_0. | 572 | 0 | 2,288 | 4 |
-| `web_live` | Live web search through the Brave Search API on Qwen3-4B and Phi-4-mini. Needs a key and network access. | 24 | 0 | 48 | 4 |
-| `kernels` | llama-bench prefill and decode tests for every model, quantization and KV cache setting, with the top kernels from Linux perf on the Pi. | 36 | 4 | 36 | 0 |
+| `harness_ablation` | Eleven harness settings (prompt format, context management, error recovery, stopping rules, and two combinations) against the baseline on the same tasks, for both models at their higher-quality quants. | 572 | 0 | 2,288 | 4 |
+| `web_live` | Live web search through the Brave Search API on both models. Needs a key and network access. | 24 | 0 | 48 | 4 |
+| `kernels` | llama-bench prefill and decode tests for every model, quantization and KV cache setting, with the top kernels from Linux perf on the Pi. | 16 | 0 | 16 | 0 |
 | `stability` | 40 long chains back to back with no cooldown, with different CPU governors on the Pi. | 8 | 4 | 24 | 4 |
 
-The counts cover both devices together, so each device runs about half of them. They come from `uv run a2e plan <suite>`, which also prints the counts per device and per task kind. A run is one repeat of one job, so runs equal runnable jobs times warm-up plus measured repeats. Skipped jobs are the 8B models at Q8_0 on the Pi and, in the stability suite, governor jobs on the Mac. Some factorial jobs are also skipped at run time when the tools do not fit the schema length.
+The counts cover both devices together, so each device runs about half of them. They come from `uv run a2e plan <suite>`, which also prints the counts per device and per task kind. A run is one repeat of one job, so runs equal runnable jobs times warm-up plus measured repeats. Skipped jobs are, in the stability suite, governor jobs on the Mac. Some factorial jobs are also skipped at run time when the tools do not fit the schema length.
 
 Run the suites in this order:
 
@@ -187,7 +187,7 @@ Here is the smoke suite in full:
 ```toml
 [suite]
 name = "smoke"
-description = "One small job of each kind on Qwen3-4B Q4_0, one measured run, no warm-up."
+description = "One small job of each kind on Qwen3-4B-Instruct-2507 Q5_K_M, one measured run, no warm-up."
 seed = 0
 
 [repeats]
@@ -203,8 +203,8 @@ cooldown_c = 0
 
 [matrix]
 device = ["pi5", "mac"]
-model = ["qwen3-4b"]
-quant = ["q4_0"]
+model = ["qwen3-4b-instruct-2507"]
+quant = ["q5_k_m"]
 kv_quant = ["f16"]
 
 [axes]
@@ -239,7 +239,7 @@ n = 3
 | BFCL multi turn | 9 | `multi_turn_base` 4, `multi_turn_miss_func` 2, `multi_turn_miss_param` 3: state across user turns, tools revealed later, missing arguments |
 | Custom chains | 26 | `calc` (2 and 4 calls), `notes` (3), `retrieval` and `fs_search` (2 and 4), `fs_organize`, `math` and `fs_math` (3 and 5): longer horizons with real tools |
 
-The two `# EDIT` lines in `configs/suites/full_eval.toml` set the two models and the two quants. The suite sets `thinking = "off"`, so reasoning models such as Qwen3 answer directly and their token budget goes to the tool call. Use names from `configs/models.toml`. The suite runs once per job and has no warm-up, so there is no repeat-to-repeat spread. Read the report by category and family totals, because a single cell has only 2 to 4 tasks. The live `web` family is left out because live results change.
+The two `# EDIT` lines in `configs/suites/full_eval.toml` set the models and quants. The suite sets `thinking = "off"`, so a reasoning model would answer directly and its token budget goes to the tool call. Neither current model has a thinking mode, so this changes nothing for them. Use names from `configs/models.toml`. The suite runs once per job and has no warm-up, so there is no repeat-to-repeat spread. Read the report by category and family totals, because a single cell has only 2 to 4 tasks. The live `web` family is left out because live results change.
 
 ```bash
 scripts/run_suite.sh full_eval
@@ -485,7 +485,7 @@ The hardware group is the first place where A2E meets a real llama-server. It ch
 
 ```bash
 export A2E_LLAMA_SERVER=~/a2e-deps/llama.cpp/build/bin/llama-server
-export A2E_GGUF=~/models/qwen3-4b/qwen3-4b-q4_0.gguf
+export A2E_GGUF=~/models/qwen3-4b-instruct-2507/qwen3-4b-instruct-2507-q5_k_m.gguf
 export A2E_CTX=16384
 uv run a2e test hardware -v
 ```
@@ -506,7 +506,7 @@ If a hardware test fails, its message names the part of the interface that did n
 
 **Multi-turn BFCL jobs fail with a server error.** The prompt grew past the context size. Raise `[server] ctx`. On the Pi, use `kv_quant = "q8_0"` for large contexts so the KV cache fits in memory.
 
-**Qwen3 answers are empty or cut off.** Qwen3 can spend its whole decode budget on its thinking text before it writes a tool call. A2E strips thinking text before parsing, so a cut-off answer counts as no call. Use a larger `decode_len` if this happens often. The pilot shows how often it happens.
+**Answers are empty or cut off.** A reasoning model can spend its whole decode budget on its thinking text before it writes a tool call. A2E strips thinking text before parsing, so a cut-off answer counts as no call. Use a larger `decode_len` if this happens often. The pilot shows how often it happens.
 
 **The kernel profile is empty.** Run the kernels suite as root, or lower `kernel.perf_event_paranoid` with `sudo sysctl kernel.perf_event_paranoid=1`. The run's `server_json` stores the note perf gave.
 

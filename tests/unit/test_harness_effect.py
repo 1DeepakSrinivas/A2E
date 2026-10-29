@@ -11,7 +11,7 @@ from a2e.store import Store
 
 def add_run(st, *, harness="baseline", model="m", device="mac", repeat=0, tasks, family="fs_search"):
     """tasks: list of (case_id, valid, [energy of each model call])."""
-    cfg = {"model": model, "quant": "q4_0", "kv_quant": "f16", "grammar": False, "family": family, "depth": 3}
+    cfg = {"model": model, "quant": "q5_k_m", "kv_quant": "f16", "grammar": False, "family": family, "depth": 3}
     if harness != "baseline":
         cfg["harness"] = harness
     run = st.insert("runs", {"config_json": json.dumps(cfg), "device": device, "phase": "measured",

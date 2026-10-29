@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 REPO = Path(__file__).resolve().parents[2]
 CONFIG_DIR = Path(os.environ.get("A2E_CONFIG_DIR", REPO / "configs"))
-QUANTS = ("q4_0", "q8_0", "q3_k_m")
+QUANTS = ("q5_k_m", "q6_k", "iq3_m")  # weight quants in the study; each model lists the ones it has
 
 
 class ModelEntry(BaseModel):
@@ -25,8 +25,12 @@ class ModelEntry(BaseModel):
     params_b: float
     file: str = "{models_dir}/{name}/{name}-{quant}.gguf"  # template; {models_dir} {name} {quant} {QUANT}
     files: dict[str, str] = Field(default_factory=dict)  # exact per-quant paths (override the template)
+    quants: list[str] = Field(default_factory=list)  # weight quants this model has; empty means every quant in QUANTS
     source: str = ""  # where the GGUF came from (record it here when you download it)
     notes: str = ""
+
+    def available_quants(self) -> tuple[str, ...]:
+        return tuple(self.quants) if self.quants else QUANTS
 
     def path_for(self, quant: str, models_dir: str) -> Path:
         tmpl = self.files.get(quant, self.file)

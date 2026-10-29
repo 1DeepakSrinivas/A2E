@@ -40,7 +40,7 @@ def test_client_against_mock_server():
 
 
 def test_build_args_device_and_kv():
-    mac = build_args(RunConfig(model="qwen3-4b", quant="q4_0", kv_quant="q8_0", device="mac"), "bin", "m.gguf")
+    mac = build_args(RunConfig(model="qwen3-4b-instruct-2507", quant="q5_k_m", kv_quant="q8_0", device="mac"), "bin", "m.gguf")
     assert mac[mac.index("-ngl") + 1] == "99" and "--cache-type-k" in mac
-    pi = build_args(RunConfig(model="qwen3-4b", quant="q4_0", device="pi5"), "bin", "m.gguf")
+    pi = build_args(RunConfig(model="qwen3-4b-instruct-2507", quant="q5_k_m", device="pi5"), "bin", "m.gguf")
     assert pi[pi.index("-ngl") + 1] == "0" and "--cache-type-k" not in pi

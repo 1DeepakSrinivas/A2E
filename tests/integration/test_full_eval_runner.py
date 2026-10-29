@@ -17,7 +17,7 @@ REPO = Path(__file__).parents[2]
 @pytest.fixture(scope="module")
 def ran(tmp_path_factory):
     tmp = tmp_path_factory.mktemp("full_eval")
-    s = make_settings(tmp, models=("qwen3-4b", "gemma3-4b"), quants=("q4_0", "q8_0"))
+    s = make_settings(tmp)
     suite = load_suite(REPO / "configs" / "suites" / "full_eval.toml")
     suite.run.idle_seconds = 0
     suite.run.sample_hz = 50

@@ -106,7 +106,7 @@ def test_cli_list_and_run_and_rescore_against_fake_server(fake_server, tmp_path)
     assert "multi_turn_miss_func" in runner.invoke(app, ["bfcl", "list"]).output
     db, raw = tmp_path / "o.db", tmp_path / "raw.jsonl"
     res = runner.invoke(app, ["bfcl", "run", "--url", srv.url, "--category", "simple_python", "--category",
-                              "irrelevance", "--model", "qwen3-4b", "--quant", "q4_0", "--device", "mac",
+                              "irrelevance", "--model", "qwen3-4b-instruct-2507", "--quant", "q5_k_m", "--device", "mac",
                               "--n", "5", "--db", str(db), "--raw", str(raw), "--n-predict", "16"])
     assert res.exit_code == 0, res.output
     assert "simple_python: 0/5 valid" in res.output and "irrelevance: 5/5 valid" in res.output  # prose = no call
@@ -121,7 +121,7 @@ def test_cli_list_and_run_and_rescore_against_fake_server(fake_server, tmp_path)
 def test_cli_rejects_unknown_category_and_writes_no_raw_file(fake_server, tmp_path):
     raw = tmp_path / "raw.jsonl"
     res = CliRunner().invoke(app, ["bfcl", "run", "--url", fake_server().url, "--category", "nope", "--model", "m",
-                                   "--quant", "q4_0", "--device", "mac", "--db", str(tmp_path / "x.db"),
+                                   "--quant", "q5_k_m", "--device", "mac", "--db", str(tmp_path / "x.db"),
                                    "--raw", str(raw)])
     assert res.exit_code != 0 and not raw.exists()
 

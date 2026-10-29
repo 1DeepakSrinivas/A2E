@@ -46,7 +46,7 @@ def test_parse_perf_report_ranks_symbols_and_ignores_noise():
 
 def test_suite_bench_task_validation(tmp_path):
     from a2e.suite import ConfigError, load_suite
-    base = '[suite]\nname = "b"\n[matrix]\ndevice = "pi5"\nmodel = "qwen3-4b"\nquant = "q4_0"\n'
+    base = '[suite]\nname = "b"\n[matrix]\ndevice = "pi5"\nmodel = "qwen3-4b-instruct-2507"\nquant = "q5_k_m"\n'
     p = tmp_path / "b.toml"
     p.write_text(base + '[[tasks]]\nkind = "bench"\n')
     with pytest.raises(ConfigError, match="n_prompt"):
