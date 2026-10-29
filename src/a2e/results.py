@@ -178,6 +178,83 @@ def timeline(store: Store, run_id: int) -> pd.DataFrame:
     return store.df("SELECT * FROM samples WHERE run_id = ? ORDER BY t", [run_id])
 
 
+PRESSURE_ORDER = ["Nominal", "Fair", "Serious", "Critical"]  # Mac thermal pressure levels, mildest first
+
+
+def _worst_pressure(levels) -> str | None:
+    seen = {x for x in levels if isinstance(x, str)}
+    ranked = [p for p in PRESSURE_ORDER if p in seen]
+    return ranked[-1] if ranked else (sorted(seen)[-1] if seen else None)
+
+
+def _sample_stats(g: pd.DataFrame, energy_j: float | None) -> dict:
+    """Envelope of one run's samples. Samples are taken only while the run is active, not during model load or idle."""
+    out = {"samples": len(g), "duration_s": g["t"].max() - g["t"].min() if len(g) > 1 else 0.0,
+           "rss_min_mb": g["rss_mb"].min(), "rss_mean_mb": g["rss_mb"].mean(), "rss_max_mb": g["rss_mb"].max(),
+           "cpu_mean_pct": g["cpu_pct"].mean(), "cpu_max_pct": g["cpu_pct"].max()}
+    p = g["power_w"].dropna()
+    out.update({"power_min_w": p.min(), "power_median_w": p.median(), "power_mean_w": p.mean(),
+                "power_p95_w": p.quantile(0.95) if len(p) else float("nan"), "power_max_w": p.max(),
+                "energy_j": energy_j})
+    out["temp_max_c"] = g["temp_c"].max()
+    out["thermal_pressure"] = _worst_pressure(g["pressure"])
+    return out
+
+
+def resources(store: Store, exp_id=None, by: list[str] | None = None, phase: str = "measured") -> pd.DataFrame:
+    """Power, memory, CPU and thermal envelope per configuration, from the 2 Hz samples of each measured run.
+
+    Each statistic is computed per run, then combined over the runs of a configuration: `_min` columns take the
+    lowest value, `_max` columns the highest, and the others (median, mean, p95, energy) are averaged.
+    Power and energy are empty when the run had no power source; they are never filled with zeros.
+    """
+    by = by or DEFAULT_BY
+    where, params = _where(exp_id, phase, "r")
+    cols = ", ".join(f"r.{c}" for c in dict.fromkeys(by + ["power_scope"]))
+    df = store.df(f"SELECT s.run_id, s.t, s.rss_mb, s.cpu_pct, s.temp_c, s.power_w, s.pressure, {cols} "
+                  f"FROM samples s JOIN v_runs r ON r.run_id = s.run_id{where}", params)
+    if df.empty:
+        return pd.DataFrame()
+    energy = turn_frame(store, exp_id, phase).groupby("run_id")["energy_j"].sum(min_count=1)
+    rows = []
+    for keys, g in df.groupby(by + ["power_scope", "run_id"], dropna=False):
+        meta = dict(zip(by + ["power_scope", "run_id"], keys))
+        e = energy.get(meta["run_id"])
+        rows.append({**meta, **_sample_stats(g, None if e is None or pd.isna(e) else float(e))})
+    r = pd.DataFrame(rows)
+    stats = [c for c in r.columns if c not in by + ["power_scope", "run_id", "thermal_pressure"]]
+    agg = {c: "min" if c.endswith("_min_w") or c.endswith("_min_mb") else
+           "max" if c.endswith("_max_w") or c.endswith("_max_mb") or c.endswith("_max_pct") or c == "temp_max_c"
+           else "mean" for c in stats}
+    grouped = r.groupby(by + ["power_scope"], dropna=False)
+    out = grouped.agg({**agg, "thermal_pressure": _worst_pressure}).join(grouped.size().rename("runs"))
+    out = out.reset_index()
+    keep = [b for b in by if out[b].notna().any()]
+    first = keep + ["power_scope", "runs"]
+    return out[first + [c for c in out.columns if c not in first]]
+
+
+def case_resources(store: Store, exp_id=None, phase: str = "measured") -> pd.DataFrame:
+    """One row per task (case): energy, power, memory and time, summed or maximised over the task's model calls."""
+    t = turn_frame(store, exp_id, phase)
+    c = case_frame(store, exp_id, phase)
+    if t.empty or c.empty:
+        return pd.DataFrame()
+
+    def agg(g: pd.DataFrame) -> pd.Series:
+        w = g.loc[g["avg_power_w"].notna(), "wall_ms"]
+        power = (g.loc[w.index, "avg_power_w"] * w).sum() / w.sum() if w.sum() else float("nan")
+        return pd.Series({"turns": len(g), "energy_j": g["energy_j"].sum(min_count=1), "avg_power_w": power,
+                          "peak_rss_mb": g["peak_rss_mb"].max(), "max_temp_c": g["max_temp_c"].max()})
+
+    per_task = t.groupby(["run_id", "task_id"]).apply(agg, include_groups=False).reset_index()
+    out = c.merge(per_task, left_on=["run_id", "case_id"], right_on=["run_id", "task_id"], how="left")
+    keep = ["exp_id", "run_id", "device", "model", "quant", "kv_quant", "task_kind", "grammar", "category", "case_id",
+            "valid", "turns", "wall_ms", "energy_j", "avg_power_w", "peak_rss_mb", "max_temp_c"]
+    out = out[[k for k in keep if k in out.columns]]
+    return out.sort_values(["exp_id", "run_id", "case_id"]).reset_index(drop=True)
+
+
 def bench_summary(store: Store, exp_id=None, phase: str = "measured") -> pd.DataFrame:
     """llama-bench throughput per configuration and test size. For decode (tg) the estimated memory bandwidth is
     tokens/s x model file size: every weight is read once per generated token, so decode speed is bounded by it."""
@@ -288,4 +365,12 @@ def report_markdown(store: Store, exp_id: int) -> str:
                                                     "tokens_per_joule", "j_per_success", "avg_power_w") if c in s]])]
     parts += ["## Memory and thermals\n",
               md_table(s[id_cols + [c for c in ("peak_rss_mb", "max_temp_c", "throttled_turns") if c in s]])]
+    res = resources(store, exp_id)
+    if not res.empty:
+        parts += ["## Resource envelope\n",
+                  "Power, memory and CPU statistics over the 2 Hz samples taken while each run was active. `_min` "
+                  "and `_max` columns are the lowest and highest value over the runs of a configuration; the others "
+                  "are averages. Power is empty when no power source was available. `thermal_pressure` is the "
+                  "worst level seen (Mac). The power scope says what the watts include.\n",
+                  md_table(res)]
     return "\n".join(parts)

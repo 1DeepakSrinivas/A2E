@@ -207,6 +207,30 @@ def results_stages(exp: list[int] = typer.Option(None), db: Path = typer.Option(
     _print_df(R.stages(_store(db), exp or None, [b for b in by.split(",") if b] or None))
 
 
+@results_app.command("resources")
+def results_resources(exp: list[int] = typer.Option(None, help="experiment id(s); default all"),
+                      by: str = typer.Option("", help="comma-separated grouping fields"),
+                      db: Path = typer.Option(None), csv: Path = typer.Option(None, help="also write to this csv")) -> None:
+    """Power (min, median, p95, max), memory, CPU and thermal pressure per configuration."""
+    from a2e import results as R
+    df = R.resources(_store(db), exp or None, [b for b in by.split(",") if b] or None)
+    _print_df(df, "No measured runs.")
+    if csv is not None and not df.empty:
+        df.to_csv(csv, index=False)
+
+
+@results_app.command("task-resources")
+def results_task_resources(exp: list[int] = typer.Option(None, help="experiment id(s); default all"),
+                           db: Path = typer.Option(None),
+                           csv: Path = typer.Option(None, help="also write to this csv")) -> None:
+    """Energy, power, peak memory and time of every task."""
+    from a2e import results as R
+    df = R.case_resources(_store(db), exp or None)
+    _print_df(df, "No measured runs.")
+    if csv is not None and not df.empty:
+        df.to_csv(csv, index=False)
+
+
 @results_app.command("stability")
 def results_stability(exp: list[int] = typer.Option(None), db: Path = typer.Option(None)) -> None:
     """Decode speed drift over long sessions and the first task where it drops (thermal knee)."""

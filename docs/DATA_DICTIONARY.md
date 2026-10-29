@@ -240,6 +240,24 @@ Within one run, with sums over the run's turns:
 
 `a2e results stages` divides each stage's total time by the total turn time. The stages are `prefill`, `decode`, `parse`, `validate`, `tool_wait`, `template` and `harness`. `unattributed` is the rest, which is time inside the HTTP call that llama-server did not report as prefill or decode.
 
+`a2e results resources` reports the power, memory, CPU and thermal envelope of each configuration from the 2 Hz `samples` table. The samples of a run are taken only while the run is active, so model load and the idle baseline are not included. Each statistic is computed per run and then combined over the measured runs of a configuration:
+
+| Column | Meaning | Combined over runs by |
+|---|---|---|
+| `samples`, `duration_s` | Number of samples and the time between the first and last | mean |
+| `power_min_w`, `power_max_w` | Lowest and highest power reading | lowest, highest |
+| `power_median_w`, `power_mean_w`, `power_p95_w` | Median, mean and 95th percentile of the power readings. The median is the sustained level. | mean |
+| `energy_j` | Sum of `energy_j` over the run's turns, with the idle baseline subtracted | mean |
+| `rss_min_mb`, `rss_mean_mb`, `rss_max_mb` | Resident memory of llama-server and its children | lowest, mean, highest |
+| `cpu_mean_pct`, `cpu_max_pct` | CPU use of the llama-server process | mean, highest |
+| `temp_max_c` | Highest chip temperature (Pi only; empty on the Mac) | highest |
+| `thermal_pressure` | Worst Mac thermal pressure level seen: `Nominal`, `Fair`, `Serious` or `Critical` | worst |
+| `power_scope` | What the power readings include, as stored with the run | |
+
+Power and energy columns are empty, never zero, when the run had no power source. On the Mac the chip temperature is not available. `powermetrics` gives only the thermal pressure level. The power readings are CPU, GPU and Neural Engine package power and leave out memory, the display and the power supply. Memory is the resident size of the server process, so it leaves out other processes and the operating system.
+
+`a2e results task-resources` gives one row per task (case). `turns` is the number of model calls in the task, `energy_j` is the sum over those calls, `avg_power_w` is the mean power of the calls weighted by their duration, and `peak_rss_mb` and `max_temp_c` are the highest values over the calls. A task's turns are matched to its case by `task_id` equal to `case_id` inside one run.
+
 `a2e results bench` averages each llama-bench test over measured runs per configuration (`tok_s`, `tok_s_sd`). For decode tests it adds `est_bandwidth_gbs`, which is `tok_s` × model file size in GB. Decode reads every weight once per generated token, so this is an estimate of the memory bandwidth decode uses. Comparing it with the device's memory bandwidth shows how close decode is to the memory limit. Prefill numbers have no bandwidth column, because prefill is mostly limited by compute.
 
 `a2e results kernels` averages each function's share over measured runs and ranks the functions per configuration and test.
