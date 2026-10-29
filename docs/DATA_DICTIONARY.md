@@ -113,6 +113,7 @@ One row per model call.
 | `n_calls` | | Tool calls parsed from this turn. |
 | `energy_j` | J | Energy over the whole turn window, idle subtracted. |
 | `energy_prefill_j`, `energy_decode_j`, `energy_tool_j` | J | Energy over each stage window, idle subtracted. |
+| `energy_harness_j` | J | Energy over the harness's own code in the turn: templating, parsing and validating, idle subtracted. The model call and the tools are not included. |
 | `avg_power_w` | W | Mean power over the turn window, idle not subtracted. |
 | `peak_rss_mb` | MiB | Highest resident memory of llama-server and its child processes during the turn. |
 | `avg_cpu_pct` | % | Mean CPU use of the llama-server process (100% is one core). |
@@ -207,7 +208,7 @@ Power sources:
 
 The views drop runs whose status is not `complete`.
 
-`v_runs` is `runs` plus these columns read from `config_json`: `model`, `quant`, `kv_quant`, `grammar`, `prefix_cache`, `decode_len`, `schema_len`, `family`, `depth`, `n_args`, `category` and `governor`. Booleans read from JSON appear as 1 or 0.
+`v_runs` is `runs` plus these columns read from `config_json`: `model`, `quant`, `kv_quant`, `grammar`, `prefix_cache`, `decode_len`, `schema_len`, `family`, `depth`, `n_args`, `category` and `governor`. Booleans read from JSON appear as 1 or 0. It also has `harness` (the name of the harness setting, `baseline` when none), `prompt_format`, `context`, `recovery` and `stopping`. Runs stored before harness variants existed read as `baseline`, `json_schema`, `full`, `none` and `fixed`.
 
 `v_turns` is `turns` plus `exp_id`, `job_id`, `phase`, `repeat_idx`, `task_kind`, `device`, `idle_power_w` and the `v_runs` setting columns.
 

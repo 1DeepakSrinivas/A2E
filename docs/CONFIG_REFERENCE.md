@@ -113,6 +113,20 @@ An axis a kind does not use is not part of its jobs, so a plain job never runs t
 
 The BFCL categories in scope are `simple_python`, `multiple`, `parallel`, `parallel_multiple`, `irrelevance`, `live_irrelevance`, `live_relevance`, `multi_turn_base`, `multi_turn_miss_func` and `multi_turn_miss_param`.
 
+### 1.7a `[[harness]]`
+
+The harness is the code around the model: how the tool list is written, what the model sees of earlier tool results, what happens when a reply cannot be read, and when the loop gives up. A suite can list several harness settings. Every custom and BFCL job then runs once for each one, on the same tasks, so the effect of each setting can be compared. Plain and bench jobs do not call tools and ignore the section. With no `[[harness]]` entry, only the default harness runs.
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `name` | string | required | A label for the setting. Names must be unique. |
+| `prompt_format` | string | `json_schema` | How the tool list is shown. `json_schema` is one JSON schema per line. `compact` is one line per tool with typed argument names, and a `?` after an optional argument. `natural` is plain sentences. The model still replies with a JSON array, and the parser does not change. |
+| `context` | string | `full` | What the model sees of earlier tool results. `full` shows all of them. `mask` replaces every tool result except the latest 2 with a short stub. `truncate` cuts each tool result to 400 characters. The stored history is never changed, only the messages sent to the model. |
+| `recovery` | string | `none` | What happens when a reply cannot be read as tool calls. `none` ends the task (custom) or the user turn (BFCL multi-turn). `feedback` keeps the bad reply and adds a message saying what was wrong. `retry` drops the bad reply and asks again with a one-line reminder that is not kept, at most 2 times in a row. BFCL single-turn cases get at most 2 more tries in both modes. A call that parses but fails validation gets an error result back in every mode. |
+| `stopping` | string | `fixed` | When to give up. `fixed` uses the turn limits of `[run]`. `tight` caps the model calls at what a correct run needs plus 2 (a custom chain needs one call per step plus `final_answer`; a BFCL user turn needs one call per ground truth call plus the closing reply). `early_stop` ends the task after 2 identical calls in a row, or 2 failed turns in a row (an unreadable reply, a failed validation or a tool error). |
+
+A harness entry with every field at its default is the baseline. Only the fields that differ from the default are written into a job's settings, so a job under the baseline harness has the same key as it had before this section existed. Two entries cannot have the same settings. The constants (2 stub-free results, 400 characters, 2 retries, 2 extra turns, 2 repeats) are in `src/a2e/agent/harness.py`.
+
 ### 1.8 Validation rules
 
 A2E refuses a suite and prints the reason when:
@@ -127,6 +141,7 @@ A2E refuses a suite and prints the reason when:
 - `n_prompt`, `n_gen` or `perf` is set on a task that is not bench
 - a BFCL multi-turn category is used with `[server] ctx` below 16384
 - `[matrix] model` names a model that is not in `configs/models.toml`
+- a `[[harness]]` entry has an unknown value, an empty or repeated name, or the same settings as another entry
 
 ### 1.9 How a suite becomes jobs
 

@@ -29,6 +29,11 @@
     "jobs": 1440,
     "suite_hash": "d2590c79132c7333"
   },
+  "harness_ablation": {
+    "job_keys_sha": "80e5ad691b174f7b",
+    "jobs": 572,
+    "suite_hash": "2f485cafd8203ec8"
+  },
   "kernels": {
     "job_keys_sha": "8a61707bf261838e",
     "jobs": 40,

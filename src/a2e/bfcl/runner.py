@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from a2e.agent.harness import Harness
 from a2e.agent.loop import TurnRecord
 from a2e.agent.prompt import render_tools
 from a2e.bfcl.convert import tool_spec
@@ -12,7 +13,7 @@ from a2e.bfcl.load import Case, load_cases, load_subset
 from a2e.bfcl.multi_turn import MAX_STEPS, run_multi_turn, score_trace
 from a2e.bfcl.replay import ReplayClient
 from a2e.bfcl.score import CaseResult
-from a2e.bfcl.single_turn import run_single_turn
+from a2e.bfcl.single_turn import run_single_turn_turns
 from a2e.store import Store
 
 
@@ -36,15 +37,17 @@ def safe_token_counter(client) -> Callable[[str], int] | None:
 
 
 def run_case(client, case: Case, *, grammar=False, cache_prompt=True, n_predict=256, max_steps=MAX_STEPS,
-             count_tokens=None) -> CaseOutcome:
+             count_tokens=None, harness: Harness | None = None) -> CaseOutcome:
     if case.is_multi_turn:
-        tr = run_multi_turn(client, case, n_predict, cache_prompt, grammar, max_steps)
+        tr = run_multi_turn(client, case, n_predict, cache_prompt, grammar, max_steps, harness)
         res = score_trace(case, tr)
+        if tr.stop_reason:
+            res.extra["stop_reason"] = tr.stop_reason
         res.extra["schema_tokens"] = (count_tokens(render_tools([tool_spec(d) for d in case.functions]))
                                       if count_tokens else None)
         return CaseOutcome(case, res, tr.turns, [t.text for t in tr.turns], tr.status, tr.user_turn_of)
-    res, turn = run_single_turn(client, case, n_predict, cache_prompt, grammar, count_tokens)
-    return CaseOutcome(case, res, [turn], [turn.text], "server_error" if turn.error else "done")
+    res, turns = run_single_turn_turns(client, case, n_predict, cache_prompt, grammar, count_tokens, harness)
+    return CaseOutcome(case, res, turns, [t.text for t in turns], "server_error" if turns[-1].error else "done")
 
 
 def case_row(o: CaseOutcome, run_id: int) -> dict:
@@ -55,9 +58,12 @@ def case_row(o: CaseOutcome, run_id: int) -> dict:
             "extra_json": json.dumps({k: v for k, v in o.result.extra.items() if k != "schema_tokens"})}
 
 
-def raw_record(o: CaseOutcome, run_id: int) -> str:
-    return json.dumps({"run_id": run_id, "case_id": o.case.id, "category": o.case.category, "status": o.status,
-                       "texts": o.texts})
+def raw_record(o: CaseOutcome, run_id: int, harness: Harness | None = None) -> str:
+    rec = {"run_id": run_id, "case_id": o.case.id, "category": o.case.category, "status": o.status,
+           "texts": o.texts}
+    if harness is not None and not harness.is_default:  # replays of a retried case need to know how many calls it took
+        rec["harness"] = harness.non_default()
+    return json.dumps(rec)
 
 
 def run_category(client, category: str, store: Store, run_id: int, *, n: int | None = None, seed: int = 0,
@@ -74,7 +80,7 @@ def run_category(client, category: str, store: Store, run_id: int, *, n: int | N
                 store.insert("turns", t.row(run_id, case.id))
             store.insert("cases", case_row(o, run_id))
             if raw:
-                raw.write(raw_record(o, run_id) + "\n")
+                raw.write(raw_record(o, run_id, kw.get("harness")) + "\n")
                 raw.flush()
     finally:
         if raw:
@@ -93,5 +99,5 @@ def rescore(raw_path: str | Path) -> list[CaseResult]:
         if rec["status"] == "server_error":
             out.append(CaseResult(case.id, case.category, False, "a2e:server_error"))
             continue
-        out.append(run_case(ReplayClient(rec["texts"]), case).result)
+        out.append(run_case(ReplayClient(rec["texts"]), case, harness=Harness(**rec.get("harness", {}))).result)
     return out

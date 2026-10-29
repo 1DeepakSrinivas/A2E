@@ -26,6 +26,8 @@ Helpers:
 - `tests/oracle.py` and `tests/bfcl_oracle.py` turn expected answers into model output. `oracle_outputs_any` works for every custom family.
 - `tests/fakes/fake_brave.py` is a local stand-in for the Brave Search API and the pages its results point to.
 
+The tests for harness variants are `tests/unit/test_harness_variants.py` (prompt formats, context views, budgets, stop rules, suite expansion and job-key stability), `tests/unit/test_store_v3.py` (the migration), `tests/integration/test_harness_loop.py`, `tests/integration/test_harness_bfcl.py` and `tests/integration/test_harness_runner.py` (the loop, BFCL runners and a whole runner pass under each variant).
+
 The tests for the BFCL tool families and web search are `tests/unit/test_agent_tools.py`, `tests/sweep/test_agent_tools_oracle.py` (every family, every depth, many seeds) and `tests/integration/test_agent_tools_runner.py`. `tests/hardware/test_real_web.py` checks the real Brave API when `BRAVE_SEARCH_API_KEY` is set.
 
 ## Running the hardware group

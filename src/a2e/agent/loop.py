@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 import httpx
 
 from a2e.agent.grammar import call_schema
+from a2e.agent.harness import (MAX_RETRIES, Harness, StopWatch, apply_context, feedback_message, retry_reminder,
+                               turn_budget)
 from a2e.agent.parse import ToolCall, parse_calls
 from a2e.agent.prompt import system_message, tool_response_message
 from a2e.client import Completion
@@ -59,7 +61,7 @@ class TurnRecord:
 @dataclass
 class Trace:
     turns: list[TurnRecord] = field(default_factory=list)
-    status: str = ""  # final_answer | parse_error | max_turns | server_error
+    status: str = ""  # final_answer | parse_error | max_turns | early_stop | server_error
     final_answer: str | None = None
 
     def score(self, steps: list[ExpectedCall]) -> ChainScore:
@@ -104,21 +106,29 @@ class AgentLoop:
     """Multi-turn tool-calling loop that times every stage of every turn.
 
     Stages per turn: template (harness), model call (prefill + decode from server timings), parse,
-    validate (schema check of the calls), tool-wait (real tool execution). The prompt only ever grows
-    by appended messages so the schema prefix stays cacheable.
+    validate (schema check of the calls), tool-wait (real tool execution). With the default `Harness` the prompt
+    only ever grows by appended messages so the schema prefix stays cacheable; other harnesses change what is
+    shown, how bad replies are handled and when the loop gives up (see `a2e.agent.harness`).
     """
 
     def __init__(self, client, registry: Registry, specs: list[dict], grammar: bool = False,
-                 n_predict: int = 128, cache_prompt: bool = True):
+                 n_predict: int = 128, cache_prompt: bool = True, harness: Harness | None = None):
         self.client, self.registry, self.specs = client, registry, specs
         self.n_predict, self.cache_prompt = n_predict, cache_prompt
         self.schema = call_schema(specs) if grammar else None
+        self.harness = harness or Harness()
 
-    def run(self, user_prompt: str, max_turns: int = 6) -> Trace:
-        messages = [system_message(self.specs), {"role": "user", "content": user_prompt}]
+    def run(self, user_prompt: str, max_turns: int = 6, expected_calls: int | None = None) -> Trace:
+        """`expected_calls` is how many model calls a correct run takes; only the `tight` stopping rule uses it."""
+        h = self.harness
+        messages = [system_message(self.specs, h.prompt_format), {"role": "user", "content": user_prompt}]
         trace = Trace(status="max_turns")
-        for step in range(max_turns):
-            turn, stamps = model_step(self.client, messages, step, self.n_predict, self.cache_prompt, self.schema)
+        watch, bad, remind = StopWatch(h), 0, False
+        for step in range(turn_budget(h, max_turns, expected_calls)):
+            shown = apply_context(messages, h)
+            if remind:
+                shown = shown + [retry_reminder()]
+            turn, stamps = model_step(self.client, shown, step, self.n_predict, self.cache_prompt, self.schema)
             trace.turns.append(turn)
             if stamps is None:
                 trace.status = "server_error"
@@ -131,8 +141,18 @@ class AgentLoop:
                                     else self.registry.execute(c.name, c.arguments))
             turn.finalize(t0, t1, t2, t3, t4, time.perf_counter())
             if turn.parse_error:
-                trace.status = "parse_error"
-                return trace
+                if h.recovery == "feedback":
+                    messages += [{"role": "assistant", "content": turn.text}, feedback_message(turn.parse_error)]
+                elif h.recovery == "retry" and bad < MAX_RETRIES:
+                    bad, remind = bad + 1, True
+                else:
+                    trace.status = "parse_error"
+                    return trace
+                if watch.update(turn.calls, True):
+                    trace.status = "early_stop"
+                    return trace
+                continue
+            bad, remind = 0, False
             done = next((r for call, r, e in zip(turn.calls, turn.results, turn.validation_errors)
                          if call.name == "final_answer" and e is None), None)
             if done is not None:
@@ -140,4 +160,7 @@ class AgentLoop:
                 return trace
             messages += [{"role": "assistant", "content": turn.text},
                          tool_response_message(turn.calls, turn.results)]
+            if watch.update(turn.calls, any(turn.validation_errors) or any(not r.ok for r in turn.results)):
+                trace.status = "early_stop"
+                return trace
         return trace

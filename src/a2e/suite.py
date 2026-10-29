@@ -16,6 +16,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from a2e.agent.harness import CONTEXTS, FIELDS as HARNESS_FIELDS, RECOVERIES, STOPPINGS, Harness
+from a2e.agent.prompt import PROMPT_FORMATS
 from a2e.bfcl.load import ALL_CATEGORIES, MULTI_TURN_CATEGORIES
 from a2e.settings import CONFIG_DIR, Settings
 from a2e.tasks.custom import FAMILY_DEPTH, FAMILY_TOOLS
@@ -28,6 +30,7 @@ AXES_FOR_KIND = {
     "bfcl": ("grammar", "prefix_cache", "decode_len", "governor"),
     "bench": ("governor",),
 }
+HARNESS_KINDS = ("custom", "bfcl")  # the kinds that call tools; plain prompts and bench jobs have no harness
 KIND_ORDER = {"plain": 0, "custom": 1, "bfcl": 2, "bench": 3}  # bench last: it needs the server stopped
 SERVER_FIELDS = ("device", "model", "quant", "kv_quant", "ctx", "flash_attn", "threads")
 
@@ -96,6 +99,19 @@ class Axes(_Strict):
         return v
 
 
+class HarnessVariant(_Strict):
+    """One named harness setting. Fields left out keep the default. Applies to custom and bfcl tasks only."""
+    name: str = Field(min_length=1)
+    prompt_format: Literal[PROMPT_FORMATS] = "json_schema"
+    context: Literal[CONTEXTS] = "full"
+    recovery: Literal[RECOVERIES] = "none"
+    stopping: Literal[STOPPINGS] = "fixed"
+
+    @property
+    def harness(self) -> Harness:
+        return Harness(**{f: getattr(self, f) for f in HARNESS_FIELDS})
+
+
 class Task(_Strict):
     kind: Literal["plain", "custom", "bfcl", "bench"]
     n: int | None = Field(None, ge=1)  # prompts / chains / BFCL cases per run; BFCL: all when unset
@@ -158,10 +174,24 @@ class Suite(_Strict):
     run: RunOpts = RunOpts()
     matrix: Matrix
     axes: Axes = Axes()
+    harness: list[HarnessVariant] = []  # [[harness]] tables; none means only the default harness
     tasks: list[Task] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def _harness_unique(self):
+        names = [v.name for v in self.harness]
+        if len(set(names)) != len(names):
+            raise ValueError("harness names must be unique")
+        settings = [v.harness for v in self.harness]
+        if len(set(settings)) != len(settings):
+            raise ValueError("two [[harness]] entries have the same settings")
+        return self
+
     def canonical(self) -> dict:
-        return json.loads(self.model_dump_json())
+        d = json.loads(self.model_dump_json())
+        if not d["harness"]:  # keeps the hash of every suite written before harness variants existed
+            del d["harness"]
+        return d
 
     @property
     def hash(self) -> str:
@@ -225,12 +255,15 @@ def expand(suite: Suite, settings: Settings) -> list[dict]:
                 grid = [{"category": c, "n": task.n} for c in task.category]
             else:
                 grid = [{"n_prompt": task.n_prompt, "n_gen": task.n_gen, "perf": task.perf, "reps": task.reps}]
-            for combo in itertools.product(*axis_values):
-                for g in grid:
-                    cfg = {**cell, "kind": task.kind, **dict(zip(axes, combo)), **g}
-                    cfg["job_key"] = job_key(cfg)
-                    cfg["skip_reason"] = feasibility(cfg, settings)
-                    jobs.append(cfg)
+            variants = suite.harness if suite.harness and task.kind in HARNESS_KINDS else [None]
+            for combo, g, hv in itertools.product(itertools.product(*axis_values), grid, variants):
+                cfg = {**cell, "kind": task.kind, **dict(zip(axes, combo)), **g}
+                if hv is not None and not hv.harness.is_default:
+                    # only non-default fields are stored, so the default harness keeps its old job keys
+                    cfg.update({"harness": hv.name, **hv.harness.non_default()})
+                cfg["job_key"] = job_key(cfg)
+                cfg["skip_reason"] = feasibility(cfg, settings)
+                jobs.append(cfg)
     seen, unique = set(), []
     for j in jobs:  # identical jobs from overlapping task entries run once
         if j["job_key"] not in seen:
