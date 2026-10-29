@@ -14,7 +14,7 @@ ROWS = list(factorial(**GRID))
 
 
 def test_grid_size():
-    assert len(ROWS) == 5 * 2 * 2 * 3 * 2 * 2 * 2 == 480
+    assert len(ROWS) == len(MODELS) * 2 * 2 * 3 * 2 * 2 * 2 == 192
 
 
 def test_all_cells_unique():
@@ -35,12 +35,18 @@ def test_pi_infeasible_cells_are_exactly_8b_q8():
         assert (why == "not run: memory") == (not ok)
 
 
+def test_pi_q8_rule_still_bites_for_a_larger_model(monkeypatch):
+    monkeypatch.setitem(MODEL_PARAMS_B, "big-8b", 8.0)
+    rows = list(factorial(**{**GRID, "models": ["big-8b"]}))
+    assert {(c.device, c.quant) for c, ok, _ in rows if not ok} == {("pi5", "q8_0")}
+
+
 def test_infeasible_count():
     bad = [c for c, ok, _ in ROWS if not ok]
     big = sum(1 for p in MODEL_PARAMS_B.values() if p > 4.0)  # 8B models, Q8_0, Pi only
     per_model = 2 * 3 * 2 * 2  # kv x schema x decode x grammar
     assert len(bad) == big * per_model
-    assert Counter(c.device for c in bad) == {"pi5": len(bad)}
+    assert {c.device for c in bad} <= {"pi5"}
 
 
 @pytest.mark.parametrize("axis,values", [("quant", {"q8_0", "q4_0"}), ("kv_quant", {"f16", "q8_0"}),

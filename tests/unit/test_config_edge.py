@@ -25,5 +25,5 @@ def test_defaults():
 
 
 def test_config_json_roundtrip():
-    c = RunConfig(model="xlam2-8b", quant="q4_0", kv_quant="q8_0", device="pi5", governor="performance")
+    c = RunConfig(model="gemma3-4b", quant="q4_0", kv_quant="q8_0", device="pi5", governor="performance")
     assert RunConfig.model_validate_json(c.model_dump_json()) == c

@@ -29,11 +29,11 @@ class ConstPower(PowerSource):
         return self.w
 
 
-def make_settings(tmp: Path, models=("qwen3-4b", "qwen3-8b"), quants=("q4_0", "q8_0"), device="mac") -> Settings:
+def make_settings(tmp: Path, models=("qwen3-4b", "gemma3-4b", "big-8b"), quants=("q4_0", "q8_0"), device="mac") -> Settings:
     bin_ = Path(_wrapper(tmp / "llama-server", FAKE))
     _wrapper(tmp / "llama-bench", FAKES / "fake_llama_bench.py")  # found next to llama-server
     perf = _wrapper(tmp / "perf", FAKES / "fake_perf.py")
-    reg = {"qwen3-4b": 4.0, "qwen3-8b": 8.0, "xlam2-3b": 3.0, "xlam2-8b": 8.0, "phi4-mini": 3.8}
+    reg = {"qwen3-4b": 4.0, "gemma3-4b": 4.0, "big-8b": 8.0}  # big-8b: fake, covers the Pi memory rule
     for m in models:
         for q in quants:
             p = tmp / "models" / m / f"{m}-{q}.gguf"

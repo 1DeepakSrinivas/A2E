@@ -15,8 +15,8 @@ def write(p: Path, text: str) -> Path:
 
 def test_committed_registry_loads_and_has_study_models():
     s = load_settings(REPO / "configs", local=REPO / "configs" / "does-not-exist.toml")
-    assert {"qwen3-4b", "qwen3-8b", "xlam2-3b", "xlam2-8b", "phi4-mini"} <= set(s.models)
-    assert s.model("qwen3-8b").params_b == 8.0
+    assert {"qwen3-4b", "gemma3-4b"} == set(s.models)
+    assert s.model("gemma3-4b").params_b == 4.0
 
 
 def test_default_file_template_and_local_overrides(tmp_path, monkeypatch):
@@ -94,3 +94,11 @@ def test_doctor_passes_with_a_complete_setup(tmp_path):
     s.models = {"m1": ModelEntry(name="m1", params_b=3)}
     checks = doctor.run_checks(s)
     assert all(c.ok for c in checks if c.critical), [c for c in checks if c.critical and not c.ok]
+
+
+def test_committed_registry_gives_one_doctor_check_per_model_and_quant(tmp_path):
+    s = Settings(llama_server=str(tmp_path / "nope"), device="mac", db=str(tmp_path / "r" / "a.db"),
+                 models_dir=str(tmp_path))
+    s.models = load_settings(REPO / "configs", local=tmp_path / "none.toml").models
+    model_checks = [c.name for c in doctor.run_checks(s) if c.name.startswith("model ")]
+    assert len(model_checks) == 2 * 3 and "model gemma3-4b q3_k_m" in model_checks

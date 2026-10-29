@@ -10,22 +10,6 @@
 params_b = 4.0
 notes = "Qwen3 4B. Has a thinking mode; see docs for the decode budget."
 
-[models.qwen3-8b]
-params_b = 8.0
-notes = "Qwen3 8B. Q4_0 only on the Pi."
-
-[models.xlam2-3b]
-params_b = 3.0
-notes = "Salesforce xLAM-2 3B, function-calling model."
-
-[models.xlam2-8b]
-params_b = 8.0
-notes = "Salesforce xLAM-2 8B. Q4_0 only on the Pi."
-
-[models.phi4-mini]
-params_b = 3.8
-notes = "Microsoft Phi-4-mini 3.8B."
-
 [models.gemma3-4b]
 params_b = 4.0
 notes = "Google Gemma 3 4B instruction tuned. Same size class as qwen3-4b, different family."

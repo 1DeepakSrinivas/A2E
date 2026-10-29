@@ -170,7 +170,7 @@ notes = "Qwen3 4B. Has a thinking mode; see docs for the decode budget."
 | `source` | string | `""` | Where the GGUF came from. Fill it in when you download a model. |
 | `notes` | string | `""` | Free text. |
 
-The committed registry has `qwen3-4b` (4.0), `qwen3-8b` (8.0), `xlam2-3b` (3.0), `xlam2-8b` (8.0) and `phi4-mini` (3.8). The Z.ai GLM model is not chosen yet, and the file has a commented placeholder for it.
+The committed registry has `qwen3-4b` (4.0) and `gemma3-4b` (4.0). The Z.ai GLM model is not chosen yet, and the file has a commented placeholder for it.
 
 ## 3. `configs/local.toml`
 

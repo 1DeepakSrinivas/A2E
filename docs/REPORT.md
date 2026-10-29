@@ -61,7 +61,7 @@ Section 7.4 maps each item to the result table that answers it.
 |---|---|
 | Devices | Raspberry Pi 5 with 8 GB (CPU only). Apple Silicon Mac (Metal GPU). Both are measured. |
 | Runtime | llama.cpp with GGUF model files, driven through `llama-server` over HTTP, and `llama-bench` for microbenchmarks. One llama.cpp commit for the whole study. |
-| Models | Qwen3-4B, Qwen3-8B, xLAM-2 3B, xLAM-2 8B, Phi-4-mini 3.8B. One Z.ai GLM small model is planned but not chosen. |
+| Models | Qwen3-4B and Gemma 3 4B. One Z.ai GLM small model is planned but not chosen. |
 | Quantization | Q8_0 and Q4_0 weights. KV cache at f16 or q8_0. |
 | Sequence lengths | Tool schema of 256, 1024 or 2048 tokens. Decode length of 128 or 512 tokens. Agent chains of 2 to 5 tool calls. |
 | Workloads | Plain generation, custom tool chains on A2E's own local tools, on BFCL's simulated file system and math tools, and on live web search, BFCL v4 single-turn, relevance and multi-turn categories, llama-bench prefill and decode tests. |
@@ -478,7 +478,7 @@ The vendored BFCL files are Apache 2.0. Their license and a NOTICE with the sour
 | Runtime | llama.cpp only, Metal on the Mac | MLC LLM, Ollama, MLX | One runtime keeps the comparison about hardware and models | User |
 | Server interface | llama-server over HTTP | Python bindings, the CLI tools | Process isolation, server-side timings, same on both devices | User (recommended) |
 | Energy | Software estimates with stated scope | USB power meter | No meter available. The power source interface allows adding one later. | User |
-| Models | Qwen3 4B/8B, xLAM-2 3B/8B, Phi-4-mini, one Z.ai GLM | | Tool-calling models of the 4B to 8B class | User |
+| Models | Qwen3 4B, Gemma 3 4B, one Z.ai GLM | | Tool-calling models of the 4B class | User |
 | Pi memory rule | 8B models at Q4_0 only on the Pi | Skip silently, record as out of memory | Q8_0 8B does not fit in 8 GB | User |
 | Quantization formats | Q8_0 and Q4_0 | Q4_K_M, adding Q5 or Q6 | llama.cpp's basic 8-bit and 4-bit formats, chosen to stand for INT8 and INT4 | User |
 | Benchmarks | BFCL v4 plus custom chains. Others after the pilot. | API-Bank, ToolBench, tau-bench now | Cost unknown before the pilot | User |

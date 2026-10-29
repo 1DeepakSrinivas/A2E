@@ -1,13 +1,13 @@
 {
   "baseline": {
-    "job_keys_sha": "fab83b4bf43eaf85",
-    "jobs": 120,
-    "suite_hash": "0392aad12552c183"
+    "job_keys_sha": "59eca340f10b3163",
+    "jobs": 48,
+    "suite_hash": "d2d26e981a45cc4c"
   },
   "bfcl": {
-    "job_keys_sha": "f43e7e3dd8668084",
-    "jobs": 800,
-    "suite_hash": "56512908e4d8055f"
+    "job_keys_sha": "2f48f641b71c1ec2",
+    "jobs": 320,
+    "suite_hash": "85b83dcc95e5677c"
   },
   "bfcl_mini": {
     "job_keys_sha": "9a930284f12164d1",
@@ -15,29 +15,29 @@
     "suite_hash": "02a6c31e9966d42f"
   },
   "cache_ablation": {
-    "job_keys_sha": "030e610de6ff366c",
-    "jobs": 120,
-    "suite_hash": "d29ef4ad4b2f3017"
+    "job_keys_sha": "783328cf05579db4",
+    "jobs": 80,
+    "suite_hash": "b7d6f567562727f7"
   },
   "chains": {
-    "job_keys_sha": "5bc1cd91dfad20da",
-    "jobs": 800,
-    "suite_hash": "30b71052ea88e257"
+    "job_keys_sha": "0f4ee56ac7ed01af",
+    "jobs": 320,
+    "suite_hash": "1a235a8ccbadbbb3"
   },
   "factorial": {
-    "job_keys_sha": "42ff06184f21ea13",
-    "jobs": 1440,
-    "suite_hash": "d2590c79132c7333"
+    "job_keys_sha": "b6e500afa605e4e1",
+    "jobs": 576,
+    "suite_hash": "27a1f72b379c0e5e"
   },
   "kernels": {
-    "job_keys_sha": "8a61707bf261838e",
-    "jobs": 40,
-    "suite_hash": "d148ec75a2b4c46c"
+    "job_keys_sha": "ef97ebbdf10c25f0",
+    "jobs": 16,
+    "suite_hash": "ccb23c94fe7d6192"
   },
   "local_tools": {
-    "job_keys_sha": "71e0fabf3eb0dcb0",
-    "jobs": 1200,
-    "suite_hash": "d845d3397398d813"
+    "job_keys_sha": "42ee96fda1b4d54c",
+    "jobs": 480,
+    "suite_hash": "34aae9a7d13c45b0"
   },
   "pilot": {
     "job_keys_sha": "420c3b5069c476cf",
@@ -50,13 +50,13 @@
     "suite_hash": "b0a6cecae8d5006e"
   },
   "stability": {
-    "job_keys_sha": "e5c92d0b53f69ce7",
+    "job_keys_sha": "9f8242ef624a906c",
     "jobs": 12,
-    "suite_hash": "6e383c602a827461"
+    "suite_hash": "58c8e161edc8d35b"
   },
   "web_live": {
-    "job_keys_sha": "445c57bb19662d24",
+    "job_keys_sha": "68e01fff881fda26",
     "jobs": 24,
-    "suite_hash": "ffc77f97a8dd7331"
+    "suite_hash": "f9281f18fe0f77b9"
   }
 }

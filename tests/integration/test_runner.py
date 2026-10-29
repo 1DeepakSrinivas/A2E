@@ -111,9 +111,9 @@ def test_process_death_leaves_running_rows_that_the_next_start_recovers(tmp_path
 
 
 def test_missing_model_fails_only_its_jobs_and_retry_failed_reruns_them(tmp_path):
-    body = SMALL.replace('model = ["qwen3-4b"]', 'model = ["qwen3-4b", "qwen3-8b"]')
+    body = SMALL.replace('model = ["qwen3-4b"]', 'model = ["qwen3-4b", "gemma3-4b"]')
     r = make(tmp_path, body=body)
-    missing = tmp_path / "models" / "qwen3-8b" / "qwen3-8b-q4_0.gguf"
+    missing = tmp_path / "models" / "gemma3-4b" / "gemma3-4b-q4_0.gguf"
     missing.unlink()
     out = r.run()
     assert out["counts"] == {"done": 4, "failed": 4}
@@ -126,7 +126,7 @@ def test_missing_model_fails_only_its_jobs_and_retry_failed_reruns_them(tmp_path
 
 
 def test_pi_memory_rule_and_mac_governor_are_skipped_with_reasons(tmp_path):
-    body = SMALL.replace('model = ["qwen3-4b"]', 'model = ["qwen3-8b"]').replace('quant = ["q4_0"]',
+    body = SMALL.replace('model = ["qwen3-4b"]', 'model = ["big-8b"]').replace('quant = ["q4_0"]',
                                                                                'quant = ["q8_0"]')
     r = make(tmp_path, body=body, device="pi5")
     out = r.run()
