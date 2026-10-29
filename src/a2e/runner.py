@@ -22,6 +22,7 @@ from pathlib import Path
 
 from a2e import env as envmod
 from a2e.bench import bench_args, perf_available, run_bench
+from a2e.agent.harness import Harness
 from a2e.agent.loop import AgentLoop, TurnRecord
 from a2e.agent.schema_gen import SchemaTooLarge, pad_tools
 from a2e.client import Client
@@ -102,7 +103,8 @@ def exec_custom(client, job: dict, ctx: dict) -> list[Unit]:
         # a fresh tool state per task (notes folder, BFCL instances, web URL list), so tasks cannot see each other
         reg = build_task_registry(task, base / f"task{i}", job["seed"], ctx.get("web"))
         trace = AgentLoop(client, reg, specs, grammar=job["grammar"], n_predict=job["decode_len"],
-                          cache_prompt=job["prefix_cache"]).run(task.prompt, max_turns=ctx["max_turns"])
+                          cache_prompt=job["prefix_cache"], harness=Harness.from_job(job)
+                          ).run(task.prompt, max_turns=ctx["max_turns"], expected_calls=len(task.steps) + 1)
         sc = trace.score(task.steps)
         if task.state_check is not None:
             sc.state_ok = bool(task.state_check(reg))
@@ -132,11 +134,12 @@ def exec_bfcl(client, job: dict, ctx: dict) -> list[Unit]:
     for case in load_subset(job["category"], job["n"], job["seed"]):
         _check_stop(ctx)
         o = run_case(client, case, grammar=job["grammar"], cache_prompt=job["prefix_cache"],
-                     n_predict=job["decode_len"], max_steps=ctx["max_steps"], count_tokens=count)
+                     n_predict=job["decode_len"], max_steps=ctx["max_steps"], count_tokens=count,
+                     harness=Harness.from_job(job))
         extra = {k: v for k, v in o.result.extra.items() if k != "schema_tokens"}
         out.append(Unit(case.id, case.category, o.turns, o.result.valid, o.result.error_type, o.status,
                         len(case.turns), o.result.extra.get("schema_tokens"), {**extra, "token_count": how},
-                        user_turns=o.user_turn_of or None, raw=raw_record(o, -1)))
+                        user_turns=o.user_turn_of or None, raw=raw_record(o, -1, Harness.from_job(job))))
     return out
 
 
@@ -176,6 +179,10 @@ def turn_row(turn: TurnRecord, run_id: int, unit: Unit, step: int, trace: list[t
         row["energy_prefill_j"] = integrate_energy(trace, *w["prefill"], idle)
         row["energy_decode_j"] = integrate_energy(trace, *w["decode"], idle)
         row["energy_tool_j"] = integrate_energy(trace, *w["tool"], idle)
+        # the harness's own code: templating, parsing and validating (the model and the tools are separate)
+        row["energy_harness_j"] = (integrate_energy(trace, start, w["prefill"][0], idle)
+                                   + integrate_energy(trace, *w["parse"], idle)
+                                   + integrate_energy(trace, *w["validate"], idle))
         if end > start:
             row["avg_power_w"] = integrate_energy(trace, start, end) / (end - start)
     ws = _window_samples(samples, start, end)

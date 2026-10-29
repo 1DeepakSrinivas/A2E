@@ -153,6 +153,7 @@ A `FAIL` line stops `scripts/run_suite.sh`. A `warn` line does not, e.g., a miss
 | `bfcl` | Accuracy and cost on every BFCL category in scope for every model, quantization and KV cache setting. | 720 | 80 | 1,440 | 36 |
 | `cache_ablation` | Prefix cache on and off, KV cache f16 and q8_0, over long chains and BFCL multi-turn. | 120 | 0 | 480 | 12 |
 | `local_tools` | File search, file organizing, math and file plus math chains of 2 to 5 calls, on small BFCL file systems, for every model at Q4_0 and Q8_0. | 1,080 | 120 | 4,320 | 18 |
+| `harness_ablation` | Eleven harness settings (prompt format, context management, error recovery, stopping rules, and two combinations) against the baseline on the same tasks, for Qwen3-4B and xLAM-2 3B at Q4_0. | 572 | 0 | 2,288 | 4 |
 | `web_live` | Live web search through the Brave Search API on Qwen3-4B and Phi-4-mini. Needs a key and network access. | 24 | 0 | 48 | 4 |
 | `kernels` | llama-bench prefill and decode tests for every model, quantization and KV cache setting, with the top kernels from Linux perf on the Pi. | 36 | 4 | 36 | 0 |
 | `stability` | 40 long chains back to back with no cooldown, with different CPU governors on the Pi. | 8 | 4 | 24 | 4 |
@@ -178,6 +179,7 @@ A suite file has these parts:
 - `[matrix]` lists the devices, models, quantizations and KV cache types. Every combination is one model load.
 - `[axes]` gives the default values for grammar, prefix cache, decode length, schema length and CPU governor. Tasks can vary these settings.
 - Each `[[tasks]]` entry adds one kind of task. A task can override any axis.
+- Each optional `[[harness]]` entry is a named harness setting. Every custom and BFCL job runs once under each one, so you can compare how the code around the model changes cost and accuracy. See section 1.7a of the configuration reference.
 
 Here is the smoke suite in full:
 
