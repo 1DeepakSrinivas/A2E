@@ -1,7 +1,7 @@
 # Quick end-to-end check of a new machine or model. A few minutes. Not used for analysis.
 [suite]
 name = "smoke"
-description = "One small job of each kind on Qwen3-4B Q4_0, one measured run, no warm-up."
+description = "One small job of each kind on Qwen3-4B-Instruct-2507 Q5_K_M, one measured run, no warm-up."
 seed = 0
 
 [repeats]
@@ -17,8 +17,8 @@ cooldown_c = 0
 
 [matrix]
 device = ["pi5", "mac"]
-model = ["qwen3-4b"]
-quant = ["q4_0"]
+model = ["qwen3-4b-instruct-2507"]
+quant = ["q5_k_m"]
 kv_quant = ["f16"]
 
 [axes]

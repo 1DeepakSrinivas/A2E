@@ -17,9 +17,9 @@ import pandas as pd
 from a2e.store import Store
 
 CONFIG_FIELDS = ["device", "model", "quant", "kv_quant", "task_kind", "family", "depth", "n_args", "category",
-                 "grammar", "prefix_cache", "decode_len", "schema_len", "governor"]
+                 "grammar", "prefix_cache", "decode_len", "schema_len", "governor", "harness", "thinking"]
 DEFAULT_BY = ["device", "model", "quant", "kv_quant", "task_kind", "family", "category", "grammar", "prefix_cache",
-              "decode_len", "schema_len"]
+              "decode_len", "schema_len", "harness", "thinking"]
 STAGES = ["prefill_ms", "decode_ms", "parse_ms", "validate_ms", "tool_wait_ms", "template_ms", "harness_ms"]
 
 
@@ -249,10 +249,29 @@ def case_resources(store: Store, exp_id=None, phase: str = "measured") -> pd.Dat
 
     per_task = t.groupby(["run_id", "task_id"]).apply(agg, include_groups=False).reset_index()
     out = c.merge(per_task, left_on=["run_id", "case_id"], right_on=["run_id", "task_id"], how="left")
-    keep = ["exp_id", "run_id", "device", "model", "quant", "kv_quant", "task_kind", "grammar", "category", "case_id",
+    keep = ["exp_id", "run_id", "repeat_idx", "device", "model", "quant", "kv_quant", "task_kind", "family", "depth",
+            "n_args", "grammar", "prefix_cache", "decode_len", "schema_len", "harness", "thinking", "category", "case_id",
             "valid", "turns", "wall_ms", "energy_j", "avg_power_w", "peak_rss_mb", "max_temp_c"]
     out = out[[k for k in keep if k in out.columns]]
     return out.sort_values(["exp_id", "run_id", "case_id"]).reset_index(drop=True)
+
+
+def failures(store: Store, exp_id=None, by: list[str] | None = None, phase: str = "measured") -> pd.DataFrame:
+    """Why tasks failed: the number of failed tasks per reason, with the number of tasks run. `error_type` is the
+    official BFCL checker's error type for BFCL, or for a custom chain `wrong_step`, `wrong_state`, `parse_error`,
+    `max_turns`, `early_stop` or `server_error`. Tasks that passed are not listed."""
+    by = by or ["device", "model", "quant", "grammar", "category"]
+    where, params = _where(exp_id, phase)
+    cols = ", ".join(dict.fromkeys(by))
+    df = store.df(f"SELECT {cols}, coalesce(error_type, 'unknown') AS reason, count(*) AS tasks FROM v_cases"
+                  f"{where}{' AND' if where else ' WHERE'} valid = 0 GROUP BY {cols}, reason", params)
+    if df.empty:
+        return df
+    ran = store.df(f"SELECT {cols}, count(*) AS tasks_run FROM v_cases{where}{' AND' if where else ' WHERE'} "
+                   f"valid IS NOT NULL GROUP BY {cols}", params)
+    out = df.merge(ran, on=list(dict.fromkeys(by)), how="left")
+    return out.sort_values(list(dict.fromkeys(by)) + ["tasks"], ascending=[True] * len(dict.fromkeys(by)) + [False]
+                           ).reset_index(drop=True)
 
 
 def bench_summary(store: Store, exp_id=None, phase: str = "measured") -> pd.DataFrame:
@@ -288,6 +307,23 @@ def kernels(store: Store, exp_id=None, top: int = 10, phase: str = "measured") -
 
 
 # ------------------------------------------------------------------------------------------- report
+def plain_number(v: float, digits: int = 3) -> str:
+    """A float with `digits` significant digits and no scientific notation: 1.23, 12.3, 123, 1234, 0.0000188.
+    Very small or large values (outside 1e-8 to 1e15) and infinities fall back to the short forms."""
+    if v == 0:
+        return "0"
+    if math.isinf(v):
+        return "inf" if v > 0 else "-inf"
+    a = abs(v)
+    if a < 1e-8 or a >= 1e15:
+        return f"{v:.{digits - 1}e}"
+    if a >= 10 ** (digits - 1):
+        return f"{v:.0f}"
+    dec = digits - 1 - math.floor(math.log10(a))
+    text = f"{v:.{dec}f}"
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
 def md_table(df: pd.DataFrame, digits: int = 3, max_rows: int = 200) -> str:
     if df is None or df.empty:
         return "_No rows._\n"
@@ -296,7 +332,7 @@ def md_table(df: pd.DataFrame, digits: int = 3, max_rows: int = 200) -> str:
         if v is None or (isinstance(v, float) and math.isnan(v)):
             return ""
         if isinstance(v, float):
-            return f"{v:.{digits}g}"
+            return plain_number(v, digits)
         return str(v).replace("|", "/")
 
     cols = list(df.columns)
@@ -308,6 +344,24 @@ def md_table(df: pd.DataFrame, digits: int = 3, max_rows: int = 200) -> str:
     return "\n".join(lines) + "\n"
 
 
+def cache_reset_warning(store: Store, exp_id: int) -> str:
+    """A warning when a measured run may have started with a warm prefix cache. Empty when every run's cache was
+    erased. A run stores how its cache was reset: `erase` (fine), `flush` (the erase failed, an unrelated prompt
+    replaced the cached prefix), `failed`, or nothing at all (a run made before the reset was checked)."""
+    rows = store.query(
+        "SELECT coalesce(json_extract(server_json, '$.cache_reset'), 'not recorded') AS how, count(*) AS runs "
+        "FROM v_runs WHERE exp_id = ? AND phase = 'measured' AND task_kind != 'bench' AND coalesce(prefix_cache, 1) = 1 GROUP BY how", [exp_id])
+    bad = [r for r in rows if r["how"] not in ("erase", "unsupported")]
+    if not bad:
+        return ""
+    detail = "; ".join(f"{r['runs']} run(s): {r['how']}" for r in bad)
+    return ("## Warning: prefix cache\n\n"
+            "Some runs may have started with prompts left in the prefix cache by an earlier job, which makes prefill "
+            "and energy look lower than they are. Affected: " + detail + ". `flush` means the server's cache erase "
+            "failed and an unrelated prompt was used instead; `not recorded` means the run was made before this check "
+            "existed. Compare prefill, cache hit and energy of such runs with care.\n")
+
+
 def report_markdown(store: Store, exp_id: int) -> str:
     exp = store.query("SELECT * FROM experiments WHERE exp_id = ?", [exp_id])
     if not exp:
@@ -315,8 +369,11 @@ def report_markdown(store: Store, exp_id: int) -> str:
     e = exp[0]
     env = json.loads(e["env_json"] or "{}")
     parts = [f"# Results for experiment {exp_id}: {e['name']}\n",
-             "This report is generated from the results database. It contains measured repeats only.\n",
-             "## Experiment\n",
+             "This report is generated from the results database. It contains measured repeats only.\n"]
+    warn = cache_reset_warning(store, exp_id)
+    if warn:
+        parts.append(warn)
+    parts += ["## Experiment\n",
              md_table(pd.DataFrame([{
                  "status": e["status"], "started": _ts(e["started_at"]), "finished": _ts(e["finished_at"]),
                  "suite hash": e["suite_hash"], "a2e commit": (e["git_commit"] or "")[:12],
@@ -356,6 +413,13 @@ def report_markdown(store: Store, exp_id: int) -> str:
         parts += ["## Accuracy\n", "Success is the share of scored cases that passed (BFCL official checker, or "
                   "every step correct for custom chains).\n",
                   md_table(s[id_cols + [c for c in ("n_scored", "success", "success_sd") if c in s]])]
+        f = failures(store, exp_id)
+        if not f.empty:
+            parts += ["## Why tasks failed\n",
+                      "Failed tasks per reason. For BFCL the reason is the official checker's error type; for custom "
+                      "chains it is `wrong_step`, `wrong_state`, `parse_error` (the reply could not be read), "
+                      "`max_turns`, `early_stop` or `server_error`. `tasks_run` is all scored tasks in the group.\n",
+                      md_table(f)]
     if "j_per_turn" in s:
         scope = store.df("SELECT DISTINCT power_scope FROM runs WHERE exp_id = ?", [exp_id])
         parts += ["## Energy\n",
@@ -363,6 +427,14 @@ def report_markdown(store: Store, exp_id: int) -> str:
                   + "; ".join(str(x) for x in scope["power_scope"]) + "\n",
                   md_table(s[id_cols + [c for c in ("j_per_turn", "j_per_prompt_token", "j_per_gen_token",
                                                     "tokens_per_joule", "j_per_success", "avg_power_w") if c in s]])]
+    if "j_per_turn" not in s:
+        scopes = store.df("SELECT DISTINCT power_scope FROM runs WHERE exp_id = ?", [exp_id])
+        parts += ["## Energy\n",
+                  "No energy was recorded for this experiment (power scope: "
+                  + "; ".join(str(x) for x in scopes["power_scope"]) + "). On the Mac `powermetrics` needs root; "
+                  "run with `sudo -E env \"PATH=$PATH\" .venv/bin/a2e run <suite>` and set `power = \"required\"` in "
+                  "`configs/local.toml` so a run without a power source fails at the start. Energy columns, "
+                  "joules per success and the efficiency views are empty without it.\n"]
     parts += ["## Memory and thermals\n",
               md_table(s[id_cols + [c for c in ("peak_rss_mb", "max_temp_c", "throttled_turns") if c in s]])]
     res = resources(store, exp_id)

@@ -6,14 +6,8 @@ from typing import Literal
 from pydantic import BaseModel
 
 Device = Literal["pi5", "mac"]
-Quant = Literal["q8_0", "q4_0", "q3_k_m"]
+Quant = Literal["q5_k_m", "q6_k", "iq3_m"]
 KVQuant = Literal["f16", "q8_0"]
-
-# Approximate parameter counts (billions), used for the Pi memory-feasibility rule.
-MODEL_PARAMS_B: dict[str, float] = {
-    "qwen3-4b": 4.0,
-    "gemma3-4b": 4.0,
-}
 
 
 class RunConfig(BaseModel):
@@ -30,20 +24,9 @@ class RunConfig(BaseModel):
     governor: str | None = None  # Pi only, e.g. ondemand/performance
 
 
-def feasible(cfg: RunConfig) -> tuple[bool, str]:
-    """Pi 5 (8GB) rule: 8B models run Q4_0 only; Q8_0 is for <=4B models."""
-    if cfg.model not in MODEL_PARAMS_B:
-        return False, f"unknown model {cfg.model!r}: add it to MODEL_PARAMS_B"
-    if cfg.device == "pi5" and cfg.quant == "q8_0" and MODEL_PARAMS_B[cfg.model] > 4.0:
-        return False, "not run: memory"
-    return True, ""
-
-
 def factorial(models, quants, kv_quants, schema_lens, decode_lens, grammars, devices):
-    """Yield (config, feasible, reason) for the full Model x Quant x SeqLen x Device grid."""
+    """Yield a config for every cell of the Model x Quant x KV x SeqLen x Decode x Grammar x Device grid."""
     for m, q, kv, s, d, g, dev in itertools.product(
         models, quants, kv_quants, schema_lens, decode_lens, grammars, devices
     ):
-        cfg = RunConfig(model=m, quant=q, kv_quant=kv, schema_len=s, decode_len=d, grammar=g, device=dev)
-        ok, why = feasible(cfg)
-        yield cfg, ok, why
+        yield RunConfig(model=m, quant=q, kv_quant=kv, schema_len=s, decode_len=d, grammar=g, device=dev)

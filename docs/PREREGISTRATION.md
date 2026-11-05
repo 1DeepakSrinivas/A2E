@@ -37,11 +37,20 @@ Energy is the software estimate with the idle baseline subtracted. On the Pi it 
 from `powermetrics`, which leaves out DRAM, the display and the power supply. Every energy result is reported with
 its power scope.
 
+## Amendment 3 (2026-10-29): the model set and the quants change
+
+The study now uses two models: Qwen3-4B-Instruct-2507 (Q5_K_M and IQ3_M) and IBM Granite 3.1 2B Instruct (Q6_K and
+IQ3_M). The earlier set (Qwen3 4B and 8B, xLAM-2 3B and 8B, Phi-4-mini, Gemma 3 4B) and the earlier weight quants
+(q4_0, q8_0, q3_k_m) are deprecated and no longer run. The Pi memory rule is removed because both models are under
+4 GB at every quant. Amendment 2 above describes the old Qwen3 model and is kept as history: the new Qwen3 model has
+no thinking mode, so `thinking = "off"` no longer changes anything for it. H3 now compares the higher-quality quant
+with IQ3_M.
+
 ## Factors
 
 - Device: Raspberry Pi 5 (8 GB) and Apple Silicon Mac.
 - Model: the registered models that fit each device.
-- Quantization: q3_k_m, q4_0 and q8_0 (q8_0 on the Pi only for models of 4B parameters or fewer).
+- Quantization: each model has two weight quants, a higher-quality one and IQ3_M (see Amendment 3).
 - Grammar: off and on, for the same model, quantization and tasks.
 - Tasks: curated BFCL categories and the custom local-tool families.
 
@@ -57,7 +66,7 @@ Each can be shown wrong by the data.
   grammar-off `success_rate` is below a threshold. The threshold is not set in advance. It is estimated from the
   data, and the claim is refuted if grammar lowers `j_per_success` for the strongest models as often as for the
   weakest.
-- **H3, quantization acts through failures.** Moving from q8_0 to q4_0 changes `j_per_success` mostly through
+- **H3, quantization acts through failures.** Moving from the higher-quality quant to IQ3_M changes `j_per_success` mostly through
   `success_rate` and `waste_share`, not through `j_per_gen_token`. Refuted if the change in joules per generated
   token explains more than half of the change in joules per success.
 - **H4, tool wait is a larger share on the Pi.** The tool-wait share of energy is higher on the Pi than on the Mac
@@ -91,4 +100,89 @@ results with a correction and the uncorrected values side by side.
 
 ## Amendments
 
-None yet.
+## Amendment 1 (2026-10-29): the harness question
+
+Added before any sweep was run. The study now also asks whether the harness, the code around the model, changes
+success per joule. If it does, the answer is shown with figures. If it does not, the study says the system is
+LLM-bound. Both answers come out of the rules below, so the conclusion is set by the data and not by the author.
+
+### What the harness is
+
+The harness is what the agent loop does around each model call. Four choices are varied, each with a default
+that is the loop as it was before this amendment:
+
+| Choice | Levels | What changes |
+|---|---|---|
+| `prompt_format` | `json_schema` (default), `compact`, `natural` | How the tool list is written in the prompt. The reply format and the parser stay the same. |
+| `context` | `full` (default), `mask`, `truncate` | What the model sees of earlier tool results. `mask` keeps the latest 2 and replaces older ones with a stub. `truncate` cuts each to 400 characters. |
+| `recovery` | `none` (default), `feedback`, `retry` | What happens to a reply that cannot be read. `feedback` adds an error message and keeps the bad reply. `retry` drops it and asks again with a one-line reminder, at most 2 times in a row. |
+| `stopping` | `fixed` (default), `tight`, `early_stop` | `tight` caps the calls at what a correct run needs plus 2. `early_stop` ends the task after 2 identical calls or 2 failed turns in a row. |
+
+The suite `harness_ablation` runs one choice at a time against the baseline (8 variants), plus two combinations:
+`lean` (compact, mask, feedback, early_stop) and `heavy` (natural and retry). Every harness runs the same tasks.
+The tool-list padding (`schema_len`) is always measured with the JSON rendering, so all formats carry the same
+tools.
+
+### Hypotheses
+
+- **H5.** For at least one lever, the harness changes joules per success by more than the margin. Refuted if every
+  variant passes the equivalence test below.
+- **H6.** Where a harness changes joules per success, most of the change comes from the number of model calls per
+  task and not from the energy per call. Refuted if the share of the change from calls per task is under half.
+- **H7.** The harness's own code (templating, parsing, validating) uses under 5% of turn energy on both devices.
+  Refuted if either device is at 5% or more.
+
+### Decision rules
+
+1. **Primary: equivalence.** For each harness against the baseline, take the ratio of joules per success, task by
+   task on the same tasks, as the geometric mean over cells (each cell is one device, model, quantization, task
+   family or category, and server setting, so every cell counts the same). The 90% interval comes from resampling
+   tasks 2,000 times, which is two one-sided tests at 5%. The bounds are 1 / 1.10 and 1.10, a margin of 10%.
+   - A variant is **equivalent** when its whole interval is inside the bounds.
+   - A variant **differs** when its whole interval is outside the bounds, or when it never succeeds where the
+     baseline does.
+   - Otherwise it is **inconclusive**.
+   - The study concludes **LLM-bound** only if every variant is equivalent. It concludes **the harness matters** if
+     any variant differs. Anything else is **inconclusive**, and the response is more repeats, not a verdict.
+2. **Supporting: variance share.** The share of the variance in log joules per success that each of device, model,
+   quantization and harness explains on its own (omega squared), after the mean of each task cell is removed, with
+   a 90% bootstrap interval over runs. A harness share under 10% supports LLM-bound.
+3. **Noise floor.** The baseline harness is measured with 3 repeats, so its own run-to-run spread is known. The
+   margin must be at least twice the median standard deviation of log joules per success across baseline cells. If
+   it is not, `a2e results efficiency noise` prints a warning, the verdict is re-read with `--margin` set to at least twice the noise, and both verdicts are reported.
+4. **Decomposition.** Joules per success equals calls per task times joules per call divided by success rate. The
+   change in each term is reported for every variant, and it is the basis for H6.
+
+### Commands
+
+```bash
+uv run a2e results efficiency harness         # ratios, intervals, verdicts and the conclusion
+uv run a2e results efficiency decomposition   # calls per task, joules per call, success rate
+uv run a2e results efficiency noise           # baseline noise and the margin check
+uv run a2e results efficiency variance        # variance shares
+uv run a2e results plots figures/             # the six figures with their tables
+```
+
+### Limits
+
+- The margin of 10% is set before the sweep. It can be changed only through a dated amendment.
+- Prompt variants can change accuracy for reasons unrelated to energy. That is part of the result, and the
+  full prompt text of each variant is in `src/a2e/agent/prompt.py`.
+- With 3 measured repeats per job, intervals are wide for small cells. The `inconclusive` verdict is how that
+  shows up.
+- The tasks come from the custom local-tool families and curated BFCL categories. A harness result does not carry
+  over to other tasks without a new run.
+
+## Amendment 2 (2026-10-29): thinking is switched off in `full_eval`
+
+Added after the first `full_eval` run on the Mac, before any pre-registered sweep. With the 256-token `decode_len`,
+Qwen3 used the whole budget on its thinking block when grammar was off. Replies were cut off before the tool call, so
+custom chains scored 0% for a reason that has nothing to do with tool calling. Gemma 3 has no thinking block and was
+not affected. The `[server] thinking = "off"` setting turns thinking off for every model that has the template
+variable. `full_eval` now uses it, and runs record it (`thinking` in the run's settings, `default` for older runs).
+
+- Results from runs made before this amendment, and runs with `thinking = "default"`, are not comparable with runs
+  that have `thinking = "off"` for models with a thinking mode. The report and the efficiency views keep them apart.
+- `harness_ablation` is unchanged and still uses the model's default behavior. If thinking should be off there too,
+  that is a further dated amendment before its sweep, because it changes the baseline every harness is compared with.
+- The fixed 10% margin and all decision rules of Amendment 1 are unchanged.

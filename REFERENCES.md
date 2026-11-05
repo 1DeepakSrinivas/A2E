@@ -97,17 +97,16 @@ for, and where in the repo.
 
 ---
 
-## 2. Models (4B tool-calling class)
+## 2. Models (small instruct models, under 4 GB per GGUF)
 
-All **Pending verification** of exact checkpoint, license, GGUF source and tool-call format. None downloaded yet.
+The earlier set (Qwen3 4B/8B, xLAM-2 3B/8B, Phi-4-mini, Gemma 3 4B) is deprecated and removed. Exact checkpoint, license and tool-call format are still **pending verification**.
 
-| Model | Planned sizes | Notes |
+| Model | Quants (size) | GGUF repository |
 |---|---|---|
-| Qwen3 | 4B | Has a thinking mode that can consume the decode budget before a call is emitted. |
-| Gemma 3 (Google) | 4B | Same size class as Qwen3 4B. GGUF from `unsloth/gemma-3-4b-it-GGUF` (Q3_K_M, Q4_0, Q8_0). |
-| Z.ai GLM small model | TBD | Needs user sign-off; research current release first. |
+| Qwen3-4B-Instruct-2507 | Q5_K_M (2.89 GB), IQ3_M (1.96 GB) | https://huggingface.co/bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF |
+| IBM Granite-3.1-2B-Instruct | Q6_K (2.08 GB), IQ3_M (1.17 GB) | https://huggingface.co/bartowski/granite-3.1-2b-instruct-GGUF |
 
-Where used: `MODEL_PARAMS_B` in `src/a2e/config.py` (parameter counts are approximate, from memory).
+Where used: `configs/models.toml` (the `quants` and `source` fields). `scripts/download_models.sh` downloads the four files.
 
 ---
 
@@ -122,7 +121,7 @@ Where used: `MODEL_PARAMS_B` in `src/a2e/config.py` (parameter counts are approx
   `--flash-attn`, `--cache-type-k`, `--cache-type-v`, `-ngl`, `-c`, `-t`.
 - **Where used:** `src/a2e/server.py`, `src/a2e/client.py`, `tests/fakes/fake_llama_server.py` (a stand-in written
   from these assumptions), `tests/hardware/` (the check that the assumptions hold).
-- **Also used:** GGUF model format and Q8_0 / Q4_0 quantization types; KV-cache quantization (`q8_0`).
+- **Also used:** GGUF model format and the Q5_K_M, Q6_K and IQ3_M quantization types; KV-cache quantization (`q8_0`).
 
 ### Raspberry Pi `vcgencmd`
 - **Commands used:** `pmic_read_adc`, `measure_temp`, `measure_clock arm`, `get_throttled`
@@ -229,9 +228,24 @@ summary**. Read each paper in full before citing it.
 - **GreenBench** (arXiv 2608.28667): notes that `powermetrics` excludes DRAM.
 - **RPi5-power** (https://github.com/jfikar/RPi5-power): community Pi 5 PMIC calibration against a USB-C meter.
 
+### Harness effects (searched 2026-10-29; status From summary)
+- **Stop Comparing LLM Agents Without Disclosing the Harness** (arXiv 2605.23950, ICML 2026): harness choice moves
+  scores; proposes a variance-decomposition protocol.
+- **AgencyBench** (arXiv 2601.11044): a model gains 20.5% in its native harness.
+- **SWE-Serve** (arXiv 2609.26777) and **From Question Answering to Task Completion** (survey, arXiv 2606.20683):
+  model-specific harnesses and richer scaffolds did not always help.
+- **The Scaffold Effect in Coding Agents** (arXiv 2607.22585): up to 40x tokens per solved task with small pass-rate
+  differences. **BankerToolBench** (arXiv 2604.11304): modest accuracy effect, large runtime effect.
+- **SWEnergy** (arXiv 2512.09543): framework design drove up to 9.4x energy with small models.
+- **The Complexity Trap** (arXiv 2508.21433): observation masking as good as LLM summarization. **Less Context,
+  Better Agents** (arXiv 2606.10209): pruning plus a running summary cut tokens about 60%.
+- **Small Reasoning Models are Instruction Followers in Function Calling** (arXiv 2608.22472): rigid schemas and
+  small-model function calling; contested.
+
 ---
 
 ## Change log
+- 2026-10-29: added harness-effect references to section 7.
 - 2026-10-29: added section 7, related work for the success-per-joule study.
 - 2026-10-28: BFCL file system and math tools, curated small file systems, Brave Search API for live web search.
 - 2026-10-28: Phase 5 added SQLite store v2, suites, runner, results, TUI, llama-bench/perf bench jobs; added

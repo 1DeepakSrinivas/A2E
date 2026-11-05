@@ -44,7 +44,7 @@ def test_cache_prompt_false_disables_reuse(real_server):
 def test_slot_erase_endpoint(real_server):
     c = Client(real_server().url)
     c.complete(SCHEMA + "Q:", 4)
-    c.reset_cache()
+    assert c.reset_cache() == "erase", "POST /slots/0?action=erase failed on this build (the flush fallback was used)"
     assert c.complete(SCHEMA + "Q:", 4).cached_tokens == 0, "POST /slots/0?action=erase did not clear cache"
 
 
@@ -100,3 +100,25 @@ def test_unreachable_after_stop(real_server):
     srv.stop()
     with pytest.raises(httpx.HTTPError):
         httpx.get(f"{srv.url}/health", timeout=1)
+
+
+def test_thinking_off_reaches_the_template_by_request_body_or_server_flag(real_server):
+    """A2E sets both the request variable and the server flag when a suite says thinking = "off". At least one must make
+    the chat template skip the thinking block (Qwen3 renders an empty <think></think> pair), or the switch does nothing."""
+    import os
+    if "qwen3" not in os.path.basename(os.environ["A2E_GGUF"]).lower():
+        pytest.skip("this check needs a Qwen3 model in A2E_GGUF (other templates have no thinking variable)")
+    messages = [{"role": "user", "content": "hi"}]
+
+    def empty_think(prompt: str) -> bool:
+        return "<think>\n\n</think>" in prompt
+
+    plain = Client(real_server().url)
+    assert not empty_think(plain.apply_template(messages)), "thinking is already off without the switch"
+    plain.template_kwargs = {"enable_thinking": False}
+    by_body = empty_think(plain.apply_template(messages))
+
+    by_flag = empty_think(Client(real_server(thinking="off").url).apply_template(messages))
+    assert by_body or by_flag, ("neither the /apply-template body variable nor --chat-template-kwargs removed the "
+                                "thinking block; use Qwen3's /no_think soft switch instead")
+    print(f"thinking off works by request body: {by_body}; by server flag: {by_flag}")

@@ -12,10 +12,21 @@ runner = CliRunner()
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
+    import a2e.cli
+
     s = make_settings(tmp_path)
     for k, v in {"A2E_LLAMA_SERVER": s.llama_server, "A2E_MODELS_DIR": s.models_dir, "A2E_DB": s.db,
                  "A2E_DEVICE": "mac"}.items():
         monkeypatch.setenv(k, v)
+    # CLI tests use the fake machine, never the developer's local power settings
+    # or output directories. Settings/environment precedence is tested separately.
+    def isolated_settings(db=None, device=None):
+        return s.model_copy(update={
+            "db": str(db) if db is not None else s.db,
+            "device": device if device is not None else s.device,
+        })
+
+    monkeypatch.setattr(a2e.cli, "_settings", isolated_settings)
     return s
 
 
@@ -39,6 +50,7 @@ def test_run_smoke_suite_then_every_results_command(env, tmp_path):
     res = ok(["results", "resources", "--csv", str(tmp_path / "res.csv")])
     assert "power_p95_w" in res and "rss_max_mb" in res and (tmp_path / "res.csv").exists()
     assert "energy_j" in ok(["results", "task-resources"])
+    ok(["results", "failures", "--csv", str(tmp_path / "fail.csv")])
     for view in ("summary", "frontier", "budget", "grammar", "stages"):
         ok(["results", "efficiency", view])
     assert "view must be one of" in runner.invoke(app, ["results", "efficiency", "nope"]).output
@@ -66,8 +78,8 @@ def test_plan_and_suites_and_lock_check(env):
 
 
 def test_doctor_runs_and_reports(env):
-    r = runner.invoke(app, ["doctor", "--models", "qwen3-4b"])
-    assert "llama-server binary" in r.output and "model qwen3-4b q4_0" in r.output
+    r = runner.invoke(app, ["doctor", "--models", "qwen3-4b-instruct-2507"])
+    assert "llama-server binary" in r.output and "model qwen3-4b-instruct-2507 q5_k_m" in r.output
 
 
 def test_test_command_lists_groups_and_rejects_unknown():

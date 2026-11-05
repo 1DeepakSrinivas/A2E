@@ -1,67 +1,72 @@
 {
   "baseline": {
-    "job_keys_sha": "59eca340f10b3163",
+    "job_keys_sha": "a601dc4b879530f7",
     "jobs": 48,
-    "suite_hash": "d2d26e981a45cc4c"
+    "suite_hash": "247985cbd44c47d8"
   },
   "bfcl": {
-    "job_keys_sha": "2f48f641b71c1ec2",
+    "job_keys_sha": "1dcc8462b79c3c08",
     "jobs": 320,
-    "suite_hash": "85b83dcc95e5677c"
+    "suite_hash": "73a08957bbe60a6a"
   },
   "bfcl_mini": {
-    "job_keys_sha": "9a930284f12164d1",
-    "jobs": 48,
-    "suite_hash": "02a6c31e9966d42f"
-  },
-  "bfcl_mini_gemma": {
-    "job_keys_sha": "6788f79fdf8c202e",
-    "jobs": 8,
-    "suite_hash": "73886738f530a2e8"
+    "job_keys_sha": "6019fdfa0999e9d4",
+    "jobs": 32,
+    "suite_hash": "5fd28145fcb0cfee"
   },
   "cache_ablation": {
-    "job_keys_sha": "783328cf05579db4",
+    "job_keys_sha": "15486b9ab5755f66",
     "jobs": 80,
-    "suite_hash": "b7d6f567562727f7"
+    "suite_hash": "f45eb00a81b1e083"
   },
   "chains": {
-    "job_keys_sha": "0f4ee56ac7ed01af",
+    "job_keys_sha": "1a5539a04ce39d9f",
     "jobs": 320,
-    "suite_hash": "1a235a8ccbadbbb3"
+    "suite_hash": "c1daa4d24d1c34e8"
   },
   "factorial": {
-    "job_keys_sha": "b6e500afa605e4e1",
+    "job_keys_sha": "3e5eb4e8bcf111fc",
     "jobs": 576,
-    "suite_hash": "27a1f72b379c0e5e"
+    "suite_hash": "eda72c07f65d9b9d"
+  },
+  "full_eval": {
+    "job_keys_sha": "8d3ad5e2516cd410",
+    "jobs": 336,
+    "suite_hash": "8ae346a80928f951"
+  },
+  "harness_ablation": {
+    "job_keys_sha": "a16fec5746e08a56",
+    "jobs": 572,
+    "suite_hash": "5b92c8c9ec086dbd"
   },
   "kernels": {
-    "job_keys_sha": "ef97ebbdf10c25f0",
+    "job_keys_sha": "b920e8bd2c558c20",
     "jobs": 16,
-    "suite_hash": "ccb23c94fe7d6192"
+    "suite_hash": "7357259770798ffd"
   },
   "local_tools": {
-    "job_keys_sha": "42ee96fda1b4d54c",
+    "job_keys_sha": "53609ca33b94b235",
     "jobs": 480,
-    "suite_hash": "34aae9a7d13c45b0"
+    "suite_hash": "a910d3bf9ef6d1a9"
   },
   "pilot": {
-    "job_keys_sha": "420c3b5069c476cf",
+    "job_keys_sha": "e4aeaf9ea8c8b563",
     "jobs": 140,
-    "suite_hash": "281fe8a0a28387aa"
+    "suite_hash": "c65ba3eef67f441d"
   },
   "smoke": {
-    "job_keys_sha": "597dcda0ede08a76",
+    "job_keys_sha": "ddcc13eb0e701218",
     "jobs": 8,
-    "suite_hash": "b0a6cecae8d5006e"
+    "suite_hash": "a1f551cbb8ba6157"
   },
   "stability": {
-    "job_keys_sha": "9f8242ef624a906c",
+    "job_keys_sha": "601030ca5fd39ef0",
     "jobs": 12,
-    "suite_hash": "58c8e161edc8d35b"
+    "suite_hash": "605ea0b2982f2934"
   },
   "web_live": {
-    "job_keys_sha": "68e01fff881fda26",
+    "job_keys_sha": "85070a5987964143",
     "jobs": 24,
-    "suite_hash": "f9281f18fe0f77b9"
+    "suite_hash": "bc8a8adedf9ca2a6"
   }
 }

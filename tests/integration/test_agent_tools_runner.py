@@ -19,8 +19,8 @@ idle_seconds = 0
 sample_hz = 20
 [matrix]
 device = ["mac"]
-model = ["qwen3-4b"]
-quant = ["q4_0"]
+model = ["qwen3-4b-instruct-2507"]
+quant = ["q5_k_m"]
 [axes]
 decode_len = [16]
 schema_len = [1024]

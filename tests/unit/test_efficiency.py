@@ -11,7 +11,7 @@ from a2e.store import Store
 
 def add_run(st, *, model="m", grammar=False, device="mac", phase="measured", cases, status="complete"):
     """cases: list of (valid, energy_j). Each case gets one turn so the energy can be attributed to it."""
-    cfg = {"model": model, "quant": "q4_0", "kv_quant": "f16", "grammar": grammar, "category": "simple_python"}
+    cfg = {"model": model, "quant": "q5_k_m", "kv_quant": "f16", "grammar": grammar, "category": "simple_python"}
     run = st.insert("runs", {"config_json": json.dumps(cfg), "device": device, "phase": phase, "repeat_idx": 0,
                              "task_kind": "bfcl", "status": status, "started_at": 0.0})
     for i, (valid, joules) in enumerate(cases):

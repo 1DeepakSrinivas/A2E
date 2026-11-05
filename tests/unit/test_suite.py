@@ -12,8 +12,9 @@ SUITES = sorted((REPO / "configs" / "suites").glob("*.toml"))
 
 
 def settings():
-    return Settings(models={k: ModelEntry(name=k, params_b=v) for k, v in
-                            {"qwen3-4b": 4.0, "gemma3-4b": 4.0, "big-8b": 8.0}.items()})
+    return Settings(models={
+        "qwen3-4b-instruct-2507": ModelEntry(name="qwen3-4b-instruct-2507", params_b=4.0, quants=["q5_k_m", "iq3_m"]),
+        "granite-3-1-2b-instruct": ModelEntry(name="granite-3-1-2b-instruct", params_b=2.0, quants=["q6_k", "iq3_m"])})
 
 
 def suite(tmp_path, body, name="t"):
@@ -25,8 +26,8 @@ def suite(tmp_path, body, name="t"):
 BASE = """
 [matrix]
 device = ["pi5", "mac"]
-model = ["qwen3-4b", "big-8b"]
-quant = ["q4_0", "q8_0"]
+model = ["qwen3-4b-instruct-2507", "granite-3-1-2b-instruct"]
+quant = ["q5_k_m", "q6_k", "iq3_m"]
 [axes]
 grammar = [false, true]
 decode_len = [128, 512]
@@ -117,9 +118,9 @@ def test_expansion_is_deterministic_and_machine_independent(tmp_path):
 
 
 def test_job_key_changes_with_any_field():
-    cfg = {"model": "m", "quant": "q4_0", "grammar": False, "n": 5}
+    cfg = {"model": "m", "quant": "q5_k_m", "grammar": False, "n": 5}
     keys = {job_key(cfg)} | {job_key({**cfg, k: v}) for k, v in
-                             [("model", "m2"), ("quant", "q8_0"), ("grammar", True), ("n", 6), ("new", 1)]}
+                             [("model", "m2"), ("quant", "iq3_m"), ("grammar", True), ("n", 6), ("new", 1)]}
     assert len(keys) == 6 and job_key(dict(reversed(list(cfg.items())))) == job_key(cfg)
 
 
@@ -134,16 +135,28 @@ def test_suite_hash_ignores_formatting_and_tracks_values(tmp_path):
 def test_feasibility_rules(tmp_path):
     s = suite(tmp_path, BASE + '[[tasks]]\nkind = "plain"\ngovernor = ["", "performance"]\n')
     jobs = expand(s, settings())
-    mem = [j for j in jobs if j["skip_reason"] and "memory" in j["skip_reason"]]
-    assert mem and all(j["device"] == "pi5" and j["quant"] == "q8_0" and j["model"] == "big-8b" for j in mem)
     gov = [j for j in jobs if j["skip_reason"] and "governor" in j["skip_reason"]]
     assert gov and all(j["device"] == "mac" and j["governor"] for j in gov)
-    assert not any(j["skip_reason"] for j in jobs if j["device"] == "pi5" and j["model"] == "qwen3-4b"
-                   and not j["governor"])
+    assert not any(j["skip_reason"] for j in jobs if j["device"] == "pi5" and not j["governor"])
+
+
+def test_each_model_only_gets_its_own_quants(tmp_path):
+    s = suite(tmp_path, BASE + '[[tasks]]\nkind = "plain"\n')
+    pairs = {(j["model"], j["quant"]) for j in expand(s, settings())}
+    assert pairs == {("qwen3-4b-instruct-2507", "q5_k_m"), ("qwen3-4b-instruct-2507", "iq3_m"),
+                     ("granite-3-1-2b-instruct", "q6_k"), ("granite-3-1-2b-instruct", "iq3_m")}
+
+
+def test_quant_no_model_has_fails_at_expansion(tmp_path):
+    s = suite(tmp_path, BASE.replace('quant = ["q5_k_m", "q6_k", "iq3_m"]', 'quant = ["q6_k"]')
+              .replace('model = ["qwen3-4b-instruct-2507", "granite-3-1-2b-instruct"]', 'model = ["qwen3-4b-instruct-2507"]')
+              + '[[tasks]]\nkind = "plain"\n')
+    with pytest.raises(ConfigError, match="q6_k"):
+        expand(s, settings())
 
 
 def test_unknown_model_fails_at_expansion(tmp_path):
-    s = suite(tmp_path, BASE.replace('"big-8b"', '"mystery"') + '[[tasks]]\nkind = "plain"\n')
+    s = suite(tmp_path, BASE.replace('"granite-3-1-2b-instruct"', '"mystery"') + '[[tasks]]\nkind = "plain"\n')
     with pytest.raises(KeyError, match="mystery"):
         expand(s, settings())
 
@@ -151,5 +164,5 @@ def test_unknown_model_fails_at_expansion(tmp_path):
 def test_plan_summary_counts(tmp_path):
     s = suite(tmp_path, BASE + '[repeats]\nwarmup = 1\nmeasured = 2\n[[tasks]]\nkind = "plain"\n')
     p = plan_summary(expand(s, settings()))
-    assert p["jobs"] == 16 and p["skipped"] == 2 and p["runnable"] == 14 and p["runs"] == 14 * 3
-    assert p["server_loads"] == 7 and p["by_kind"]["plain"] == 14
+    assert p["jobs"] == 16 and p["skipped"] == 0 and p["runnable"] == 16 and p["runs"] == 16 * 3
+    assert p["server_loads"] == 8 and p["by_kind"]["plain"] == 16

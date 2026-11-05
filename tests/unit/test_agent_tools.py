@@ -156,7 +156,7 @@ def test_web_tools_use_bfcl_names_and_return_json():
 # ---------------------------------------------------------------- suite validation
 def test_suite_accepts_new_families_and_checks_their_depths(tmp_path):
     from a2e.suite import ConfigError, load_suite
-    base = '[suite]\nname = "t"\n[matrix]\ndevice = "pi5"\nmodel = "qwen3-4b"\nquant = "q4_0"\n'
+    base = '[suite]\nname = "t"\n[matrix]\ndevice = "pi5"\nmodel = "qwen3-4b-instruct-2507"\nquant = "q5_k_m"\n'
     p = tmp_path / "s.toml"
     p.write_text(base + '[[tasks]]\nkind = "custom"\nfamily = ["fs_search", "math", "web"]\ndepth = 2\n'
                  'distractors = "synthetic"\n')

@@ -1,19 +1,20 @@
 # Models in the study. Committed; machine-specific paths go in configs/local.toml.
 #
-# Each model needs a GGUF file per quantization (q4_0, q8_0, q3_k_m). By default the file is expected at
-#   {models_dir}/{name}/{name}-{quant}.gguf      e.g. models/qwen3-4b/qwen3-4b-q4_0.gguf
+# Each model lists the weight quants it has in `quants` (names from a2e.settings.QUANTS: q5_k_m, q6_k, iq3_m).
+# Suites may list any of them; a model x quant pair the model does not have is left out of the grid.
+# By default the GGUF file is expected at
+#   {models_dir}/{name}/{name}-{quant}.gguf      e.g. models/qwen3-4b-instruct-2507/qwen3-4b-instruct-2507-q5_k_m.gguf
 # Change `file` (a template) or set exact paths under [models.<name>.files] in local.toml.
-# params_b is used for the Pi memory rule (Q8_0 only for models of 4B parameters or fewer).
-# Record where each GGUF came from in `source` when you download it, and add it to REFERENCES.md.
+# `source` records the Hugging Face repo each GGUF comes from (also listed in REFERENCES.md).
 
-[models.qwen3-4b]
+[models.qwen3-4b-instruct-2507]
 params_b = 4.0
-notes = "Qwen3 4B. Has a thinking mode; see docs for the decode budget."
+quants = ["q5_k_m", "iq3_m"]
+source = "bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF"
+notes = "Qwen3 4B Instruct 2507. Non-thinking model. Q5_K_M 2.89 GB, IQ3_M 1.96 GB."
 
-[models.gemma3-4b]
-params_b = 4.0
-notes = "Google Gemma 3 4B instruction tuned. Same size class as qwen3-4b, different family."
-
-# Z.ai GLM small model: not chosen yet. Add an entry here once it is picked, e.g.
-# [models.glm-small]
-# params_b = 9.0
+[models.granite-3-1-2b-instruct]
+params_b = 2.0
+quants = ["q6_k", "iq3_m"]
+source = "bartowski/granite-3.1-2b-instruct-GGUF"
+notes = "IBM Granite 3.1 2B Instruct. Q6_K 2.08 GB, IQ3_M 1.17 GB."

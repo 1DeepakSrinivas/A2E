@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from a2e.settings import QUANTS, Settings, detect_device
+from a2e.settings import Settings, detect_device
 
 
 @dataclass
@@ -33,7 +33,7 @@ def run_checks(settings: Settings, models: list[str] | None = None) -> list[Chec
     out.append(Check("llama-bench binary (bench jobs)", bool(bench) and Path(bench).exists(),
                      bench or "not found next to llama-server; set [paths] llama_bench", critical=False))
     for name in models or sorted(settings.models):
-        for q in QUANTS:
+        for q in settings.model(name).available_quants():
             p = settings.model_path(name, q)
             out.append(Check(f"model {name} {q}", p.exists(), str(p), critical=False))
     if dev == "pi5":

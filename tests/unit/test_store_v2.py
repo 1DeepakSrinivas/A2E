@@ -8,7 +8,7 @@ from a2e.store import MIGRATIONS, TABLES, VIEWS, Store
 
 
 def mk_run(store, **kw):
-    cfg = {"model": "qwen3-4b", "quant": "q4_0", "kv_quant": "f16", "grammar": True, "decode_len": 128,
+    cfg = {"model": "qwen3-4b-instruct-2507", "quant": "q5_k_m", "kv_quant": "f16", "grammar": True, "decode_len": 128,
            "family": "calc", "depth": 3, **kw.pop("cfg", {})}
     row = {"config_json": json.dumps(cfg), "device": "mac", "phase": "measured", "started_at": 1.0, **kw}
     return store.insert("runs", row)
@@ -65,7 +65,7 @@ def test_views_hide_aborted_and_running_runs_and_expose_config_fields(tmp_path):
     for r in (ok, bad, live):
         s.insert("turns", {"run_id": r, "prefill_ms": 1.0})
     rows = s.query("SELECT run_id, model, quant, grammar, decode_len, family, depth FROM v_turns")
-    assert rows == [{"run_id": ok, "model": "qwen3-4b", "quant": "q4_0", "grammar": 1, "decode_len": 128,
+    assert rows == [{"run_id": ok, "model": "qwen3-4b-instruct-2507", "quant": "q5_k_m", "grammar": 1, "decode_len": 128,
                      "family": "calc", "depth": 3}]
     assert s.scalar("SELECT count(*) FROM turns") == 3
 

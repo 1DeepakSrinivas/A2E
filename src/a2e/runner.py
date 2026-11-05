@@ -22,15 +22,16 @@ from pathlib import Path
 
 from a2e import env as envmod
 from a2e.bench import bench_args, perf_available, run_bench
+from a2e.agent.harness import Harness
 from a2e.agent.loop import AgentLoop, TurnRecord
 from a2e.agent.schema_gen import SchemaTooLarge, pad_tools
-from a2e.client import Client
+from a2e.client import CacheResetError, Client
 from a2e.config import RunConfig
 from a2e.hardware import Instruments, make_instruments, read_governor, set_governor, wait_for_cooldown
 from a2e.metrics.power_base import integrate_energy
 from a2e.metrics.sampler import Sampler, measure_idle_power
 from a2e.plain import plain_prompts, run_plain
-from a2e.server import LlamaServer, build_args
+from a2e.server import THINKING_OFF, LlamaServer, build_args
 from a2e.settings import Settings, resolve_device
 from a2e.store import Store
 from a2e.suite import Suite, expand, load_suite, server_key
@@ -102,7 +103,8 @@ def exec_custom(client, job: dict, ctx: dict) -> list[Unit]:
         # a fresh tool state per task (notes folder, BFCL instances, web URL list), so tasks cannot see each other
         reg = build_task_registry(task, base / f"task{i}", job["seed"], ctx.get("web"))
         trace = AgentLoop(client, reg, specs, grammar=job["grammar"], n_predict=job["decode_len"],
-                          cache_prompt=job["prefix_cache"]).run(task.prompt, max_turns=ctx["max_turns"])
+                          cache_prompt=job["prefix_cache"], harness=Harness.from_job(job)
+                          ).run(task.prompt, max_turns=ctx["max_turns"], expected_calls=len(task.steps) + 1)
         sc = trace.score(task.steps)
         if task.state_check is not None:
             sc.state_ok = bool(task.state_check(reg))
@@ -132,11 +134,12 @@ def exec_bfcl(client, job: dict, ctx: dict) -> list[Unit]:
     for case in load_subset(job["category"], job["n"], job["seed"]):
         _check_stop(ctx)
         o = run_case(client, case, grammar=job["grammar"], cache_prompt=job["prefix_cache"],
-                     n_predict=job["decode_len"], max_steps=ctx["max_steps"], count_tokens=count)
+                     n_predict=job["decode_len"], max_steps=ctx["max_steps"], count_tokens=count,
+                     harness=Harness.from_job(job))
         extra = {k: v for k, v in o.result.extra.items() if k != "schema_tokens"}
         out.append(Unit(case.id, case.category, o.turns, o.result.valid, o.result.error_type, o.status,
                         len(case.turns), o.result.extra.get("schema_tokens"), {**extra, "token_count": how},
-                        user_turns=o.user_turn_of or None, raw=raw_record(o, -1)))
+                        user_turns=o.user_turn_of or None, raw=raw_record(o, -1, Harness.from_job(job))))
     return out
 
 
@@ -176,6 +179,10 @@ def turn_row(turn: TurnRecord, run_id: int, unit: Unit, step: int, trace: list[t
         row["energy_prefill_j"] = integrate_energy(trace, *w["prefill"], idle)
         row["energy_decode_j"] = integrate_energy(trace, *w["decode"], idle)
         row["energy_tool_j"] = integrate_energy(trace, *w["tool"], idle)
+        # the harness's own code: templating, parsing and validating (the model and the tools are separate)
+        row["energy_harness_j"] = (integrate_energy(trace, start, w["prefill"][0], idle)
+                                   + integrate_energy(trace, *w["parse"], idle)
+                                   + integrate_energy(trace, *w["validate"], idle))
         if end > start:
             row["avg_power_w"] = integrate_energy(trace, start, end) / (end - start)
     ws = _window_samples(samples, start, end)
@@ -286,7 +293,7 @@ class Runner:
         slot_dir.mkdir(exist_ok=True)
         args = build_args(cfg, self.settings.llama_server, str(model_path), port=port, ctx=job["ctx"],
                           threads=job["threads"] or self.settings.threads, flash_attn=job["flash_attn"],
-                          slot_save_path=str(slot_dir))
+                          slot_save_path=str(slot_dir), thinking=job.get("thinking", "default"))
         srv = LlamaServer(args, port=port, log_path=log_dir / f"llama-server-{job['model']}-{job['quant']}.log")
         load_s = srv.start(timeout=900)
         info = {"args": args, "model_file": envmod.file_fingerprint(model_path)}
@@ -301,6 +308,8 @@ class Runner:
         srv, url, pid, load_s, info = self._start_server(job)
         self._server, self._server_key = srv, key
         client = (self.hooks.make_client or Client)(url)
+        if job.get("thinking") == "off":
+            client.template_kwargs = dict(THINKING_OFF)
         idle = None
         if inst.power and self.suite.run.idle_seconds > 0:
             idle = measure_idle_power(inst.power, self.suite.run.idle_seconds)
@@ -337,15 +346,23 @@ class Runner:
         for r in range(total):
             phase = "warmup" if r < job["warmup"] else "measured"
             self.log({"event": "run_start", "job_id": job["job_id"], "repeat": r, "phase": phase})
+            # every repeat starts with a cold prefix cache, and how that was done is stored with the run
+            reset = getattr(client, "reset_cache", None)
             try:
-                client.reset_cache()  # every repeat starts with a cold prefix cache
-            except Exception:  # noqa: BLE001 - older servers or stubs without the endpoint
-                pass
+                how = (reset() or "unknown") if reset else "unsupported"  # stubs may have no such method
+            except CacheResetError as e:
+                how = "failed"
+                self.log({"event": "cache_reset", "how": how, "error": str(e)})
+                if job.get("prefix_cache", True):
+                    raise RuntimeError(f"no cold prefix cache: {e}") from e
+            if how not in ("erase", "unknown", "unsupported"):
+                self.log({"event": "cache_reset", "how": how})
             run_id = st.insert("runs", {
                 "exp_id": self.exp_id, "job_id": job["job_id"], "config_json": cfg_json, "device": job["device"],
                 "phase": phase, "repeat_idx": r, "task_kind": job["kind"], "status": "running",
                 "started_at": time.time(), "idle_power_w": info["idle_power_w"], "power_scope": inst.scope,
-                "load_time_s": info["load_time_s"], "server_json": server_json})
+                "load_time_s": info["load_time_s"],
+                "server_json": json.dumps({**json.loads(server_json), "cache_reset": how})})
             sampler = Sampler(info["pid"], inst.power, inst.thermal, hz=self.suite.run.sample_hz) if info["pid"] \
                 else None
             t_run0 = time.perf_counter()

@@ -41,7 +41,8 @@ A2E has five layers. Each layer only calls the layers below it.
 |---|---|
 | `plain.py` | Picks plain prompts with the seed and runs one generation of exactly `decode_len` tokens. |
 | `agent/loop.py` | `model_step` does one model call: apply the chat template, call `/completion`, parse. `TurnRecord` holds a turn's results and `finalize` turns six timestamps into stage times and windows. `AgentLoop` runs a custom chain: call the model, validate, run tools, feed results back, until `final_answer`, a parse error, a server error or `max_turns`. |
-| `agent/prompt.py` | The fixed tool prompts (`SYSTEM` for custom chains, `SYSTEM_BFCL` for BFCL) and the tool-response message format. |
+| `agent/prompt.py` | The fixed tool prompts (`SYSTEM` for custom chains, `SYSTEM_BFCL` for BFCL), the three ways to show the tool list (`json_schema`, `compact`, `natural`) and the tool-response message format. |
+| `agent/harness.py` | The `Harness` setting (prompt format, context, recovery, stopping), the context views (`mask`, `truncate`), the turn budget and the `StopWatch` that detects repeated calls and failed turns. The default `Harness()` reproduces the loop as it was before variants existed. |
 | `agent/parse.py` | Reads tool calls out of model text. Handles thinking blocks, code fences, `<tool_call>` tags, single objects, arrays, `parameters` instead of `arguments`, and arguments given as a JSON string. Errors are `empty`, `no_json`, `malformed_json` and `bad_shape`. |
 | `agent/grammar.py` | `call_schema` builds the JSON schema of valid calls that grammar mode sends to llama-server. `SUPPORTED_KEYWORDS` lists the JSON Schema keywords the tool schemas may use. |
 | `agent/schema_gen.py` | `pad_tools` adds seeded distractor tools until the rendered tool list reaches the target token count. |

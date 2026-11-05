@@ -23,6 +23,9 @@ bfcl = [
 tui = [
     "textual>=8.2.8",
 ]
+plots = [
+    "matplotlib>=3.9",
+]
 
 [dependency-groups]
 dev = ["pytest>=8"]

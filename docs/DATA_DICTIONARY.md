@@ -85,7 +85,7 @@ A job becomes `done` only after all of its runs are written. A job that was `run
 | `idle_power_w` | real | Mean idle power measured after the model load, in watts. Subtracted from all energy numbers of the run. |
 | `power_scope` | text | What the power readings cover, e.g., "sum of Pi 5 PMIC rail V*I; excludes PSU losses and peripherals (estimate)". `none` when no power was recorded. |
 | `load_time_s` | real | Seconds from starting llama-server to its health check passing. |
-| `server_json` | text | Server arguments, the model file fingerprint (size, modification time, SHA-256 of the first MiB), cooldown wait, the actual governor, the cooler setting and notes about the instruments. |
+| `server_json` | text | Server arguments, the model file fingerprint (size, modification time, SHA-256 of the first MiB), cooldown wait, the actual governor, the cooler setting, notes about the instruments, and `cache_reset`: how the prefix cache was cleared before the run (`erase` is the server's slot erase; `flush` means the erase failed and one unrelated prompt replaced the cached prefix). A job with the prefix cache on is failed, not run, when neither works. Runs made before this field existed have none, and the report marks them as not recorded. |
 
 Every run of a job that did not finish is marked `aborted`, including repeats that had completed, because a job's runs only count as a set.
 
@@ -113,6 +113,7 @@ One row per model call.
 | `n_calls` | | Tool calls parsed from this turn. |
 | `energy_j` | J | Energy over the whole turn window, idle subtracted. |
 | `energy_prefill_j`, `energy_decode_j`, `energy_tool_j` | J | Energy over each stage window, idle subtracted. |
+| `energy_harness_j` | J | Energy over the harness's own code in the turn: templating, parsing and validating, idle subtracted. The model call and the tools are not included. |
 | `avg_power_w` | W | Mean power over the turn window, idle not subtracted. |
 | `peak_rss_mb` | MiB | Highest resident memory of llama-server and its child processes during the turn. |
 | `avg_cpu_pct` | % | Mean CPU use of the llama-server process (100% is one core). |
@@ -207,7 +208,7 @@ Power sources:
 
 The views drop runs whose status is not `complete`.
 
-`v_runs` is `runs` plus these columns read from `config_json`: `model`, `quant`, `kv_quant`, `grammar`, `prefix_cache`, `decode_len`, `schema_len`, `family`, `depth`, `n_args`, `category` and `governor`. Booleans read from JSON appear as 1 or 0.
+`v_runs` is `runs` plus these columns read from `config_json`: `model`, `quant`, `kv_quant`, `grammar`, `prefix_cache`, `decode_len`, `schema_len`, `family`, `depth`, `n_args`, `category` and `governor`. Booleans read from JSON appear as 1 or 0. It also has `harness` (the name of the harness setting, `baseline` when none), `prompt_format`, `context`, `recovery`, `stopping` and `thinking` (`off` when the suite switched thinking off, otherwise `default`). Runs stored before harness variants existed read as `baseline`, `json_schema`, `full`, `none` and `fixed`.
 
 `v_turns` is `turns` plus `exp_id`, `job_id`, `phase`, `repeat_idx`, `task_kind`, `device`, `idle_power_w` and the `v_runs` setting columns.
 
@@ -277,5 +278,19 @@ Power and energy columns are empty, never zero, when the run had no power source
 | `budget_j`, `tasks_done`, `successes` | (`budget` view) Tasks the budget buys when the suite runs in order. A task that would overshoot is not counted. Without a given budget list, ten values up to the median full-suite energy of each device are used. |
 | `*_delta`, `*_ratio` | (`grammar` view) Grammar on minus off, and on divided by off. A `j_per_gen_token_ratio` above 1 means grammar made each generated token cost more. |
 | `prefill_share`, `decode_share`, `tool_wait_share`, `other_share` | (`stages` view) Shares of attributed energy. `other_share` is parsing, validation, templating and harness time. |
+
+`a2e results efficiency harness` compares each harness with the baseline harness on the same tasks. The ratio is of joules per success, as the geometric mean over cells (one cell is one device, model, quantization, task family or category and server setting) of the variant's value divided by the baseline's. The interval is a bootstrap percentile interval over tasks.
+
+| Column | Meaning |
+|---|---|
+| `cells`, `tasks` | Cells compared and tasks in them. Only tasks run under both harnesses count. |
+| `cells_undefined`, `cells_lost` | Cells that could not be compared, and cells where the baseline passed some tasks but the variant passed none |
+| `ratio`, `lo`, `hi` | Variant over baseline, with the 90% interval. Above 1 is costlier. `inf` when the variant never succeeds. |
+| `lower_bound`, `upper_bound` | The equivalence bounds, 1 / (1 + margin) and 1 + margin |
+| `verdict` | `equivalent` (interval inside the bounds), `differs` (outside them) or `inconclusive` |
+
+`decomposition` splits a change into `d_log_turns` (model calls per task), `d_log_j_per_turn` (joules per call) and `d_log_success` (success rate), all as natural-log ratios against the baseline, averaged over cells. `d_log_total = d_log_turns + d_log_j_per_turn − d_log_success`. `turns_share` is the share of the absolute change that comes from the first term. `noise` lists, for each baseline cell, `sd_log` (the standard deviation of log joules per success over the repeats) and `max_ratio` (the largest gap between two repeats). `variance` gives `eta2` and `omega2` for each factor, with `omega2_lo` and `omega2_hi` as the 90% interval. `stages` adds `harness_code_share`, the share of energy in the harness's own code, when `energy_harness_j` was recorded.
+
+`a2e results failures` lists the failed tasks (`valid = 0`) per reason for each device, model, quant, grammar setting and category: `reason` is the case's `error_type`, `tasks` is how many failed for that reason and `tasks_run` is all scored tasks in the group. Reports print numbers with 3 significant digits and no scientific notation (1.23, 123, 1020, 0.0000188).
 
 `a2e results stability` takes each job's tasks in order and computes decode tokens per second per task. It reports the mean of the first 3 tasks, the mean of the last 3, and the first task (from the fourth on) whose speed is below 90% of the first 3. This marks where thermal throttling starts to slow decoding. It also reports the highest temperature and the number of tasks during which the Pi reported throttling.

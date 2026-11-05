@@ -3,7 +3,7 @@
 # Network latency is part of tool wait. Keep n small: every task uses at least one search of your quota.
 [suite]
 name = "web_live"
-description = "Web search -> open a result -> save a note, on Qwen3-4B and Gemma 3 4B Q4_0; scored on the tool path."
+description = "Web search -> open a result -> save a note, on Qwen3-4B-Instruct-2507 and Granite 3.1 2B at their higher-quality quants; scored on the tool path."
 seed = 0
 
 [repeats]
@@ -20,8 +20,8 @@ cooldown_timeout_s = 900
 
 [matrix]
 device = ["pi5", "mac"]
-model = ["qwen3-4b", "gemma3-4b"]
-quant = ["q4_0"]
+model = ["qwen3-4b-instruct-2507", "granite-3-1-2b-instruct"]
+quant = ["q5_k_m", "q6_k"]
 kv_quant = ["f16"]
 
 [axes]

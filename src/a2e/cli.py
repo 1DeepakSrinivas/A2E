@@ -232,22 +232,60 @@ def results_task_resources(exp: list[int] = typer.Option(None, help="experiment 
 
 
 @results_app.command("efficiency")
-def results_efficiency(view: str = typer.Argument("summary", help="summary | frontier | budget | grammar | stages"),
+def results_efficiency(view: str = typer.Argument("summary", help="summary | frontier | budget | grammar | stages | "
+                                                                  "harness | decomposition | noise | variance"),
                        exp: list[int] = typer.Option(None, help="experiment id(s); default all"),
                        by: str = typer.Option("", help="comma-separated grouping fields"),
+                       margin: float = typer.Option(0.10, help="harness view: equivalence margin (0.10 = 10%)"),
                        db: Path = typer.Option(None), csv: Path = typer.Option(None, help="also write to this csv")) -> None:
-    """Success per joule: joules per task and per success, Pareto front, budget curves, grammar effect, stage energy."""
+    """Success per joule: joules per task and per success, Pareto front, budget curves, grammar effect, stage energy,
+    and the harness question (harness effect with a verdict, decomposition, noise floor, variance shares)."""
     from a2e import efficiency as E
     st, ids, groups = _store(db), exp or None, [b for b in by.split(",") if b] or None
     views = {"summary": lambda: E.efficiency(st, ids, groups),
              "frontier": lambda: E.pareto_front(E.efficiency(st, ids, groups)),
              "budget": lambda: E.budget_curve(st, ids, by=groups),
              "grammar": lambda: E.grammar_effect(st, ids),
-             "stages": lambda: E.stage_energy(st, ids, groups)}
+             "stages": lambda: E.stage_energy(st, ids, groups),
+             "harness": lambda: E.harness_effect(st, ids, margin=margin, by=groups),
+             "decomposition": lambda: E.decompose(st, ids, by=groups),
+             "noise": lambda: E.noise_floor(st, ids),
+             "variance": lambda: E.variance_share(st, ids)}
     if view not in views:
         raise typer.BadParameter(f"view must be one of {', '.join(views)}")
     df = views[view]()
-    _print_df(df, "No measured runs with energy and scored tasks.")
+    _print_df(df, "No measured runs with energy and scored tasks." if view != "harness" else
+              "No comparison: need the baseline harness and another harness on the same tasks, with energy.")
+    if view == "harness":
+        typer.echo(f"\nConclusion (margin {margin:.0%}): {E.conclusion(df)}")
+    if view == "noise" and not df.empty:
+        c = E.margin_check(df, margin)
+        typer.echo(f"\nMedian run-to-run sd of log joules per success {c['median_sd_log']:.4f}; margin {c['margin_log']:.4f}. "
+                   + ("The margin is at least twice the noise." if c["ok"] else
+                      "WARNING: the margin is under twice the noise; widen it or add repeats."))
+    if csv is not None and not df.empty:
+        df.to_csv(csv, index=False)
+
+
+@results_app.command("plots")
+def results_plots(out: Path = typer.Argument(..., help="folder for the PNG figures and their CSV tables"),
+                  exp: list[int] = typer.Option(None, help="experiment id(s); default all"),
+                  margin: float = typer.Option(0.10, help="equivalence margin"),
+                  db: Path = typer.Option(None)) -> None:
+    """Harness figures: forest plot, decomposition, frontier, variance shares, stage energy and noise floor."""
+    from a2e import plots
+    made = plots.make_figures(_store(db), out, exp or None, margin)
+    typer.echo("\n".join(str(p) for p in made) if made else "Nothing to plot: no measured runs with energy and scores.")
+
+
+@results_app.command("failures")
+def results_failures(exp: list[int] = typer.Option(None, help="experiment id(s); default all"),
+                     by: str = typer.Option("", help="comma-separated grouping fields"),
+                     db: Path = typer.Option(None), csv: Path = typer.Option(None, help="also write to this csv")) -> None:
+    """Why tasks failed: failed tasks per reason, with the number of tasks run."""
+    from a2e import results as R
+    df = R.failures(_store(db), exp or None, [b for b in by.split(",") if b] or None)
+    _print_df(df, "No failed tasks.")
     if csv is not None and not df.empty:
         df.to_csv(csv, index=False)
 

@@ -8,7 +8,7 @@ from a2e.store import Store
 
 pytest.importorskip("pandas")
 
-CFG = {"model": "m", "quant": "q4_0", "kv_quant": "f16", "grammar": False, "prefix_cache": True,
+CFG = {"model": "m", "quant": "q5_k_m", "kv_quant": "f16", "grammar": False, "prefix_cache": True,
        "decode_len": 128, "schema_len": 0, "device": "mac"}
 
 

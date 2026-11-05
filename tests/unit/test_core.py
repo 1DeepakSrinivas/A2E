@@ -1,27 +1,11 @@
-import pytest
-
-from a2e import config
-from a2e.config import RunConfig, factorial, feasible
+from a2e.config import factorial
 from a2e.metrics.power_base import integrate_energy
 from a2e.store import Store
 
 
-@pytest.fixture(autouse=True)
-def fake_big_model(monkeypatch):
-    monkeypatch.setitem(config.MODEL_PARAMS_B, "big-8b", 8.0)  # no 8B model is in the study
-
-
-def test_pi_memory_rule():
-    assert not feasible(RunConfig(model="big-8b", quant="q8_0", device="pi5"))[0]
-    assert feasible(RunConfig(model="big-8b", quant="q4_0", device="pi5"))[0]
-    assert feasible(RunConfig(model="qwen3-4b", quant="q8_0", device="pi5"))[0]
-    assert feasible(RunConfig(model="big-8b", quant="q8_0", device="mac"))[0]
-
-
-def test_factorial_marks_infeasible():
-    rows = list(factorial(["big-8b"], ["q8_0", "q4_0"], ["f16"], [256], [128], [False], ["pi5", "mac"]))
-    assert len(rows) == 4
-    assert sum(1 for _, ok, _ in rows if not ok) == 1
+def test_factorial_covers_every_cell():
+    rows = list(factorial(["qwen3-4b-instruct-2507"], ["q5_k_m", "iq3_m"], ["f16"], [256], [128], [False], ["pi5", "mac"]))
+    assert len(rows) == 4 and len({r.model_dump_json() for r in rows}) == 4
 
 
 def test_energy_integration_constant_power():

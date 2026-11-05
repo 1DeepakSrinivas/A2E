@@ -42,6 +42,7 @@ These settings are passed to llama-server. Jobs that differ in any of them use a
 | `ctx` | integer, 512 or more | `8192` | Context size in tokens (`-c`). BFCL multi-turn categories need 16384 or more. |
 | `flash_attn` | string | `"on"` | Value for `--flash-attn`. Newer llama.cpp builds take `on`, `off` or `auto`. KV cache quantization needs flash attention. |
 | `threads` | integer, 0 or more | `0` | Value for `-t`. 0 means use `[machine] threads` from `local.toml`, or llama.cpp's own default if that is unset. |
+| `thinking` | string | `"default"` | `"off"` starts llama-server with `--chat-template-kwargs '{"enable_thinking": false}'` and also sends that variable with every chat template request, so reasoning models answer directly instead of spending the token budget on a thinking block. Chat templates without that variable (both current models) are not affected. Only `"off"` is stored in a job's settings, so suites written before this field keep their job keys. A suite uses one value, and a different value starts a separate server. |
 
 A2E always passes `--jinja`, and passes `-ngl 99` on the Mac (all layers on the GPU) and `-ngl 0` on the Pi (CPU only). It adds `--cache-type-k` and `--cache-type-v` when `kv_quant` is not `f16`.
 
@@ -64,7 +65,7 @@ Every combination of these four lists is one model load.
 |---|---|---|---|
 | `device` | list | required | `pi5`, `mac` |
 | `model` | list | required | names from `configs/models.toml` |
-| `quant` | list | required | `q4_0`, `q8_0`, `q3_k_m` |
+| `quant` | list | required | `q5_k_m`, `q6_k`, `iq3_m`. A model only gets the quants it lists in `configs/models.toml`; other pairs are left out of the grid. A quant that no listed model has is an error. |
 | `kv_quant` | list | `["f16"]` | `f16`, `q8_0` |
 
 A2E only runs the jobs whose device matches the machine it runs on. The other device's jobs are not loaded into this machine's experiment.
@@ -113,6 +114,20 @@ An axis a kind does not use is not part of its jobs, so a plain job never runs t
 
 The BFCL categories in scope are `simple_python`, `multiple`, `parallel`, `parallel_multiple`, `irrelevance`, `live_irrelevance`, `live_relevance`, `multi_turn_base`, `multi_turn_miss_func` and `multi_turn_miss_param`.
 
+### 1.7a `[[harness]]`
+
+The harness is the code around the model: how the tool list is written, what the model sees of earlier tool results, what happens when a reply cannot be read, and when the loop gives up. A suite can list several harness settings. Every custom and BFCL job then runs once for each one, on the same tasks, so the effect of each setting can be compared. Plain and bench jobs do not call tools and ignore the section. With no `[[harness]]` entry, only the default harness runs.
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `name` | string | required | A label for the setting. Names must be unique. |
+| `prompt_format` | string | `json_schema` | How the tool list is shown. `json_schema` is one JSON schema per line. `compact` is one line per tool with typed argument names, and a `?` after an optional argument. `natural` is plain sentences. The model still replies with a JSON array, and the parser does not change. |
+| `context` | string | `full` | What the model sees of earlier tool results. `full` shows all of them. `mask` replaces every tool result except the latest 2 with a short stub. `truncate` cuts each tool result to 400 characters. The stored history is never changed, only the messages sent to the model. |
+| `recovery` | string | `none` | What happens when a reply cannot be read as tool calls. `none` ends the task (custom) or the user turn (BFCL multi-turn). `feedback` keeps the bad reply and adds a message saying what was wrong. `retry` drops the bad reply and asks again with a one-line reminder that is not kept, at most 2 times in a row. BFCL single-turn cases get at most 2 more tries in both modes. A call that parses but fails validation gets an error result back in every mode. |
+| `stopping` | string | `fixed` | When to give up. `fixed` uses the turn limits of `[run]`. `tight` caps the model calls at what a correct run needs plus 2 (a custom chain needs one call per step plus `final_answer`; a BFCL user turn needs one call per ground truth call plus the closing reply). `early_stop` ends the task after 2 identical calls in a row, or 2 failed turns in a row (an unreadable reply, a failed validation or a tool error). |
+
+A harness entry with every field at its default is the baseline. Only the fields that differ from the default are written into a job's settings, so a job under the baseline harness has the same key as it had before this section existed. Two entries cannot have the same settings. The constants (2 stub-free results, 400 characters, 2 retries, 2 extra turns, 2 repeats) are in `src/a2e/agent/harness.py`.
+
 ### 1.8 Validation rules
 
 A2E refuses a suite and prints the reason when:
@@ -127,6 +142,7 @@ A2E refuses a suite and prints the reason when:
 - `n_prompt`, `n_gen` or `perf` is set on a task that is not bench
 - a BFCL multi-turn category is used with `[server] ctx` below 16384
 - `[matrix] model` names a model that is not in `configs/models.toml`
+- a `[[harness]]` entry has an unknown value, an empty or repeated name, or the same settings as another entry
 
 ### 1.9 How a suite becomes jobs
 
@@ -144,7 +160,6 @@ The job key is the first 16 hex characters of the SHA-256 hash of this JSON with
 
 A job is skipped, with the reason stored, when:
 
-- the device is `pi5`, the quantization is `q8_0` and the model has more than 4 billion parameters ("not run: memory")
 - the job sets a governor and the device is not `pi5` ("not run: governor settings apply to the Pi only")
 - at run time, a custom task's tools do not fit in `schema_len` tokens ("not run: core tools need ...")
 
@@ -157,20 +172,23 @@ The suite hash is the SHA-256 of the whole parsed suite, so comments and formatt
 ## 2. `configs/models.toml`
 
 ```toml
-[models.qwen3-4b]
+[models.qwen3-4b-instruct-2507]
 params_b = 4.0
-notes = "Qwen3 4B. Has a thinking mode; see docs for the decode budget."
+quants = ["q5_k_m", "iq3_m"]
+source = "bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF"
+notes = "Qwen3 4B Instruct 2507. Non-thinking model."
 ```
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `params_b` | number | required | Parameter count in billions. Used for the Pi memory rule. |
-| `file` | string | `"{models_dir}/{name}/{name}-{quant}.gguf"` | Template for the GGUF path. Placeholders are `{models_dir}`, `{name}`, `{quant}` (`q4_0`) and `{QUANT}` (`Q4_0`). |
-| `files` | table | empty | Exact path per quantization, e.g., `q4_0 = "/data/Qwen3-4B-Q4_0.gguf"`. Wins over `file`. |
+| `params_b` | number | required | Parameter count in billions. Recorded for reference. |
+| `quants` | list | all of `q5_k_m`, `q6_k`, `iq3_m` | The weight quants this model has. Suites expand only these, and `a2e doctor` checks only these files. |
+| `file` | string | `"{models_dir}/{name}/{name}-{quant}.gguf"` | Template for the GGUF path. Placeholders are `{models_dir}`, `{name}`, `{quant}` (`q5_k_m`) and `{QUANT}` (`Q5_K_M`). |
+| `files` | table | empty | Exact path per quantization, e.g., `q5_k_m = "/data/Qwen_Qwen3-4B-Instruct-2507-Q5_K_M.gguf"`. Wins over `file`. |
 | `source` | string | `""` | Where the GGUF came from. Fill it in when you download a model. |
 | `notes` | string | `""` | Free text. |
 
-The committed registry has `qwen3-4b` (4.0) and `gemma3-4b` (4.0). The Z.ai GLM model is not chosen yet, and the file has a commented placeholder for it.
+The committed registry has `qwen3-4b-instruct-2507` (4.0; `q5_k_m`, `iq3_m`) and `granite-3-1-2b-instruct` (2.0; `q6_k`, `iq3_m`). Model names avoid dots because TOML reads a dot in a table name as a nested table.
 
 ## 3. `configs/local.toml`
 
@@ -214,9 +232,9 @@ Settings for the `web` task family, which uses the Brave Search API.
 ### 3.4 Per-model overrides
 
 ```toml
-[models.qwen3-4b.files]
-q4_0 = "~/models/Qwen3-4B-Q4_0.gguf"
-q8_0 = "~/models/Qwen3-4B-Q8_0.gguf"
+[models.qwen3-4b-instruct-2507.files]
+q5_k_m = "~/models/Qwen_Qwen3-4B-Instruct-2507-Q5_K_M.gguf"
+iq3_m = "~/models/Qwen_Qwen3-4B-Instruct-2507-IQ3_M.gguf"
 ```
 
 ## 4. Environment variables

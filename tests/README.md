@@ -26,13 +26,19 @@ Helpers:
 - `tests/oracle.py` and `tests/bfcl_oracle.py` turn expected answers into model output. `oracle_outputs_any` works for every custom family.
 - `tests/fakes/fake_brave.py` is a local stand-in for the Brave Search API and the pages its results point to.
 
+The full evaluation suite is checked by `tests/unit/test_full_eval_suite.py` (50 tasks per configuration, coverage of every category and horizon) and `tests/integration/test_full_eval_runner.py` (one model and quant run end to end, then the report script).
+
+The harness statistics are tested in `tests/unit/test_harness_effect.py` (equivalence verdicts against known effects, decomposition identity, noise floor, variance shares) and the figures in `tests/unit/test_harness_plots.py` (needs `uv sync --extra plots`).
+
+The tests for harness variants are `tests/unit/test_harness_variants.py` (prompt formats, context views, budgets, stop rules, suite expansion and job-key stability), `tests/unit/test_store_v3.py` (the migration), `tests/integration/test_harness_loop.py`, `tests/integration/test_harness_bfcl.py` and `tests/integration/test_harness_runner.py` (the loop, BFCL runners and a whole runner pass under each variant).
+
 The tests for the BFCL tool families and web search are `tests/unit/test_agent_tools.py`, `tests/sweep/test_agent_tools_oracle.py` (every family, every depth, many seeds) and `tests/integration/test_agent_tools_runner.py`. `tests/hardware/test_real_web.py` checks the real Brave API when `BRAVE_SEARCH_API_KEY` is set.
 
 ## Running the hardware group
 
 ```bash
 export A2E_LLAMA_SERVER=~/a2e-deps/llama.cpp/build/bin/llama-server
-export A2E_GGUF=~/models/qwen3-4b/qwen3-4b-q4_0.gguf
+export A2E_GGUF=~/models/qwen3-4b-instruct-2507/qwen3-4b-instruct-2507-q5_k_m.gguf
 export A2E_DEVICE=pi5        # or mac (detected when unset)
 export A2E_CTX=16384         # multi-turn BFCL tests need this
 uv run a2e test hardware -v

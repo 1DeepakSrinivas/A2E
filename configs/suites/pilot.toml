@@ -2,7 +2,7 @@
 # the cooldown target and whether to fit the cooler, and tell us if API-Bank / ToolBench / tau-bench are affordable.
 [suite]
 name = "pilot"
-description = "Qwen3-4B Q4_0: plain vs tool calling, every task family, a slice of every BFCL category in scope."
+description = "Qwen3-4B-Instruct-2507 Q5_K_M: plain vs tool calling, every task family, a slice of every BFCL category in scope."
 seed = 0
 
 [repeats]
@@ -20,8 +20,8 @@ cooldown_timeout_s = 900
 
 [matrix]
 device = ["pi5", "mac"]
-model = ["qwen3-4b"]
-quant = ["q4_0"]
+model = ["qwen3-4b-instruct-2507"]
+quant = ["q5_k_m"]
 kv_quant = ["f16", "q8_0"]
 
 [axes]

@@ -16,20 +16,22 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from a2e.agent.harness import CONTEXTS, FIELDS as HARNESS_FIELDS, RECOVERIES, STOPPINGS, Harness
+from a2e.agent.prompt import PROMPT_FORMATS
 from a2e.bfcl.load import ALL_CATEGORIES, MULTI_TURN_CATEGORIES
 from a2e.settings import CONFIG_DIR, Settings
 from a2e.tasks.custom import FAMILY_DEPTH, FAMILY_TOOLS
 
 MIN_CTX_MULTI_TURN = 16384
-PI_Q8_MAX_PARAMS_B = 4.0
 AXES_FOR_KIND = {
     "plain": ("prefix_cache", "decode_len", "governor"),
     "custom": ("grammar", "prefix_cache", "decode_len", "schema_len", "governor"),
     "bfcl": ("grammar", "prefix_cache", "decode_len", "governor"),
     "bench": ("governor",),
 }
+HARNESS_KINDS = ("custom", "bfcl")  # the kinds that call tools; plain prompts and bench jobs have no harness
 KIND_ORDER = {"plain": 0, "custom": 1, "bfcl": 2, "bench": 3}  # bench last: it needs the server stopped
-SERVER_FIELDS = ("device", "model", "quant", "kv_quant", "ctx", "flash_attn", "threads")
+SERVER_FIELDS = ("device", "model", "quant", "kv_quant", "ctx", "flash_attn", "threads", "thinking")
 
 
 class ConfigError(ValueError):
@@ -59,6 +61,10 @@ class Server(_Strict):
     ctx: int = Field(8192, ge=512)
     flash_attn: str = "on"
     threads: int = Field(0, ge=0)  # 0 = use [machine] threads from local.toml, or llama.cpp's default
+    # "off" starts llama-server with --chat-template-kwargs {"enable_thinking": false}, so reasoning models answer
+    # directly instead of spending the token budget on a thinking block. Models whose chat template has no such
+    # variable (both current models) are unaffected.
+    thinking: Literal["default", "off"] = "default"
 
 
 class RunOpts(_Strict):
@@ -73,7 +79,7 @@ class RunOpts(_Strict):
 class Matrix(_Strict):
     device: list[Literal["pi5", "mac"]]
     model: list[str]
-    quant: list[Literal["q4_0", "q8_0", "q3_k_m"]]
+    quant: list[Literal["q5_k_m", "q6_k", "iq3_m"]]
     kv_quant: list[Literal["f16", "q8_0"]] = ["f16"]
 
     _l = field_validator("device", "model", "quant", "kv_quant", mode="before")(_listify)
@@ -94,6 +100,19 @@ class Axes(_Strict):
         if any(x < 16 for x in v):
             raise ValueError("lengths must be >= 16")
         return v
+
+
+class HarnessVariant(_Strict):
+    """One named harness setting. Fields left out keep the default. Applies to custom and bfcl tasks only."""
+    name: str = Field(min_length=1)
+    prompt_format: Literal[PROMPT_FORMATS] = "json_schema"
+    context: Literal[CONTEXTS] = "full"
+    recovery: Literal[RECOVERIES] = "none"
+    stopping: Literal[STOPPINGS] = "fixed"
+
+    @property
+    def harness(self) -> Harness:
+        return Harness(**{f: getattr(self, f) for f in HARNESS_FIELDS})
 
 
 class Task(_Strict):
@@ -158,10 +177,26 @@ class Suite(_Strict):
     run: RunOpts = RunOpts()
     matrix: Matrix
     axes: Axes = Axes()
+    harness: list[HarnessVariant] = []  # [[harness]] tables; none means only the default harness
     tasks: list[Task] = Field(min_length=1)
 
+    @model_validator(mode="after")
+    def _harness_unique(self):
+        names = [v.name for v in self.harness]
+        if len(set(names)) != len(names):
+            raise ValueError("harness names must be unique")
+        settings = [v.harness for v in self.harness]
+        if len(set(settings)) != len(settings):
+            raise ValueError("two [[harness]] entries have the same settings")
+        return self
+
     def canonical(self) -> dict:
-        return json.loads(self.model_dump_json())
+        d = json.loads(self.model_dump_json())
+        if not d["harness"]:  # keeps the hash of every suite written before harness variants existed
+            del d["harness"]
+        if d["server"]["thinking"] == "default":  # likewise for suites written before the thinking switch
+            del d["server"]["thinking"]
+        return d
 
     @property
     def hash(self) -> str:
@@ -189,14 +224,11 @@ def job_key(cfg: dict) -> str:
 
 
 def server_key(cfg: dict) -> tuple:
-    return tuple(cfg[k] for k in SERVER_FIELDS)
+    return tuple(cfg.get(k, "default" if k == "thinking" else None) for k in SERVER_FIELDS)
 
 
 def feasibility(cfg: dict, settings: Settings) -> str | None:
     """None if the job can run; otherwise the reason it is skipped (stored with the job)."""
-    params = settings.model(cfg["model"]).params_b
-    if cfg["device"] == "pi5" and cfg["quant"] == "q8_0" and params > PI_Q8_MAX_PARAMS_B:
-        return "not run: memory (Pi 5 8GB runs Q8_0 only for models <= 4B)"
     if cfg.get("governor") and cfg["device"] != "pi5":
         return "not run: governor settings apply to the Pi only"
     return None
@@ -206,12 +238,19 @@ def expand(suite: Suite, settings: Settings) -> list[dict]:
     """All jobs of a suite, in run order (grouped so each model loads once per device)."""
     for m in suite.matrix.model:
         settings.model(m)  # unknown models fail early with a clear message
+    for q in suite.matrix.quant:
+        if not any(q in settings.model(m).available_quants() for m in suite.matrix.model):
+            raise ConfigError(f"quant {q!r} is not available for any model in the matrix")
     jobs = []
     m = suite.matrix
     base = {"seed": suite.suite.seed, "warmup": suite.repeats.warmup, "measured": suite.repeats.measured,
             "ctx": suite.server.ctx, "flash_attn": suite.server.flash_attn,
             "threads": suite.server.threads}  # 0 = machine default; local.toml threads apply at launch only
+    if suite.server.thinking != "default":
+        base["thinking"] = suite.server.thinking  # stored only when set, so old jobs keep their keys
     for dev, model, quant, kv in itertools.product(m.device, m.model, m.quant, m.kv_quant):
+        if quant not in settings.model(model).available_quants():
+            continue  # each model has its own quants; pairs it does not have are not part of the grid
         cell = {**base, "device": dev, "model": model, "quant": quant, "kv_quant": kv}
         for task in suite.tasks:
             axes = AXES_FOR_KIND[task.kind]
@@ -225,12 +264,15 @@ def expand(suite: Suite, settings: Settings) -> list[dict]:
                 grid = [{"category": c, "n": task.n} for c in task.category]
             else:
                 grid = [{"n_prompt": task.n_prompt, "n_gen": task.n_gen, "perf": task.perf, "reps": task.reps}]
-            for combo in itertools.product(*axis_values):
-                for g in grid:
-                    cfg = {**cell, "kind": task.kind, **dict(zip(axes, combo)), **g}
-                    cfg["job_key"] = job_key(cfg)
-                    cfg["skip_reason"] = feasibility(cfg, settings)
-                    jobs.append(cfg)
+            variants = suite.harness if suite.harness and task.kind in HARNESS_KINDS else [None]
+            for combo, g, hv in itertools.product(itertools.product(*axis_values), grid, variants):
+                cfg = {**cell, "kind": task.kind, **dict(zip(axes, combo)), **g}
+                if hv is not None and not hv.harness.is_default:
+                    # only non-default fields are stored, so the default harness keeps its old job keys
+                    cfg.update({"harness": hv.name, **hv.harness.non_default()})
+                cfg["job_key"] = job_key(cfg)
+                cfg["skip_reason"] = feasibility(cfg, settings)
+                jobs.append(cfg)
     seen, unique = set(), []
     for j in jobs:  # identical jobs from overlapping task entries run once
         if j["job_key"] not in seen:
