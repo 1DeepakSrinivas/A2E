@@ -23,7 +23,6 @@ use sysinfo::{Pid, ProcessesToUpdate, System};
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Resources {
     pub harness_peak_bytes: u64,
-    pub tool_peak_bytes: u64,
     pub inference_peak_bytes: u64,
     pub combined_peak_bytes: u64,
     pub available_min_bytes: Option<u64>,
@@ -146,7 +145,7 @@ impl Power {
             let mut b = BufReader::new(stdout);
             let mut watts = 0.;
             let mut seen = false;
-            while let Ok(Some(line)) = crate::sdk::line(&mut b, 8192) {
+            while let Ok(Some(line)) = crate::process::line(&mut b, 8192) {
                 let s = String::from_utf8_lossy(&line);
                 if s.starts_with("*** Sampled") {
                     if seen {
@@ -181,7 +180,7 @@ impl Power {
 }
 impl Drop for Power {
     fn drop(&mut self) {
-        crate::sdk::kill_group(&mut self.child);
+        crate::process::kill_group(&mut self.child);
         if let Some(h) = self.reader.take() {
             let _ = h.join();
         }
@@ -195,13 +194,7 @@ pub struct Monitor {
 }
 impl Monitor {
     /// Background sampling for one loading or task interval.
-    pub fn start(
-        pid: u32,
-        tool_pid: Option<u32>,
-        r: &Runtime,
-        path: &Path,
-        cancel: Arc<AtomicBool>,
-    ) -> Result<Self> {
+    pub fn start(pid: u32, r: &Runtime, path: &Path, cancel: Arc<AtomicBool>) -> Result<Self> {
         // SAFETY: No memory preconditions
         let is_root = unsafe { libc::geteuid() } == 0;
         let power = if r.power != "none" && std::env::consts::OS == "macos" && is_root {
@@ -233,7 +226,7 @@ impl Monitor {
             let start = Instant::now();
             let mut system = System::new();
             let own = std::process::id();
-            let pids = [own, tool_pid.unwrap_or(own), pid].map(Pid::from_u32);
+            let pids = [own, pid].map(Pid::from_u32);
             let mut previous_power: Option<(f64, f64)> = None;
             let mut energy = 0.;
             let mut energy_intervals = 0;
@@ -248,7 +241,7 @@ impl Monitor {
                         .map(|p| p.memory())
                         .unwrap_or(0)
                 };
-                let (h, t, m) = (memory(own), tool_pid.map(memory).unwrap_or(0), memory(pid));
+                let (h, m) = (memory(own), memory(pid));
                 let cpu = pids
                     .iter()
                     .copied()
@@ -275,9 +268,9 @@ impl Monitor {
                     }
                 }
                 previous_power = watts.map(|w| (elapsed, w));
-                let exceeded = h + t + m > r.memory_limit_mb * 1024 * 1024
+                let exceeded = h + m > r.memory_limit_mb * 1024 * 1024
                     || system.available_memory() < r.reserve_mb * 1024 * 1024;
-                let sample = json!({"seconds":elapsed,"harness_bytes":h,"tool_bytes":t,"inference_bytes":m,"available_bytes":system.available_memory(),"cpu_ms":cpu_elapsed,"temperature_c":temp,"throttled":throttled,"power_w":watts,"faults":faults});
+                let sample = json!({"seconds":elapsed,"harness_bytes":h,"inference_bytes":m,"available_bytes":system.available_memory(),"cpu_ms":cpu_elapsed,"temperature_c":temp,"throttled":throttled,"power_w":watts,"faults":faults});
                 let write_result = serde_json::to_writer(&mut writer, &sample)
                     .map_err(std::io::Error::other)
                     .and_then(|_| writer.write_all(b"\n"))
@@ -285,9 +278,8 @@ impl Monitor {
                 {
                     let mut s = stats.lock().unwrap_or_else(|e| e.into_inner());
                     s.harness_peak_bytes = s.harness_peak_bytes.max(h);
-                    s.tool_peak_bytes = s.tool_peak_bytes.max(t);
                     s.inference_peak_bytes = s.inference_peak_bytes.max(m);
-                    s.combined_peak_bytes = s.combined_peak_bytes.max(h + t + m);
+                    s.combined_peak_bytes = s.combined_peak_bytes.max(h + m);
                     s.available_min_bytes = Some(
                         s.available_min_bytes
                             .map_or(system.available_memory(), |a| {
@@ -313,12 +305,9 @@ impl Monitor {
                 }
                 if exceeded || cancel.load(Ordering::Relaxed) {
                     over.store(exceeded, Ordering::Relaxed);
-                    // SAFETY: Process-group IDs from managed children
+                    // SAFETY: Process-group ID from the managed inference server
                     unsafe {
                         libc::kill(-(pid as i32), libc::SIGKILL);
-                        if let Some(p) = tool_pid {
-                            libc::kill(-(p as i32), libc::SIGKILL);
-                        }
                     }
                     break;
                 }

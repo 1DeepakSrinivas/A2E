@@ -15,7 +15,7 @@ builds the Rust CLI, and downloads and verifies the three GGUF files under
 `models/native`. After setup, disable swap for the Pi baseline and run
 `target/release/a2e-native run`.
 
-See the [native guide](docs/NATIVE.md) for Mac setup, tool manifests, experiments,
+See the [native guide](docs/NATIVE.md) for Mac setup, tool definitions, experiments,
 and OpenRouter judging.
 
 ## Python and BFCL quick start

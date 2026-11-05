@@ -1,15 +1,14 @@
-//! Integration tests for the agent loop and real tool subprocesses
+//! Integration tests for the agent loop with in-process tools
 //! Scripted inference, resource limits, retrieval checks, and run recovery
 
 mod support;
 use a2e_native::{
     adapter::{Adapter, Call},
     case::{Case, FinalAnswer},
-    config::{Config, Manifest, Mode, Runtime, Suite, Variant},
+    config::{Catalog, Config, Mode, Runtime, Suite, Variant},
     eval::{evaluate, FailureClass, Observation},
     inference::Inference,
     runner::{select_tools, task_run, Status, TaskExecution},
-    sdk::{ToolHost, ToolProcess},
     store::Store,
     tools::Builtins,
 };
@@ -27,10 +26,8 @@ fn repo() -> PathBuf {
         .unwrap()
         .to_owned()
 }
-fn manifest() -> Manifest {
-    let mut m = Manifest::load(&repo().join("configs/native/tools/standard.toml")).unwrap();
-    m.executable = env!("CARGO_BIN_EXE_a2e-native").into();
-    m
+fn catalog() -> Catalog {
+    Catalog::load(&repo().join("configs/native/tools/standard.toml")).unwrap()
 }
 fn suite() -> Suite {
     Suite::load(&repo().join("configs/native/suites/smoke.toml")).unwrap()
@@ -58,7 +55,7 @@ fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> a2e_native:
         case: t,
         suite: s,
         variant: v,
-        manifest: &manifest(),
+        catalog: &catalog(),
         ctx: 1024,
         dir: dir.path(),
         cancel: Arc::new(AtomicBool::new(false)),
@@ -201,73 +198,51 @@ fn timeout_keeps_failed_call_cost_and_missing_timings() {
     assert_eq!(out.generated_tokens, None);
 }
 #[test]
-fn real_tool_process_preserves_state_and_exits_on_drop() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut p = ToolProcess::spawn(&manifest(), dir.path(), false).unwrap();
-    let pid = p.pid();
-    p.request("init", "", json!({"fixtures":{}}), Duration::from_secs(2))
-        .unwrap();
-    assert!(
-        p.request(
-            "call",
-            "write_file",
-            json!({"path":"a.txt","content":"saved"}),
-            Duration::from_secs(2)
-        )
-        .unwrap()
-        .ok
+fn slow_tool_past_the_budget_stops_the_attempt() {
+    let mut t = task();
+    t.fixtures.faults =
+        vec![
+            serde_json::from_value(json!({"tool":"read_file","mode":"slow_ms","ms":1200})).unwrap(),
+        ];
+    let server = MockServer::new(
+        vec![call("read_file", json!({"path":"reading.txt"}))],
+        100,
+        Duration::ZERO,
     );
-    assert_eq!(
-        p.request(
-            "call",
-            "read_file",
-            json!({"path":"a.txt"}),
-            Duration::from_secs(2)
-        )
-        .unwrap()
-        .output["content"],
-        "saved"
-    );
-    drop(p);
-    // SAFETY: signal zero checks whether the child was reaped.
-    assert_eq!(unsafe { libc::kill(pid as i32, 0) }, -1);
+    let mut s = suite();
+    s.budget.tool_seconds = 1;
+    let out = execute(&server, &t, &Variant::default(), &s);
+    assert_eq!(out.status, Status::ResourceLimit, "{:?}", out.reason);
+    assert!(out.reason.as_deref().unwrap().contains("tool_timeout"));
+    assert!(out.tool_ms >= 1000.);
 }
 #[test]
-fn timeout_kills_stalled_tool_and_does_not_hang_drop() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut m = manifest();
-    m.executable = "/bin/sleep".into();
-    m.args = vec!["30".into()];
-    m.timeout_seconds = 1;
-    let mut p = ToolProcess::spawn(&m, dir.path(), false).unwrap();
-    let start = std::time::Instant::now();
-    assert!(p
-        .request("init", "", json!({}), Duration::from_millis(20))
-        .is_err());
-    drop(p);
-    assert!(start.elapsed() < Duration::from_secs(2));
+fn oversize_tool_result_stops_the_attempt() {
+    let mut t = task();
+    t.fixtures
+        .files
+        .insert("reading.txt".into(), "x".repeat(3000));
+    let server = MockServer::new(
+        vec![call("read_file", json!({"path":"reading.txt"}))],
+        100,
+        Duration::ZERO,
+    );
+    let mut s = suite();
+    s.budget.tool_output_bytes = 256;
+    let out = execute(&server, &t, &Variant::default(), &s);
+    assert_eq!(out.status, Status::ResourceLimit, "{:?}", out.reason);
+    assert!(out.reason.as_deref().unwrap().contains("output_limit"));
 }
 #[test]
-fn output_limit_rejects_unbounded_tool_stream() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut m = manifest();
-    m.output_limit_bytes = 256;
-    let mut p = ToolProcess::spawn(&m, dir.path(), false).unwrap();
-    p.request(
-        "init",
-        "",
-        json!({"fixtures":{"files":{"a.txt":"x".repeat(3000)}}}),
-        Duration::from_secs(2),
-    )
-    .unwrap();
-    assert!(p
-        .request(
-            "call",
-            "read_file",
-            json!({"path":"a.txt"}),
-            Duration::from_secs(2)
-        )
-        .is_err());
+fn tool_setup_time_is_recorded_and_stays_outside_tool_calls() {
+    let server = MockServer::new(
+        vec![call("final_answer", json!({"answer":"nothing to do"}))],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &task(), &Variant::default(), &suite());
+    assert!(out.tool_setup_ms > 0.);
+    assert_eq!(out.tool_ms, 0.);
 }
 #[test]
 fn store_recovers_interrupted_attempt_without_double_counting() {
@@ -308,7 +283,7 @@ fn native_store_refuses_legacy_database() {
 #[test]
 fn every_shipped_suite_validates_and_has_disjoint_splits() {
     let cfg = Config::load(&repo().join("configs/native/models.toml")).unwrap();
-    let m = manifest();
+    let m = catalog();
     for entry in std::fs::read_dir(repo().join("configs/native/suites")).unwrap() {
         let path = entry.unwrap().path();
         let s = Suite::load(&path).unwrap();
@@ -321,7 +296,7 @@ fn every_shipped_suite_validates_and_has_disjoint_splits() {
 fn fixture_queries_generalize_and_fetch_is_task_scoped() {
     let dir = tempfile::tempdir().unwrap();
     let mut tools = Builtins::new(dir.path().into(), false).unwrap();
-    tools.initialize(json!({"fixtures":{"pages":[{"id":"source","url":"https://example.org/specs","title":"Device memory requirements","text":"The device requires 1 GB memory."}]}})).unwrap();
+    tools.initialize(&serde_json::from_value(json!({"pages":[{"id":"source","url":"https://example.org/specs","title":"Device memory requirements","text":"The device requires 1 GB memory."}]})).unwrap()).unwrap();
     assert!(tools
         .call("fetch_page", json!({"source_id":"source"}))
         .is_err());
@@ -373,8 +348,8 @@ fn file_paths_and_html_extraction_keep_tool_data_bounded() {
 }
 
 #[test]
-fn shipped_cases_validate_against_the_standard_manifest() {
-    let registry = manifest();
+fn shipped_cases_validate_against_the_standard_catalog() {
+    let registry = catalog();
     let registry = registry
         .tools
         .iter()
@@ -408,7 +383,7 @@ fn guided_plan_marks_cases_without_a_workflow_not_applicable() {
             ..Default::default()
         },
     ];
-    let plan = a2e_native::runner::plan(&cfg, &s, &[chain, single], &manifest()).unwrap();
+    let plan = a2e_native::runner::plan(&cfg, &s, &[chain, single], &catalog()).unwrap();
     let groups = plan["groups"].as_array().unwrap();
     let guided = groups
         .iter()
@@ -427,7 +402,7 @@ fn guided_plan_marks_cases_without_a_workflow_not_applicable() {
 #[test]
 fn distractors_extend_autonomous_tools_but_not_guided_stages() {
     let mut c = task();
-    let m = manifest();
+    let m = catalog();
     let base = select_tools(&c, &m, &Variant::default(), &[], 0)
         .unwrap()
         .len();
@@ -485,8 +460,8 @@ fn failed_attempts_report_a_failure_class_and_check_results() {
     assert!(out.checks.iter().any(|c| !c.passed));
 }
 #[test]
-fn manifest_and_builtin_registry_list_the_same_tools() {
-    let mut declared = manifest()
+fn catalog_and_builtin_registry_list_the_same_tools() {
+    let mut declared = catalog()
         .tools
         .iter()
         .map(|t| t.name.clone())
@@ -510,7 +485,7 @@ fn sql_file_seeds_resolve_relative_to_the_case_and_validate() {
     };
     let path = dir.path().join("db-1.toml");
     std::fs::write(&path, case("sql_file = \"seed.sql\"")).unwrap();
-    let m = manifest();
+    let m = catalog();
     let registry = m.tools.iter().map(|t| t.name.as_str()).collect();
     let cases = a2e_native::case::load_all(std::slice::from_ref(&path)).unwrap();
     cases[0].validate(&registry).unwrap();
@@ -539,7 +514,7 @@ fn shipped_database_seeds_load() {
     }
 }
 #[test]
-fn database_case_runs_through_the_real_tool_process() {
+fn database_case_runs_through_the_agent_loop() {
     let sql =
         std::fs::read_to_string(repo().join("configs/native/fixtures/inventory.sql")).unwrap();
     let case = Case::from_toml(&format!(

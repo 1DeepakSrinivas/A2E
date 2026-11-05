@@ -1,5 +1,5 @@
 // tools/mod.rs
-// Built-in tool host: shared task state, handler registry, and fault injection
+// Built-in tools run in the harness process: shared task state, handler registry, and fault injection
 // Domain modules register handlers by tool name
 
 mod db;
@@ -18,7 +18,6 @@ pub use web::{html_text, public_ip, validate_url};
 use crate::{
     fixtures::{Fault, FaultMode, Fixtures, Note, Todo},
     read_bounded,
-    sdk::ToolHost,
 };
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
@@ -105,12 +104,9 @@ impl Builtins {
             })
     }
 }
-impl ToolHost for Builtins {
-    fn initialize(&mut self, args: Value) -> Result<Value> {
-        let fixtures: Fixtures = match args.get("fixtures") {
-            Some(v) if !v.is_null() => serde_json::from_value(v.clone())?,
-            _ => Fixtures::default(),
-        };
+impl Builtins {
+    /// Resets task state from fixtures.
+    pub fn initialize(&mut self, fixtures: &Fixtures) -> Result<()> {
         let w = &mut self.world;
         w.files.clear();
         for (name, body) in &fixtures.files {
@@ -121,23 +117,25 @@ impl ToolHost for Builtins {
             std::fs::write(p, body)?;
             w.files.insert(name.clone());
         }
-        w.devices = fixtures.devices;
-        w.kv = fixtures.kv;
-        w.notes = fixtures.notes;
-        w.todos = fixtures.todos;
+        w.devices = fixtures.devices.clone();
+        w.kv = fixtures.kv.clone();
+        w.notes = fixtures.notes.clone();
+        w.todos = fixtures.todos.clone();
         w.clock = fixtures
             .clock
+            .clone()
             .unwrap_or_else(|| "2026-01-01T00:00:00Z".into());
         parse_date(&w.clock)?;
         w.db = fixtures
             .db
+            .as_ref()
             .map(|d| db::Db::open(d.sql.as_deref().context("database seed needs sql")?))
             .transpose()?;
-        w.web.load(fixtures.pages);
-        self.faults = fixtures.faults.into_iter().map(|f| (f, 0)).collect();
-        Ok(json!({"ready":true}))
+        w.web.load(fixtures.pages.clone());
+        self.faults = fixtures.faults.iter().cloned().map(|f| (f, 0)).collect();
+        Ok(())
     }
-    fn call(&mut self, name: &str, a: Value) -> Result<Value> {
+    pub fn call(&mut self, name: &str, a: Value) -> Result<Value> {
         let handler = *self
             .handlers
             .get(name)
@@ -163,7 +161,8 @@ impl ToolHost for Builtins {
         }
         Ok(out)
     }
-    fn snapshot(&mut self) -> Result<Value> {
+    /// Final task state for outcome checks.
+    pub fn snapshot(&mut self) -> Result<Value> {
         let w = &self.world;
         let mut files = BTreeMap::new();
         for name in &w.files {
@@ -192,7 +191,8 @@ mod test_support {
     pub fn host(fixtures: Value) -> (Builtins, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
         let mut h = Builtins::new(dir.path().into(), false).unwrap();
-        h.initialize(json!({"fixtures":fixtures})).unwrap();
+        h.initialize(&serde_json::from_value(fixtures).unwrap())
+            .unwrap();
         (h, dir)
     }
 }
@@ -247,13 +247,10 @@ mod tests {
     fn unknown_tools_and_bad_fixtures_are_rejected() {
         let (mut h, _dir) = host(json!({}));
         assert!(h.call("nope", json!({})).is_err());
-        assert!(h.initialize(json!({"fixtures":{"flies":{}}})).is_err());
-        assert!(h
-            .initialize(json!({"fixtures":{"clock":"tomorrow"}}))
-            .is_err());
-        assert!(h
-            .initialize(json!({"fixtures":{"db":{"sql":"NOT SQL"}}}))
-            .is_err());
+        assert!(serde_json::from_value::<Fixtures>(json!({"flies":{}})).is_err());
+        let mut bad = |v: Value| h.initialize(&serde_json::from_value(v).unwrap()).is_err();
+        assert!(bad(json!({"clock":"tomorrow"})));
+        assert!(bad(json!({"db":{"sql":"NOT SQL"}})));
     }
     #[test]
     fn snapshot_includes_every_state_domain() {

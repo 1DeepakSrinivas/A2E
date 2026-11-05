@@ -3,7 +3,7 @@
 // Command dispatch, interrupt handling, and JSON output
 
 use a2e_native::{
-    config::{Config, Manifest, Suite},
+    config::{Catalog, Config, Suite},
     store::Store,
 };
 use anyhow::Result;
@@ -42,13 +42,13 @@ enum Commands {
         #[arg(default_value = "configs/native/suites/smoke.toml")]
         suite: PathBuf,
         #[arg(long, default_value = "configs/native/tools/standard.toml")]
-        manifest: PathBuf,
+        tools: PathBuf,
     },
     Run {
         #[arg(default_value = "configs/native/suites/smoke.toml")]
         suite: PathBuf,
         #[arg(long, default_value = "configs/native/tools/standard.toml")]
-        manifest: PathBuf,
+        tools: PathBuf,
         #[arg(long)]
         retry_failed: bool,
     },
@@ -76,8 +76,6 @@ enum Commands {
         #[arg(long)]
         calibration: Option<PathBuf>,
     },
-    #[command(hide = true)]
-    ToolHost,
 }
 #[derive(Subcommand)]
 enum Models {
@@ -89,7 +87,7 @@ enum Cases {
         #[arg(default_value = "configs/native/cases")]
         path: PathBuf,
         #[arg(long, default_value = "configs/native/tools/standard.toml")]
-        manifest: PathBuf,
+        tools: PathBuf,
     },
     List {
         #[arg(default_value = "configs/native/cases")]
@@ -102,7 +100,7 @@ enum Cases {
 enum Tools {
     Validate {
         #[arg(default_value = "configs/native/tools/standard.toml")]
-        manifest: PathBuf,
+        tools: PathBuf,
     },
 }
 fn main() {
@@ -113,19 +111,14 @@ fn main() {
 }
 fn entry() -> Result<()> {
     let cli = Cli::parse();
-    if matches!(cli.command, Commands::ToolHost) {
-        let root = std::env::var("A2E_TOOL_ROOT")?;
-        let live = std::env::var("A2E_WEB_MODE").as_deref() == Ok("live");
-        return a2e_native::sdk::serve(&mut a2e_native::tools::Builtins::new(root.into(), live)?);
-    }
     if let Commands::Tools {
-        command: Tools::Validate { manifest },
+        command: Tools::Validate { tools },
     } = &cli.command
     {
-        let m = Manifest::load(manifest)?;
+        let c = Catalog::load(tools)?;
         println!(
             "{}",
-            json!({"valid":true,"protocol":m.protocol,"tools":m.tools.iter().map(|t|&t.name).collect::<Vec<_>>()})
+            json!({"valid":true,"tools":c.tools.iter().map(|t|&t.name).collect::<Vec<_>>()})
         );
         return Ok(());
     }
@@ -146,13 +139,13 @@ fn entry() -> Result<()> {
             command: Models::Fetch,
         } => serde_json::to_value(c.fetch_models()?)?,
         Commands::Doctor { probe } => doctor(&c, probe, stop)?,
-        Commands::Plan { suite, manifest } => {
+        Commands::Plan { suite, tools } => {
             let s = Suite::load(&suite)?;
-            a2e_native::runner::plan(&c, &s, &s.load_cases(&suite)?, &Manifest::load(&manifest)?)?
+            a2e_native::runner::plan(&c, &s, &s.load_cases(&suite)?, &Catalog::load(&tools)?)?
         }
         Commands::Run {
             suite,
-            manifest,
+            tools,
             retry_failed,
         } => {
             let s = Suite::load(&suite)?;
@@ -160,7 +153,7 @@ fn entry() -> Result<()> {
                 &c,
                 &s,
                 &s.load_cases(&suite)?,
-                &Manifest::load(&manifest)?,
+                &Catalog::load(&tools)?,
                 retry_failed,
                 stop,
             )?
@@ -181,7 +174,7 @@ fn entry() -> Result<()> {
             study,
             calibration,
         } => a2e_native::judge::run(&db(p)?, &c.judge, study.as_deref(), calibration.as_deref())?,
-        Commands::Tools { .. } | Commands::Cases { .. } | Commands::ToolHost => unreachable!(),
+        Commands::Tools { .. } | Commands::Cases { .. } => unreachable!(),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())
@@ -189,9 +182,9 @@ fn entry() -> Result<()> {
 /// Case file validation and listing; needs no model configuration.
 fn cases(command: &Cases) -> Result<()> {
     let output = match command {
-        Cases::Validate { path, manifest } => {
-            let m = Manifest::load(manifest)?;
-            let registry = m.tools.iter().map(|t| t.name.as_str()).collect();
+        Cases::Validate { path, tools } => {
+            let c = Catalog::load(tools)?;
+            let registry = c.tools.iter().map(|t| t.name.as_str()).collect();
             let all = a2e_native::case::load_all(std::slice::from_ref(path))?;
             for case in &all {
                 case.validate(&registry)?;
@@ -237,7 +230,6 @@ fn doctor(c: &Config, probe: bool, stop: Arc<AtomicBool>) -> Result<serde_json::
                 let mut server = a2e_native::inference::Server::spawn(c, m, 1024, &dir)?;
                 let monitor = a2e_native::measure::Monitor::start(
                     server.pid(),
-                    None,
                     &c.runtime,
                     &dir.join("samples.jsonl"),
                     stop.clone(),

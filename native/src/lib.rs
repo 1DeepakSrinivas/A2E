@@ -1,5 +1,5 @@
 // lib.rs
-// Shared modules for the native evaluation CLI and tool SDK
+// Shared modules for the native evaluation CLI
 // Artifact hashing, bounded reads, and UTF-8-safe text limits
 
 pub mod adapter;
@@ -10,8 +10,8 @@ pub mod fixtures;
 pub mod inference;
 pub mod judge;
 pub mod measure;
+pub mod process;
 pub mod runner;
-pub mod sdk;
 pub mod store;
 pub mod tools;
 

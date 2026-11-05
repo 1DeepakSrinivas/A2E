@@ -1,8 +1,3 @@
-protocol = 1
-executable = "@self"
-args = ["tool-host"]
-timeout_seconds = 20
-output_limit_bytes = 8192
 
 [[tools]]
 name = "search_files"

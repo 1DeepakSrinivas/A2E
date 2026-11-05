@@ -114,7 +114,6 @@ pub struct Web {
     evidence: BTreeMap<String, Page>,
     live: bool,
     requests: usize,
-    http: Client,
 }
 impl Web {
     pub fn new(live: bool) -> Result<Self> {
@@ -124,10 +123,6 @@ impl Web {
             evidence: BTreeMap::new(),
             live,
             requests: 0,
-            http: Client::builder()
-                .timeout(Duration::from_secs(12))
-                .redirect(reqwest::redirect::Policy::none())
-                .build()?,
         })
     }
     pub fn load(&mut self, pages: Vec<Page>) {
@@ -152,8 +147,10 @@ impl Web {
             self.take_request()?;
             let key =
                 std::env::var("BRAVE_SEARCH_API_KEY").context("BRAVE_SEARCH_API_KEY is missing")?;
-            let response = self
-                .http
+            let response = Client::builder()
+                .timeout(Duration::from_secs(12))
+                .redirect(reqwest::redirect::Policy::none())
+                .build()?
                 .get("https://api.search.brave.com/res/v1/web/search")
                 .query(&[("q", query), ("count", "3")])
                 .header("X-Subscription-Token", key)

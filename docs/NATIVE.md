@@ -46,8 +46,8 @@ retry unsuccessful attempts. The database and streamed traces live under
 and the evidence used for judging.
 
 Latency includes failed attempts. The runtime measures model loading separately
-and records inference, harness, and tool process RSS. Peak RSS comes from
-samples. Pi power is unavailable. Mac power comes from privileged
+and records inference and harness RSS. Tools run inside the harness process,
+so harness RSS includes them. Peak RSS comes from samples. Pi power is unavailable. Mac power comes from privileged
 `powermetrics` samples and covers the reported CPU, GPU, and ANE scope.
 
 ## Cases
@@ -56,24 +56,28 @@ Each benchmark case is one TOML file under `configs/native/cases/<category>/`.
 A case sets its scope (prompt and call limits), the tools it may use, fixtures,
 typed outcome checks, and optional judge settings. A suite selects cases by
 path, split, and tags. Run `a2e-native cases validate` to check every file
-against the tool manifest and `a2e-native cases list --ids` to see the counts.
+against the tool definitions and `a2e-native cases list --ids` to see the counts.
 See `configs/native/cases/chain/difference-dev-0.toml` for a worked example.
 
 ## Add a tool
 
-Copy the [example manifest](../configs/native/tools/uppercase.toml). Set the
-executable, argument schema, timeout, and maximum response size. Build the
-[Rust example](../native/examples/rust_tool.rs) with
-`cargo build --example rust_tool`, or compile the
-[Go example](../native/examples/go-tool/main.go) with `go build` and point
-the manifest at it.
+All tools are Rust functions that run inside the harness process, so there is
+no tool executable, protocol, or second process to measure. A tool has two
+parts:
 
-The harness starts the executable once per task. It sends `init`, `call`,
-and `snapshot` requests as JSON lines. The response echoes `protocol` and
-`id` and contains `ok`, `output`, and `error`. Write diagnostics to stderr.
-Use `A2E_TOOL_ROOT` for task files. Register the tool name in a case's
-`tools.allowed` list, then run `a2e-native tools validate <manifest>` and pass
-`--manifest <manifest>` to `plan` and `run`. Run tool executables you trust.
+1. A handler in `native/src/tools/<domain>.rs`. It is a function
+   `fn(&mut World, &Value) -> Result<Value>` that you register by name in the
+   module's `register` function. `World` holds the task state (files, stores,
+   clock, database, pages).
+2. A definition in `configs/native/tools/standard.toml` with the name, the
+   description, and the JSON Schema for the arguments. This is what the model
+   sees, so wording changes can be tried without rebuilding.
+
+Then list the tool in a case's `tools.allowed`. Run
+`a2e-native tools validate` to check that every definition has a handler and a
+valid schema. Keep handlers bounded in time and output, because the harness
+stops a task when a call passes `budget.tool_seconds` or returns more than
+`budget.tool_output_bytes`.
 
 ## Score retrieval summaries
 
