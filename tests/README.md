@@ -1,5 +1,7 @@
 # Tests
 
+**Deprecated.** The Python and BFCL tests belong to the retired Python runtime and are skipped by default. Set `A2E_LEGACY_TESTS=1` to run them. Rust tests are in `native/tests` and run with `cargo test --workspace`.
+
 The tests are run by group. The groups are defined in `configs/tests.toml`, so a group name means the same tests in every session.
 
 ```bash

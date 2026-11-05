@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import socket
 import sys
 from pathlib import Path
@@ -12,9 +13,18 @@ FAKE = Path(__file__).parent / "fakes" / "fake_llama_server.py"
 SUITES = ("unit", "integration", "sweep", "hardware")
 
 
+DEPRECATED = "Python and BFCL tests are deprecated; set A2E_LEGACY_TESTS=1 to run them"
+
+
 def pytest_collection_modifyitems(items):
-    """Tag every test with its suite (from its directory) so `-m <suite>` selects a group."""
+    """Tag every test with its suite (from its directory) so `-m <suite>` selects a group.
+
+    All tests are skipped unless A2E_LEGACY_TESTS=1.
+    """
+    legacy = os.environ.get("A2E_LEGACY_TESTS") == "1"
     for item in items:
+        if not legacy:
+            item.add_marker(pytest.mark.skip(reason=DEPRECATED))
         for suite in SUITES:
             if f"/tests/{suite}/" in str(item.fspath).replace("\\", "/"):
                 item.add_marker(getattr(pytest.mark, suite))
