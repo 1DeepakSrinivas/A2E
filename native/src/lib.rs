@@ -13,6 +13,7 @@ pub mod judge;
 pub mod measure;
 pub mod process;
 pub mod record;
+pub mod report;
 pub mod rubric;
 pub mod runner;
 pub mod store;

@@ -68,6 +68,16 @@ enum Commands {
         #[arg(long)]
         csv: Option<PathBuf>,
     },
+    Report {
+        #[arg(long)]
+        db: Option<PathBuf>,
+        #[arg(long)]
+        study: Option<String>,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        run: Option<i64>,
+    },
     Judge {
         #[arg(long)]
         db: Option<PathBuf>,
@@ -171,6 +181,18 @@ fn entry() -> Result<()> {
                 a2e_native::store::summary(&rows)
             }
         }
+        Commands::Report {
+            db: p,
+            study,
+            out,
+            run,
+        } => a2e_native::report::generate(
+            &db(p)?,
+            study.as_deref(),
+            out.as_deref(),
+            &a2e_native::config::expand_path(&c.runtime.output_dir),
+            run,
+        )?,
         Commands::Judge {
             db: p,
             study,

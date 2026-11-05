@@ -783,3 +783,112 @@ fn judged_attempt_stores_handoff_material_and_call_records() {
         .unwrap();
     assert_eq!(count(&st, "judge_calls"), 1);
 }
+
+fn recorded_study(dir: &Path, attempts: &[(&str, &str, Vec<String>)]) -> Store {
+    let (case, variant) = (task(), Variant::default());
+    let st = Store::open(&dir.join("native.db")).unwrap();
+    let definition = json!({
+        "suite": {"name":"report-test","split":"heldout","models":["test","other"],"variants":[{"name":"baseline"}]},
+        "runtime": {"memory_limit_mb": 768},
+        "device": "test-device",
+    });
+    st.study("study", &definition, std::slice::from_ref(&case))
+        .unwrap();
+    for (job, model, script) in attempts {
+        let server = MockServer::new(script.clone(), 100, Duration::ZERO);
+        let out = execute(&server, &case, &variant, &suite());
+        let id = st
+            .begin(&RunKey {
+                model,
+                ..key(&case, &variant, job, Path::new("trace"))
+            })
+            .unwrap();
+        st.finish(id, &out).unwrap();
+    }
+    st
+}
+fn solved() -> Vec<String> {
+    vec![
+        call("read_file", json!({"path":"reading.txt"})),
+        call(
+            "write_file",
+            json!({"path":"copy.txt","content":"Reading: 17"}),
+        ),
+        call("final_answer", json!({"answer":"copied"})),
+    ]
+}
+#[test]
+fn report_writes_markdown_and_valid_svg_plots() {
+    let dir = tempfile::tempdir().unwrap();
+    let st = recorded_study(
+        dir.path(),
+        &[
+            ("a", "test", solved()),
+            (
+                "b",
+                "other",
+                vec![call("final_answer", json!({"answer":"done"}))],
+            ),
+        ],
+    );
+    let out = dir.path().join("out");
+    let summary = a2e_native::report::generate(&st, None, Some(&out), dir.path(), None).unwrap();
+    assert_eq!(summary["attempts"], 2);
+    let md = std::fs::read_to_string(out.join("report.md")).unwrap();
+    for section in [
+        "## Headline",
+        "## Success by category",
+        "## Failure classes",
+        "## Latency",
+        "## Memory",
+        "## Failed attempts",
+    ] {
+        assert!(md.contains(section), "missing {section}");
+    }
+    assert!(md.contains("chain-copy"));
+    assert!(md.contains("100.0%") && md.contains("0.0%"));
+    let plots = std::fs::read_dir(out.join("plots"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect::<Vec<_>>();
+    assert!(plots.len() >= 6, "plots: {plots:?}");
+    for p in plots {
+        let svg = std::fs::read_to_string(&p).unwrap();
+        assert!(svg.starts_with("<svg") && svg.trim_end().ends_with("</svg>"));
+        assert_eq!(svg.matches("<text").count(), svg.matches("</text>").count());
+        assert!(
+            !svg.contains("NaN") && !svg.contains("=\"inf") && !svg.contains("-inf"),
+            "{p:?}"
+        );
+        assert!(md.contains(&format!(
+            "plots/{}",
+            p.file_name().unwrap().to_string_lossy()
+        )));
+    }
+}
+#[test]
+fn report_prints_not_available_for_missing_measurements() {
+    let dir = tempfile::tempdir().unwrap();
+    let st = recorded_study(dir.path(), &[("a", "test", solved())]);
+    let out = dir.path().join("out");
+    a2e_native::report::generate(&st, Some("study"), Some(&out), dir.path(), None).unwrap();
+    let md = std::fs::read_to_string(out.join("report.md")).unwrap();
+    assert!(md.contains("n/a"));
+    let thermal = md.split("## Temperature and energy").nth(1).unwrap();
+    assert!(thermal.lines().any(|l| l.contains("| n/a |")), "{thermal}");
+    assert!(!md.contains("## Judge scores"));
+}
+#[test]
+fn report_handles_a_study_without_finished_attempts_and_unknown_studies() {
+    let dir = tempfile::tempdir().unwrap();
+    let st = recorded_study(dir.path(), &[]);
+    let out = dir.path().join("out");
+    let summary = a2e_native::report::generate(&st, None, Some(&out), dir.path(), None).unwrap();
+    assert_eq!(summary["attempts"], 0);
+    let md = std::fs::read_to_string(out.join("report.md")).unwrap();
+    assert!(md.contains("No scored attempts."));
+    assert!(
+        a2e_native::report::generate(&st, Some("missing"), Some(&out), dir.path(), None).is_err()
+    );
+    assert!(a2e_native::report::generate(&st, None, Some(&out), dir.path(), Some(999)).is_err());
+}

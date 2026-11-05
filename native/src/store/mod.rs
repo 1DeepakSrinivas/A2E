@@ -199,14 +199,21 @@ impl Store {
     }
     /// Latest attempts as JSON rows without the heavy text columns.
     pub fn rows(&self) -> Result<Vec<Value>> {
+        self.rows_where("1=1", [])
+    }
+    pub fn study_rows(&self, study: &str) -> Result<Vec<Value>> {
+        self.rows_where("study=?", [study])
+    }
+    fn rows_where(&self, filter: &str, args: impl rusqlite::Params) -> Result<Vec<Value>> {
         self.query(
+            &format!(
             "SELECT id,study,job,attempt,state,phase,model,context,variant,mode,repeat_index,case_id,category,split,status,reason,failure_class,retrieval_success,
                 model_calls,tool_invocations,valid_tool_calls,argument_errors,repairs,prompt_tokens,generated_tokens,cached_tokens,
                 prefill_ms,decode_ms,http_ms,template_ms,tokenize_ms,parse_ms,validate_ms,tool_ms,tool_setup_ms,wall_ms,harness_other_ms,
                 harness_peak_bytes,inference_peak_bytes,combined_peak_bytes,available_min_bytes,cpu_time_ms,minor_faults,major_faults,
                 peak_temperature_c,throttled,energy_j,power_scope,sample_count,memory_exceeded,verdict,provisional,pending,passed,trace
-             FROM v_run_summary ORDER BY id",
-            [],
+             FROM v_run_summary WHERE {filter} ORDER BY id"),
+            args,
         )
     }
     /// Any SELECT as JSON objects keyed by column name.
