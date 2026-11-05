@@ -5,19 +5,17 @@
 pub mod adapter;
 pub mod case;
 pub mod config;
+pub mod dotenv;
 pub mod eval;
 pub mod fixtures;
-pub mod handoff;
 pub mod inference;
-pub mod judge;
 pub mod measure;
 pub mod process;
 pub mod record;
-pub mod report;
-pub mod rubric;
 pub mod runner;
 pub mod store;
 pub mod tools;
+pub mod upload;
 
 use anyhow::{bail, Result};
 use serde::Serialize;

@@ -11,14 +11,6 @@ reserve_mb = 128
 sample_ms = 500
 power = "auto"
 
-[judge]
-# Set explicit OpenRouter model and provider IDs in local.toml or the environment.
-model = ""
-provider = ""
-max_tokens = 2048
-max_requests = 100
-timeout_seconds = 120
-
 [[models]]
 id = "functiongemma-270m"
 adapter = "functiongemma"

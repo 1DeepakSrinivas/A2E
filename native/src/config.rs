@@ -60,36 +60,36 @@ impl Default for Runtime {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct JudgeConfig {
-    pub model: String,
-    pub provider: String,
-    pub max_tokens: u32,
-    pub timeout_seconds: u64,
-    pub max_requests: usize,
-    pub rubrics_dir: String,
+pub struct Roles {
+    pub controller: bool,
+    pub benchmark_target: bool,
 }
-impl Default for JudgeConfig {
-    fn default() -> Self {
-        Self {
-            model: String::new(),
-            provider: String::new(),
-            max_tokens: 2048,
-            timeout_seconds: 120,
-            max_requests: 100,
-            rubrics_dir: "configs/native/rubrics".into(),
-        }
-    }
-}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
     pub runtime: Runtime,
     #[serde(default)]
-    pub judge: JudgeConfig,
+    pub roles: Roles,
     pub models: Vec<Model>,
+    #[serde(skip)]
+    pub host_id: String,
+    #[serde(skip)]
+    pub host_file: Option<PathBuf>,
+}
+
+/// Device identity as `user@hostname` without the domain suffix; `A2E_HOST_ID` overrides it.
+pub fn host_id() -> String {
+    if let Ok(id) = std::env::var("A2E_HOST_ID") {
+        return id;
+    }
+    let user = std::env::var("USER").unwrap_or_default();
+    let full = sysinfo::System::host_name().unwrap_or_default();
+    let host = full.split('.').next().unwrap_or_default();
+    format!("{user}@{host}")
 }
 
 pub fn expand_path(s: &str) -> PathBuf {
@@ -163,11 +163,20 @@ impl Config {
     /// Configuration with local overrides and validation.
     pub fn load(path: &Path) -> Result<Self> {
         let mut v: toml::Value = toml::from_str(&std::fs::read_to_string(path)?)?;
-        let local = path.parent().unwrap_or(Path::new(".")).join("local.toml");
+        let dir = path.parent().unwrap_or(Path::new("."));
+        let host_id = host_id();
+        let host_file = dir.join("hosts").join(format!("{host_id}.toml"));
+        let host_file = host_file.exists().then_some(host_file);
+        if let Some(f) = &host_file {
+            merge(&mut v, toml::from_str(&std::fs::read_to_string(f)?)?);
+        }
+        let local = dir.join("local.toml");
         if local != path && local.exists() {
             merge(&mut v, toml::from_str(&std::fs::read_to_string(local)?)?);
         }
         let mut c: Self = v.try_into()?;
+        c.host_id = host_id;
+        c.host_file = host_file;
         if let Ok(p) = std::env::var("A2E_NATIVE_MODELS_DIR") {
             c.runtime.models_dir = p;
         }
@@ -176,12 +185,6 @@ impl Config {
         }
         if let Ok(p) = std::env::var("A2E_NATIVE_OUTPUT_DIR") {
             c.runtime.output_dir = p;
-        }
-        if let Ok(m) = std::env::var("A2E_JUDGE_MODEL") {
-            c.judge.model = m;
-        }
-        if let Ok(p) = std::env::var("A2E_JUDGE_PROVIDER") {
-            c.judge.provider = p;
         }
         let mut names = BTreeSet::new();
         for m in &c.models {
@@ -433,5 +436,48 @@ impl Catalog {
             .cloned()
             .map(|t| (t.name.clone(), t))
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const BASE: &str = "[runtime]\nthreads = 4\n\n[[models]]\nid = \"m\"\nadapter = \"qwen3\"\nquant = \"q\"\nsource = \"o/r\"\nrevision = \"0123456789012345678901234567890123456789\"\nfile = \"m.gguf\"\n";
+
+    fn setup(host: Option<&str>, local: Option<&str>) -> (tempfile::TempDir, PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("models.toml");
+        std::fs::write(&base, BASE).unwrap();
+        if let Some(h) = host {
+            std::fs::create_dir(dir.path().join("hosts")).unwrap();
+            std::fs::write(dir.path().join("hosts/test@host.toml"), h).unwrap();
+        }
+        if let Some(l) = local {
+            std::fs::write(dir.path().join("local.toml"), l).unwrap();
+        }
+        (dir, base)
+    }
+
+    // Tests share the process environment, so one test sets A2E_HOST_ID for all.
+    #[test]
+    fn host_file_roles_and_precedence() {
+        std::env::set_var("A2E_HOST_ID", "test@host");
+
+        let (_d, base) = setup(None, None);
+        let c = Config::load(&base).unwrap();
+        assert!(c.host_file.is_none() && !c.roles.controller && !c.roles.benchmark_target);
+
+        let host = "[roles]\ncontroller = true\n[runtime]\nthreads = 2\n";
+        let (_d, base) = setup(Some(host), None);
+        let c = Config::load(&base).unwrap();
+        assert!(c.host_file.is_some() && c.roles.controller && !c.roles.benchmark_target);
+        assert_eq!(c.runtime.threads, 2);
+
+        let (_d, base) = setup(Some(host), Some("[runtime]\nthreads = 3\n"));
+        assert_eq!(Config::load(&base).unwrap().runtime.threads, 3);
+
+        let (_d, base) = setup(Some("[roles]\nunknown = true\n"), None);
+        assert!(Config::load(&base).is_err());
     }
 }

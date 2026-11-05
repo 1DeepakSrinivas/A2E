@@ -270,11 +270,22 @@ fn live_cases_need_no_fixtures_and_fixture_web_cases_have_pages() {
 }
 
 #[test]
-fn shipped_rubrics_load_and_every_judged_case_names_one() {
-    let rubrics =
-        a2e_native::rubric::Rubric::load_dir(&repo().join("configs/native/rubrics")).unwrap();
-    assert!(rubrics.contains_key("retrieval_summary"));
+fn every_judged_case_names_a_rubric_of_the_results_project() {
+    let dir = repo().join("a2e-results/cli/rubrics");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        eprintln!("skipped: submodule a2e-results is not checked out");
+        return;
+    };
+    let names: Vec<String> = entries
+        .filter_map(|e| {
+            e.ok()?
+                .path()
+                .file_stem()
+                .map(|s| s.to_string_lossy().into_owned())
+        })
+        .collect();
+    assert!(names.iter().any(|n| n == "retrieval_summary"));
     for case in library().iter().filter(|c| c.judge.enabled) {
-        assert!(rubrics.contains_key(&case.judge.rubric), "{}", case.id);
+        assert!(names.contains(&case.judge.rubric), "{}", case.id);
     }
 }

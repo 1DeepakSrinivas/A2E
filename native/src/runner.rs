@@ -10,8 +10,12 @@ use crate::{
     inference::{Completion, Inference, Server},
     measure::{Monitor, Resources},
     record::{ParseStatus, ToolEntry, Turn},
-    store::{LoadRecord, Phase, RunKey, RunLock, Store},
+    store::{Phase, RunLock},
     tools::Builtins,
+    upload::{
+        payload::{self, LoadRecord, RunMeta},
+        Resume, Uploader,
+    },
 };
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -721,8 +725,8 @@ pub fn run(
     let root = crate::config::expand_path(&config.runtime.output_dir);
     let _lock = RunLock::acquire(&root)?;
     let machine = crate::measure::machine(&config.runtime)?;
-    let store = Store::open(&root.join("native.sqlite3"))?;
-    let recovered = store.recover()?;
+    let mut resume = Resume::open(&root.join("resume.jsonl"))?;
+    let mut uploader = Uploader::open(&root)?;
     let mut artifacts = BTreeMap::new();
     for id in &suite.models {
         let m = config.model(id)?;
@@ -740,7 +744,7 @@ pub fn run(
     }
     let definition = json!({"suite":suite,"cases":cases,"tools":catalog,"runtime":config.runtime,"artifacts":artifacts,"device":machine["device"],"kernel":machine["kernel"],"arch":machine["arch"],"total_memory_bytes":machine["total_memory_bytes"],"runtime_version":env!("CARGO_PKG_VERSION"),"binary_sha256":crate::hash_file(&std::env::current_exe()?)?});
     let study = crate::canonical_hash(&definition)?;
-    store.study(&study, &definition, cases)?;
+    uploader.submit(vec![payload::study(&study, &definition, cases)?])?;
     let mut completed = 0;
     let mut skipped = 0;
     let mut not_applicable = 0;
@@ -782,30 +786,36 @@ pub fn run(
                 ))
             })();
             let load_error = launched.as_ref().err().map(ToString::to_string);
-            let load_id = Some(match &launched {
-                Ok((server, l)) => store.model_load(&LoadRecord {
+            let load_id = resume.next_load_id(&study)?;
+            let no_resources = Resources::default();
+            let load_error_text = load_error.clone();
+            let record = match &launched {
+                Ok((server, l)) => LoadRecord {
+                    id: &load_id,
                     study: &study,
                     model: model_id,
                     context: *ctx,
                     load_ms: l.load_ms,
-                    resources: l.resources.clone(),
+                    resources: &l.resources,
                     template: Some(&l.template),
                     server_version: Some(&server.version),
                     props: Some(&l.props),
                     error: None,
-                })?,
-                Err(e) => store.model_load(&LoadRecord {
+                },
+                Err(_) => LoadRecord {
+                    id: &load_id,
                     study: &study,
                     model: model_id,
                     context: *ctx,
                     load_ms: 0.,
-                    resources: Default::default(),
+                    resources: &no_resources,
                     template: None,
                     server_version: None,
                     props: None,
-                    error: Some(&e.to_string()),
-                })?,
-            });
+                    error: load_error_text.as_deref(),
+                },
+            };
+            uploader.submit(payload::load(&record))?;
             for v in &suite.variants {
                 for repeat in 0..suite.warmup + suite.repeats {
                     let phase = if repeat < suite.warmup {
@@ -815,8 +825,9 @@ pub fn run(
                     };
                     for case in cases {
                         if cancel.load(Ordering::Relaxed) {
+                            let upload = uploader.flush()?;
                             return Ok(
-                                json!({"study":study,"completed":completed,"skipped":skipped,"not_applicable":not_applicable,"interrupted":true}),
+                                json!({"study":study,"completed":completed,"skipped":skipped,"not_applicable":not_applicable,"interrupted":true,"upload":upload}),
                             );
                         }
                         if v.mode == Mode::Guided && case.stage_plan().is_none() {
@@ -826,24 +837,13 @@ pub fn run(
                         let key = crate::canonical_hash(
                             &json!({"model":model_id,"ctx":ctx,"variant":v,"repeat":repeat,"case":case.id}),
                         )?;
-                        if !store.should_run(&study, &key, retry_failed)? {
+                        if !resume.should_run(&study, &key, retry_failed) {
                             skipped += 1;
                             continue;
                         }
                         let dir = group.join(&key[..16]);
                         std::fs::create_dir_all(&dir)?;
-                        let id = store.begin(&RunKey {
-                            study: &study,
-                            job: &key,
-                            phase,
-                            model: model_id,
-                            context: *ctx,
-                            variant: v,
-                            repeat,
-                            case,
-                            load_id,
-                            trace: &dir.join("trace.jsonl"),
-                        })?;
+                        let attempt = resume.next_attempt(&study, &key);
                         let result = match &launched {
                             Ok((server, _)) => server.client.reset().and_then(|_| {
                                 task_run(TaskExecution {
@@ -873,18 +873,44 @@ pub fn run(
                                 ..Default::default()
                             },
                         };
-                        store.finish(id, &out)?;
+                        let meta = RunMeta {
+                            study: &study,
+                            job: &key,
+                            attempt,
+                            phase,
+                            model: model_id,
+                            context: *ctx,
+                            variant: v,
+                            repeat,
+                            case,
+                            load_id: Some(&load_id),
+                            trace: &dir.join("trace.jsonl"),
+                        };
+                        uploader.submit(payload::run(&meta, &out)?)?;
+                        let state = if out.status == Status::Interrupted {
+                            "interrupted"
+                        } else {
+                            "complete"
+                        };
+                        resume.record_job(
+                            &study,
+                            &key,
+                            attempt,
+                            state,
+                            Some(&crate::store::tag(&out.status)),
+                        )?;
                         completed += 1;
                         println!(
                             "{}",
-                            json!({"run":id,"case":case.id,"model":model_id,"context":ctx,"variant":v.name,"phase":crate::store::tag(&phase),"status":out.status,"reason":out.reason})
+                            json!({"run":payload::run_id(&study, &key, attempt),"case":case.id,"model":model_id,"context":ctx,"variant":v.name,"phase":crate::store::tag(&phase),"status":out.status,"reason":out.reason})
                         );
                     }
                 }
             }
         }
     }
+    let upload = uploader.flush()?;
     Ok(
-        json!({"study":study,"completed":completed,"skipped":skipped,"not_applicable":not_applicable,"recovered_interrupted":recovered}),
+        json!({"study":study,"completed":completed,"skipped":skipped,"not_applicable":not_applicable,"upload":upload}),
     )
 }

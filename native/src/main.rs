@@ -2,10 +2,7 @@
 // Command-line entry point for native experiments and setup checks
 // Command dispatch, interrupt handling, and JSON output
 
-use a2e_native::{
-    config::{Catalog, Config, Suite},
-    store::Store,
-};
+use a2e_native::config::{Catalog, Config, Suite};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde_json::json;
@@ -60,31 +57,9 @@ enum Commands {
         #[command(subcommand)]
         command: Cases,
     },
-    Results {
+    Upload {
         #[arg(long)]
-        db: Option<PathBuf>,
-        #[arg(long)]
-        json: bool,
-        #[arg(long)]
-        csv: Option<PathBuf>,
-    },
-    Report {
-        #[arg(long)]
-        db: Option<PathBuf>,
-        #[arg(long)]
-        study: Option<String>,
-        #[arg(long)]
-        out: Option<PathBuf>,
-        #[arg(long)]
-        run: Option<i64>,
-    },
-    Judge {
-        #[arg(long)]
-        db: Option<PathBuf>,
-        #[arg(long)]
-        study: Option<String>,
-        #[arg(long)]
-        calibration: Option<PathBuf>,
+        status: bool,
     },
 }
 #[derive(Subcommand)]
@@ -98,7 +73,7 @@ enum Cases {
         path: PathBuf,
         #[arg(long, default_value = "configs/native/tools/standard.toml")]
         tools: PathBuf,
-        #[arg(long, default_value = "configs/native/rubrics")]
+        #[arg(long, default_value = "a2e-results/cli/rubrics")]
         rubrics: PathBuf,
     },
     List {
@@ -122,6 +97,7 @@ fn main() {
     }
 }
 fn entry() -> Result<()> {
+    a2e_native::dotenv::load(std::path::Path::new(".env"))?;
     let cli = Cli::parse();
     if let Commands::Tools {
         command: Tools::Validate { tools },
@@ -141,11 +117,6 @@ fn entry() -> Result<()> {
     let stop = Arc::new(AtomicBool::new(false));
     let flag = stop.clone();
     ctrlc::set_handler(move || flag.store(true, Ordering::Relaxed))?;
-    let db = |p: Option<PathBuf>| {
-        Store::open(&p.unwrap_or_else(|| {
-            a2e_native::config::expand_path(&c.runtime.output_dir).join("native.sqlite3")
-        }))
-    };
     let output = match cli.command {
         Commands::Models {
             command: Models::Fetch,
@@ -170,38 +141,31 @@ fn entry() -> Result<()> {
                 stop,
             )?
         }
-        Commands::Results { db: p, json, csv } => {
-            let rows = db(p)?.rows()?;
-            if let Some(path) = csv {
-                a2e_native::store::export_csv(&rows, &path)?;
-            }
-            if json {
-                serde_json::to_value(rows)?
+        Commands::Upload { status } => {
+            let mut uploader = a2e_native::upload::Uploader::open(
+                &a2e_native::config::expand_path(&c.runtime.output_dir),
+            )?;
+            serde_json::to_value(if status {
+                uploader.status()?
             } else {
-                a2e_native::store::summary(&rows)
-            }
+                uploader.flush()?
+            })?
         }
-        Commands::Report {
-            db: p,
-            study,
-            out,
-            run,
-        } => a2e_native::report::generate(
-            &db(p)?,
-            study.as_deref(),
-            out.as_deref(),
-            &a2e_native::config::expand_path(&c.runtime.output_dir),
-            run,
-        )?,
-        Commands::Judge {
-            db: p,
-            study,
-            calibration,
-        } => a2e_native::judge::run(&db(p)?, &c.judge, study.as_deref(), calibration.as_deref())?,
         Commands::Tools { .. } | Commands::Cases { .. } => unreachable!(),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())
+}
+/// Rubric names from the cloud project's rubric files, or `None` when the folder is missing.
+fn rubric_names(dir: &std::path::Path) -> Option<Vec<String>> {
+    Some(
+        std::fs::read_dir(dir)
+            .ok()?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().is_some_and(|x| x == "toml"))
+            .filter_map(|p| p.file_stem().map(|s| s.to_string_lossy().into_owned()))
+            .collect(),
+    )
 }
 /// Case file validation and listing; needs no model configuration.
 fn cases(command: &Cases) -> Result<()> {
@@ -212,12 +176,22 @@ fn cases(command: &Cases) -> Result<()> {
             rubrics,
         } => {
             let c = Catalog::load(tools)?;
-            let known = a2e_native::rubric::Rubric::load_dir(rubrics)?;
+            let known = rubric_names(rubrics);
+            if known.is_none() {
+                eprintln!(
+                    "warning: {} not found; rubric names are not checked (run git submodule update --init)",
+                    rubrics.display()
+                );
+            }
             let registry = c.tools.iter().map(|t| t.name.as_str()).collect();
             let all = a2e_native::case::load_all(std::slice::from_ref(path))?;
             for case in &all {
                 case.validate(&registry)?;
-                if case.judge.enabled && !known.contains_key(&case.judge.rubric) {
+                if case.judge.enabled
+                    && known
+                        .as_ref()
+                        .is_some_and(|k| !k.contains(&case.judge.rubric))
+                {
                     anyhow::bail!(
                         "case {} names unknown rubric {}",
                         case.id,
@@ -292,6 +266,6 @@ fn doctor(c: &Config, probe: bool, stop: Arc<AtomicBool>) -> Result<serde_json::
         models.push(item);
     }
     Ok(
-        json!({"machine":machine,"models":models,"llama_server":c.runtime.llama_server,"expected_llama_commit":c.runtime.llama_commit,"pi_energy":"unavailable without a supported measurement source"}),
+        json!({"host":c.host_id,"host_file":c.host_file,"roles":c.roles,"machine":machine,"models":models,"llama_server":c.runtime.llama_server,"expected_llama_commit":c.runtime.llama_commit,"pi_energy":"unavailable without a supported measurement source"}),
     )
 }
