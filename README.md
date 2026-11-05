@@ -1,6 +1,6 @@
 # A2E
 
-A2E measures how small language models use tools under time, memory, and call budgets. The native Rust runtime targets Raspberry Pi 3B+ and Apple Silicon Mac and uses llama.cpp for inference. It is the supported runtime. The Python runtime, which ran BFCL v4 on Raspberry Pi 5 and Apple Silicon Mac, is retired and its files are frozen.
+A2E measures how small language models use tools under time, memory, and call budgets. The native Rust runtime targets Raspberry Pi 3B+ and Apple Silicon Mac and uses llama.cpp for inference. It is the supported runtime. The earlier Python and BFCL runtime has been removed; it remains in git history.
 
 ## Native quick start
 
@@ -19,34 +19,13 @@ See the [native guide](docs/NATIVE.md) for Mac setup, writing cases and tools, a
 sending results to the cloud. Judging, scoring and reports live in the A2E-Results
 project ([github.com/1DeepakSrinivas/A2E-Results](https://github.com/1DeepakSrinivas/A2E-Results)), which is the submodule `a2e-results`.
 
-## Python and BFCL quick start (retired)
-
-These commands still work on the frozen Python files, but they are no longer maintained.
-
-```bash
-scripts/setup_pi.sh                            # or scripts/setup_mac.sh on the Mac
-uv sync --extra bfcl --extra tui
-cp configs/local.example.toml configs/local.toml   # then set llama_server and models_dir
-uv run a2e doctor                                 # check the machine
-uv run a2e plan smoke                             # see what a suite runs
-uv run a2e run smoke                              # run it (Ctrl+C to stop, run again to resume)
-uv run a2e results summary                        # read the results
-uv run a2e tui                                    # or do all of this from the terminal UI
-uv run a2e test quick                             # run the tests
-```
-
-On a Mac, run with `sudo -E` to record energy.
-
 ## Documents
 
-- [docs/USER_GUIDE.md](docs/USER_GUIDE.md) explains how to install, configure, run, stop and resume, and read results.
-- [docs/CONFIG_REFERENCE.md](docs/CONFIG_REFERENCE.md) lists every field of every configuration file.
-- [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md) lists every table and column of the results database and how each number is computed.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) describes the code and how data moves through it.
-- [docs/REPORT.md](docs/REPORT.md) is the methods report. It explains what is measured, how it is measured, and why each choice was made.
+- [docs/NATIVE.md](docs/NATIVE.md) explains how to install, configure, run, resume, write cases and tools, and send results to the cloud.
+- [docs/REPORT.md](docs/REPORT.md) is the methods report, written for the earlier Python runtime.
+- [docs/PREREGISTRATION.md](docs/PREREGISTRATION.md) states the research question and hypotheses.
 - [REFERENCES.md](REFERENCES.md) lists every source, tool and dataset, with how each was checked.
-- [tests/README.md](tests/README.md) describes the tests.
 
 ## Status
 
-The native smoke suite has run against all three models on an Apple Silicon Mac. Run the Pi smoke suite after installation to check its memory and latency limits. The Python path also has a separate `uv run a2e test hardware` group.
+The native smoke suite has run against all three models on an Apple Silicon Mac. Run the Pi smoke suite after installation to check its memory and latency limits.

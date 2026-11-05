@@ -11,9 +11,8 @@ Keep comments short. Explain decisions, protocol constraints, and measurement
 limitations when the code cannot express them. Avoid ASCII art, decorative
 separators, and comments that repeat the implementation.
 
-The native runtime is the supported path. The Python and BFCL files in the
-repository are frozen. Leave them untouched unless asked, and do not make the
-native runtime depend on them.
+The native runtime is the only runtime. The earlier Python and BFCL code was
+removed and is in git history.
 
 Cases are TOML files under `configs/native/cases`. Every case needs `[[golden]]`
 calls, and the tests replay them through the agent loop. Run
