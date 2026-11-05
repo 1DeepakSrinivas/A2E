@@ -11,3 +11,7 @@ gpu_layers = 0
 model = ""
 provider = ""
 max_requests = 100
+
+[roles]
+controller = false
+benchmark_target = false

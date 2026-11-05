@@ -26,6 +26,15 @@ architecture. Copy `configs/native/local.example.toml` to
 `configs/native/local.toml` to override machine settings. A different memory
 limit or GPU setting produces a separate study.
 
+Each device has an optional file `configs/native/hosts/<user>@<hostname>.toml`,
+for example `deepak@RPi.toml`. The CLI loads the file that matches the current
+user and hostname, or the one named by `A2E_HOST_ID`. The file can hold any
+setting from the models file plus a `[roles]` table with the booleans
+`controller` and `benchmark_target`, which both default to false. Settings
+apply in this order, and the later one wins: the models file, the host file,
+`local.toml`, then environment variables. `doctor` prints the host, the loaded
+host file and the roles.
+
 ## Run and read results
 
 ```bash
