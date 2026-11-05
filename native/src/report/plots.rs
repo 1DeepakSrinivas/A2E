@@ -144,9 +144,15 @@ fn heatmap(r: &Report) -> Option<String> {
     if rows.is_empty() {
         return None;
     }
-    let (left, top, cw, ch) = (110., 140., 44., 28.);
+    let reach = r
+        .groups
+        .iter()
+        .map(|g| text_width(&format!("{} · {}", g.model, g.label(many)), 11.))
+        .fold(0., f64::max)
+        * 0.8;
+    let (left, top, cw, ch) = (110., 80. + reach, 44., 28.);
     let mut s = Svg::new(
-        left + r.groups.len() as f64 * cw + 30.,
+        left + r.groups.len() as f64 * cw + reach.max(30.),
         top + rows.len() as f64 * ch + 24.,
     );
     s.title(
@@ -156,7 +162,7 @@ fn heatmap(r: &Report) -> Option<String> {
     for (gi, g) in r.groups.iter().enumerate() {
         let x = left + gi as f64 * cw + cw / 2.;
         s.text_rotated(
-            x + 4.,
+            x - 4.,
             top - 8.,
             &format!("{} · {}", g.model, g.label(many)),
             11.,

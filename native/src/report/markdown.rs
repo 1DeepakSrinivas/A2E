@@ -133,7 +133,9 @@ fn header(out: &mut String, r: &Report) {
                     1,
                 ),
                 cell(
-                    load.and_then(|l| l["peak_bytes"].as_f64()).map(|v| v / MB),
+                    load.and_then(|l| l["peak_bytes"].as_f64())
+                        .filter(|v| *v > 0.)
+                        .map(|v| v / MB),
                     0,
                 ),
             ]
@@ -543,10 +545,19 @@ fn appendix(out: &mut String, r: &Report) {
             "### Run {}: {} ({} · {})\n",
             f.id, f.case_id, f.model, f.variant
         );
+        let or_na = |s: &str| {
+            if s.is_empty() {
+                NA.to_string()
+            } else {
+                s.to_string()
+            }
+        };
         let _ = writeln!(
             out,
             "- Status: {}. Class: {}. Reason: {}.",
-            f.status, f.class, f.reason
+            f.status,
+            or_na(&f.class),
+            or_na(&f.reason)
         );
         let _ = writeln!(
             out,
