@@ -68,6 +68,7 @@ pub struct JudgeConfig {
     pub max_tokens: u32,
     pub timeout_seconds: u64,
     pub max_requests: usize,
+    pub rubrics_dir: String,
 }
 impl Default for JudgeConfig {
     fn default() -> Self {
@@ -77,6 +78,7 @@ impl Default for JudgeConfig {
             max_tokens: 2048,
             timeout_seconds: 120,
             max_requests: 100,
+            rubrics_dir: "configs/native/rubrics".into(),
         }
     }
 }

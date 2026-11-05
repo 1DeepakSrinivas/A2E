@@ -246,8 +246,50 @@ impl Store {
             for key in ["evidence", "final_state", "case"] {
                 r[key] = json_text(r[key].as_str().map(String::from));
             }
+            let id = r["id"].as_i64().unwrap_or_default();
+            let mut calls = self.query(
+                "SELECT tool,arguments,ok FROM tool_calls WHERE run_id=? ORDER BY idx",
+                [id],
+            )?;
+            for c in &mut calls {
+                c["arguments"] = json_text(c["arguments"].as_str().map(String::from));
+                c["ok"] = json!(c["ok"] == 1);
+            }
+            r["calls"] = json!(calls);
         }
         Ok(rows)
+    }
+    /// Requests to the judge model; `run_id` is empty for calibration.
+    pub fn judge_calls(
+        &self,
+        run_id: Option<i64>,
+        purpose: &str,
+        rubric: &str,
+        records: &[crate::judge::CallRecord],
+    ) -> Result<()> {
+        let tx = self.db.unchecked_transaction()?;
+        {
+            let mut insert = tx.prepare_cached("INSERT INTO judge_calls(run_id,purpose,rubric,attempt,model,provider,response_id,prompt_tokens,completion_tokens,cost,wall_ms,ok,error) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")?;
+            for r in records {
+                insert.execute(params![
+                    run_id,
+                    purpose,
+                    rubric,
+                    r.attempt,
+                    r.model,
+                    r.provider,
+                    r.response_id,
+                    r.prompt_tokens,
+                    r.completion_tokens,
+                    r.cost,
+                    r.wall_ms,
+                    r.ok,
+                    r.error
+                ])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
     }
     pub fn freeze_judge(&self, study: &str, config: &str) -> Result<()> {
         self.db.execute(

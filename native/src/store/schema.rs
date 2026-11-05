@@ -155,6 +155,21 @@ CREATE TABLE judgments(
 CREATE TABLE run_judgments(
     run_id INTEGER PRIMARY KEY REFERENCES runs(id),
     cache_key TEXT NOT NULL REFERENCES judgments(cache_key));
+CREATE TABLE judge_calls(
+    id INTEGER PRIMARY KEY,
+    run_id INTEGER REFERENCES runs(id),
+    purpose TEXT NOT NULL,
+    rubric TEXT NOT NULL,
+    attempt INTEGER NOT NULL,
+    model TEXT,
+    provider TEXT,
+    response_id TEXT,
+    prompt_tokens INTEGER,
+    completion_tokens INTEGER,
+    cost REAL,
+    wall_ms REAL,
+    ok INTEGER NOT NULL,
+    error TEXT);
 ";
 
 /// Views count only the latest attempt of each job; a judged `pass` counts as success.

@@ -739,3 +739,47 @@ fn every_offline_golden_sequence_succeeds_through_the_agent_loop() {
         );
     }
 }
+
+#[test]
+fn judged_attempt_stores_handoff_material_and_call_records() {
+    let cases = a2e_native::case::load_all(&[repo().join("configs/native/cases/web")]).unwrap();
+    let case = cases.iter().find(|c| c.id == "web-wal-summary").unwrap();
+    let script = case
+        .golden
+        .iter()
+        .map(|g| call(&g.tool, g.args.clone()))
+        .chain([call(
+            "final_answer",
+            json!({"answer":case.golden_answer.clone().unwrap()}),
+        )])
+        .collect::<Vec<_>>();
+    let server = MockServer::new(script, 100, Duration::ZERO);
+    let variant = Variant::default();
+    let out = execute(&server, case, &variant, &suite());
+    assert_eq!(out.status, Status::AwaitingJudge, "{:?}", out.reason);
+    let dir = tempfile::tempdir().unwrap();
+    let st = study_store(dir.path(), case);
+    let id = st
+        .begin(&key(case, &variant, "job", Path::new("trace")))
+        .unwrap();
+    st.finish(id, &out).unwrap();
+    let inputs = st.judge_inputs().unwrap();
+    assert_eq!(inputs.len(), 1);
+    assert_eq!(inputs[0]["calls"].as_array().unwrap().len(), 3);
+    assert_eq!(inputs[0]["calls"][2]["tool"], "write_file");
+    let stored: Case = serde_json::from_value(inputs[0]["case"].clone()).unwrap();
+    let packet = a2e_native::handoff::packet(&stored, &inputs[0]);
+    assert_eq!(packet["prompt"], case.scope.prompt);
+    assert_eq!(packet["evidence"][0]["source_id"], "sqlite_wal");
+    assert_eq!(packet["required_facts"].as_array().unwrap().len(), 3);
+    assert!(packet.get("files").is_none());
+    let record = a2e_native::judge::CallRecord {
+        ok: true,
+        prompt_tokens: Some(900),
+        cost: Some(0.002),
+        ..Default::default()
+    };
+    st.judge_calls(Some(id), "run", "retrieval_summary-v1", &[record])
+        .unwrap();
+    assert_eq!(count(&st, "judge_calls"), 1);
+}

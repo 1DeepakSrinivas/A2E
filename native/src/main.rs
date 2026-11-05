@@ -88,6 +88,8 @@ enum Cases {
         path: PathBuf,
         #[arg(long, default_value = "configs/native/tools/standard.toml")]
         tools: PathBuf,
+        #[arg(long, default_value = "configs/native/rubrics")]
+        rubrics: PathBuf,
     },
     List {
         #[arg(default_value = "configs/native/cases")]
@@ -182,12 +184,24 @@ fn entry() -> Result<()> {
 /// Case file validation and listing; needs no model configuration.
 fn cases(command: &Cases) -> Result<()> {
     let output = match command {
-        Cases::Validate { path, tools } => {
+        Cases::Validate {
+            path,
+            tools,
+            rubrics,
+        } => {
             let c = Catalog::load(tools)?;
+            let known = a2e_native::rubric::Rubric::load_dir(rubrics)?;
             let registry = c.tools.iter().map(|t| t.name.as_str()).collect();
             let all = a2e_native::case::load_all(std::slice::from_ref(path))?;
             for case in &all {
                 case.validate(&registry)?;
+                if case.judge.enabled && !known.contains_key(&case.judge.rubric) {
+                    anyhow::bail!(
+                        "case {} names unknown rubric {}",
+                        case.id,
+                        case.judge.rubric
+                    );
+                }
             }
             json!({"valid":true,"summary":a2e_native::case::summary(&all)})
         }
