@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::os::unix::process::CommandExt;
 use std::{
-    io::{BufReader, BufWriter, Write},
-    path::Path,
+    io::BufReader,
     process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -20,6 +19,22 @@ use std::{
 };
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
+/// One resource reading; `t_ms` counts from the start of monitoring.
+#[derive(Clone, Debug, Default)]
+pub struct Sample {
+    pub t_ms: f64,
+    pub harness_bytes: u64,
+    pub inference_bytes: u64,
+    pub available_bytes: u64,
+    pub cpu_ms: Option<u64>,
+    pub temperature_c: Option<f64>,
+    pub throttled: Option<String>,
+    pub power_w: Option<f64>,
+    pub minor_faults: Option<u64>,
+    pub major_faults: Option<u64>,
+}
+/// Samples kept per interval; summary statistics still cover every sample.
+pub const MAX_SAMPLES: usize = 20_000;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Resources {
     pub harness_peak_bytes: u64,
@@ -33,9 +48,10 @@ pub struct Resources {
     pub throttled: Option<String>,
     pub energy_j: Option<f64>,
     pub power_scope: String,
-    pub samples: u64,
+    pub sample_count: u64,
     pub memory_exceeded: bool,
-    pub telemetry_error: Option<String>,
+    #[serde(skip)]
+    pub series: Vec<Sample>,
 }
 /// Device and swap preflight for the baseline.
 pub fn machine(r: &Runtime) -> Result<Value> {
@@ -194,7 +210,7 @@ pub struct Monitor {
 }
 impl Monitor {
     /// Background sampling for one loading or task interval.
-    pub fn start(pid: u32, r: &Runtime, path: &Path, cancel: Arc<AtomicBool>) -> Result<Self> {
+    pub fn start(pid: u32, r: &Runtime, cancel: Arc<AtomicBool>) -> Result<Self> {
         // SAFETY: No memory preconditions
         let is_root = unsafe { libc::geteuid() } == 0;
         let power = if r.power != "none" && std::env::consts::OS == "macos" && is_root {
@@ -205,7 +221,6 @@ impl Monitor {
         if r.power == "required" && power.is_none() {
             bail!("power_required: supported telemetry unavailable");
         }
-        let file = std::fs::File::create(path)?;
         let stop = Arc::new(AtomicBool::new(false));
         let exceeded = Arc::new(AtomicBool::new(false));
         let summary = Arc::new(Mutex::new(Resources {
@@ -222,7 +237,6 @@ impl Monitor {
         let stats = summary.clone();
         let r = r.clone();
         let handle = thread::spawn(move || {
-            let mut writer = BufWriter::new(file);
             let start = Instant::now();
             let mut system = System::new();
             let own = std::process::id();
@@ -270,11 +284,6 @@ impl Monitor {
                 previous_power = watts.map(|w| (elapsed, w));
                 let exceeded = h + m > r.memory_limit_mb * 1024 * 1024
                     || system.available_memory() < r.reserve_mb * 1024 * 1024;
-                let sample = json!({"seconds":elapsed,"harness_bytes":h,"inference_bytes":m,"available_bytes":system.available_memory(),"cpu_ms":cpu_elapsed,"temperature_c":temp,"throttled":throttled,"power_w":watts,"faults":faults});
-                let write_result = serde_json::to_writer(&mut writer, &sample)
-                    .map_err(std::io::Error::other)
-                    .and_then(|_| writer.write_all(b"\n"))
-                    .and_then(|_| writer.flush());
                 {
                     let mut s = stats.lock().unwrap_or_else(|e| e.into_inner());
                     s.harness_peak_bytes = s.harness_peak_bytes.max(h);
@@ -293,15 +302,27 @@ impl Monitor {
                         (Some(a), Some(b)) => Some(a.max(b)),
                         (a, b) => a.or(b),
                     };
+                    let (minor, major) = (s.minor_faults, s.major_faults);
+                    if s.series.len() < MAX_SAMPLES {
+                        s.series.push(Sample {
+                            t_ms: elapsed * 1000.,
+                            harness_bytes: h,
+                            inference_bytes: m,
+                            available_bytes: system.available_memory(),
+                            cpu_ms: cpu_elapsed,
+                            temperature_c: temp,
+                            throttled: throttled.clone(),
+                            power_w: watts,
+                            minor_faults: minor,
+                            major_faults: major,
+                        });
+                    }
                     if throttled.is_some() {
                         s.throttled = throttled;
                     }
                     s.energy_j = (energy_intervals > 0).then_some(energy);
-                    s.samples += 1;
+                    s.sample_count += 1;
                     s.memory_exceeded |= exceeded;
-                    if let Err(e) = write_result {
-                        s.telemetry_error = Some(e.to_string());
-                    }
                 }
                 if exceeded || cancel.load(Ordering::Relaxed) {
                     over.store(exceeded, Ordering::Relaxed);
@@ -324,10 +345,7 @@ impl Monitor {
     }
     pub fn finish(mut self) -> Resources {
         self.shutdown();
-        self.summary
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone()
+        std::mem::take(&mut *self.summary.lock().unwrap_or_else(|e| e.into_inner()))
     }
     fn shutdown(&mut self) {
         self.stop.store(true, Ordering::Relaxed);

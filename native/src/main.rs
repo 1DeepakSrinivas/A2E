@@ -228,12 +228,8 @@ fn doctor(c: &Config, probe: bool, stop: Arc<AtomicBool>) -> Result<serde_json::
                     anyhow::bail!("device preflight failed");
                 }
                 let mut server = a2e_native::inference::Server::spawn(c, m, 1024, &dir)?;
-                let monitor = a2e_native::measure::Monitor::start(
-                    server.pid(),
-                    &c.runtime,
-                    &dir.join("samples.jsonl"),
-                    stop.clone(),
-                )?;
+                let monitor =
+                    a2e_native::measure::Monitor::start(server.pid(), &c.runtime, stop.clone())?;
                 let ready = server.ready(c.runtime.startup_seconds, &stop);
                 let resources = monitor.finish();
                 if resources.memory_exceeded {

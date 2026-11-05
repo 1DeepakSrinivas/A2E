@@ -9,7 +9,7 @@ use a2e_native::{
     eval::{evaluate, FailureClass, Observation},
     inference::Inference,
     runner::{select_tools, task_run, Status, TaskExecution},
-    store::Store,
+    store::{Phase, RunKey, Store},
     tools::Builtins,
 };
 use serde_json::json;
@@ -244,24 +244,50 @@ fn tool_setup_time_is_recorded_and_stays_outside_tool_calls() {
     assert!(out.tool_setup_ms > 0.);
     assert_eq!(out.tool_ms, 0.);
 }
+fn key<'a>(case: &'a Case, variant: &'a Variant, job: &'a str, trace: &'a Path) -> RunKey<'a> {
+    RunKey {
+        study: "study",
+        job,
+        phase: Phase::Measured,
+        model: "test",
+        context: 1024,
+        variant,
+        repeat: 0,
+        case,
+        load_id: None,
+        trace,
+    }
+}
+fn study_store(dir: &Path, case: &Case) -> Store {
+    let st = Store::open(&dir.join("native.db")).unwrap();
+    st.study("study", &json!({}), std::slice::from_ref(case))
+        .unwrap();
+    st
+}
+fn count(st: &Store, table: &str) -> i64 {
+    st.db
+        .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
+        .unwrap()
+}
 #[test]
 fn store_recovers_interrupted_attempt_without_double_counting() {
     let dir = tempfile::tempdir().unwrap();
-    let st = Store::open(&dir.path().join("native.db")).unwrap();
-    st.study("study", &json!({})).unwrap();
-    let meta = json!({"model":"test","variant":{"name":"baseline"},"context":1024,"case":{"id":"t","category":"simple","scope":{"expected_calls":1},"tools":{"allowed":["read_file"]}}});
-    st.begin("study", "job", "measured", &meta, Path::new("trace"))
+    let (case, variant) = (task(), Variant::default());
+    let st = study_store(dir.path(), &case);
+    st.begin(&key(&case, &variant, "job", Path::new("trace")))
         .unwrap();
     assert_eq!(st.recover().unwrap(), 1);
     assert!(st.should_run("study", "job", false).unwrap());
     let id = st
-        .begin("study", "job", "measured", &meta, Path::new("trace2"))
+        .begin(&key(&case, &variant, "job", Path::new("trace2")))
         .unwrap();
-    st.finish(
-        id,
-        &json!({"status":"success","wall_ms":10,"model_calls":1}),
-    )
-    .unwrap();
+    let out = a2e_native::runner::Outcome {
+        status: Status::Success,
+        wall_ms: 10.,
+        model_calls: 1,
+        ..Default::default()
+    };
+    st.finish(id, &out).unwrap();
     assert!(!st.should_run("study", "job", false).unwrap());
     let rows = st.rows().unwrap();
     assert_eq!(rows.len(), 1);
@@ -273,12 +299,124 @@ fn store_recovers_interrupted_attempt_without_double_counting() {
     assert!(st.freeze_judge("study", "different").is_err());
 }
 #[test]
-fn native_store_refuses_legacy_database() {
+fn native_store_refuses_legacy_and_foreign_databases() {
     let dir = tempfile::tempdir().unwrap();
-    let p = dir.path().join("old.db");
-    let c = rusqlite::Connection::open(&p).unwrap();
+    let foreign = dir.path().join("foreign.db");
+    let c = rusqlite::Connection::open(&foreign).unwrap();
     c.execute("CREATE TABLE turns(id INTEGER)", []).unwrap();
-    assert!(Store::open(&p).is_err());
+    drop(c);
+    assert!(Store::open(&foreign).is_err());
+    let old = dir.path().join("old.db");
+    let c = rusqlite::Connection::open(&old).unwrap();
+    c.execute_batch(
+        "CREATE TABLE runs(id INTEGER); PRAGMA application_id=1093813582; PRAGMA user_version=1;",
+    )
+    .unwrap();
+    drop(c);
+    let error = Store::open(&old).err().unwrap().to_string();
+    assert!(error.contains("v1"), "{error}");
+}
+#[test]
+fn finished_attempt_fills_every_table_and_the_views() {
+    let dir = tempfile::tempdir().unwrap();
+    let (case, variant) = (task(), Variant::default());
+    let st = study_store(dir.path(), &case);
+    let server = MockServer::new(
+        vec![
+            call("read_file", json!({"path":"reading.txt"})),
+            call(
+                "write_file",
+                json!({"path":"copy.txt","content":"Reading: 17"}),
+            ),
+            call("final_answer", json!({"answer":"copied"})),
+        ],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &case, &variant, &suite());
+    let id = st
+        .begin(&key(&case, &variant, "job", Path::new("trace")))
+        .unwrap();
+    st.finish(id, &out).unwrap();
+    assert_eq!(count(&st, "turns"), 3);
+    assert_eq!(count(&st, "tool_calls"), 2);
+    assert_eq!(count(&st, "checks"), out.checks.len() as i64);
+    assert!(count(&st, "samples") >= 1);
+    let turn = st
+        .query(
+            "SELECT parse_status,generated_tokens FROM turns WHERE run_id=? ORDER BY idx",
+            [id],
+        )
+        .unwrap();
+    assert_eq!(turn[2]["parse_status"], "final");
+    assert_eq!(turn[0]["generated_tokens"], 12);
+    let tools = st
+        .query("SELECT tool,ok FROM tool_calls ORDER BY idx", [])
+        .unwrap();
+    assert_eq!(tools[0]["tool"], "read_file");
+    assert_eq!(tools[1]["ok"], 1);
+    let run = &st.rows().unwrap()[0];
+    assert_eq!(run["status"], "success");
+    assert_eq!(run["passed"], 1);
+    assert_eq!(run["model_calls"], 3);
+    assert_eq!(run["generated_tokens"], 36);
+    let by_category = st.query("SELECT * FROM v_category_success", []).unwrap();
+    assert_eq!(
+        (&by_category[0]["passes"], &by_category[0]["scored"]),
+        (&json!(1), &json!(1))
+    );
+    assert!(st.query("SELECT * FROM v_resources", []).unwrap().len() == 1);
+}
+#[test]
+fn failed_attempts_appear_in_the_failure_view() {
+    let dir = tempfile::tempdir().unwrap();
+    let (case, variant) = (task(), Variant::default());
+    let st = study_store(dir.path(), &case);
+    let server = MockServer::new(
+        vec![call("final_answer", json!({"answer":"done"}))],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &case, &variant, &suite());
+    let id = st
+        .begin(&key(&case, &variant, "job", Path::new("trace")))
+        .unwrap();
+    st.finish(id, &out).unwrap();
+    let failures = st.query("SELECT * FROM v_failures", []).unwrap();
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0]["attempts"], 1);
+    assert_eq!(st.rows().unwrap()[0]["passed"], 0);
+    let failed = st
+        .query(
+            "SELECT passed FROM checks WHERE run_id=? AND passed=0",
+            [id],
+        )
+        .unwrap();
+    assert!(!failed.is_empty());
+}
+#[test]
+fn harness_overhead_stays_a_small_share_of_wall_time() {
+    let server = MockServer::new(
+        vec![
+            call("read_file", json!({"path":"reading.txt"})),
+            call(
+                "write_file",
+                json!({"path":"copy.txt","content":"Reading: 17"}),
+            ),
+            call("final_answer", json!({"answer":"copied"})),
+        ],
+        100,
+        Duration::from_millis(60),
+    );
+    let out = execute(&server, &task(), &Variant::default(), &suite());
+    assert_eq!(out.status, Status::Success);
+    assert!(out.wall_ms >= 180.);
+    assert!(
+        out.harness_other_ms < out.wall_ms * 0.1,
+        "other {} of wall {}",
+        out.harness_other_ms,
+        out.wall_ms
+    );
 }
 #[test]
 fn every_shipped_suite_validates_and_has_disjoint_splits() {

@@ -11,6 +11,7 @@ pub mod inference;
 pub mod judge;
 pub mod measure;
 pub mod process;
+pub mod record;
 pub mod runner;
 pub mod store;
 pub mod tools;
