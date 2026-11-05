@@ -122,6 +122,7 @@ fn main() {
     }
 }
 fn entry() -> Result<()> {
+    a2e_native::dotenv::load(std::path::Path::new(".env"))?;
     let cli = Cli::parse();
     if let Commands::Tools {
         command: Tools::Validate { tools },

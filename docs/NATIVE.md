@@ -37,8 +37,10 @@ target/release/a2e-native report
 ```
 
 Pass a suite file to `plan` or `run`. The shipped suites are listed in the
-suites section below. Set `BRAVE_SEARCH_API_KEY` for the live suite. The other
-suites use recorded fixture data.
+suites section below. Set `BRAVE_SEARCH_API_KEY` for the live suite, either in
+the shell or in a `.env` file in the working directory. The CLI reads `.env` at
+start-up as `KEY=VALUE` lines, and a variable already set in the shell wins. The
+other suites use recorded fixture data.
 
 Run the same command again to resume completed work. Use `--retry-failed` to
 retry unsuccessful attempts. The database and the trace files live under
