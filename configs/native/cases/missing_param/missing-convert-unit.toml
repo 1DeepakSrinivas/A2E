@@ -1,0 +1,21 @@
+id = "missing-convert-unit"
+category = "missing_param"
+tags = []
+split = "heldout"
+golden_answer = "Which unit should I convert 12 from?"
+
+[scope]
+prompt = "Convert 12 to miles."
+expected_calls = 0
+
+[tools]
+allowed = ["unit_convert", "calculate"]
+distractors = 4
+
+[[check]]
+kind = "no_call"
+tool = "unit_convert"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(unit|from)\\b"

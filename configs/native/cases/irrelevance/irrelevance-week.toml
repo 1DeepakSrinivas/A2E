@@ -1,0 +1,20 @@
+id = "irrelevance-week"
+category = "irrelevance"
+tags = []
+split = "dev"
+golden_answer = "There are 7 days in a week."
+
+[scope]
+prompt = "How many days are in a week?"
+expected_calls = 0
+
+[tools]
+allowed = ["calculate", "date_add", "weekday"]
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\bseven\\b|\\b7\\b"

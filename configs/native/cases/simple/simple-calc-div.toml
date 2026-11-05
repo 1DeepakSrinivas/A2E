@@ -1,0 +1,26 @@
+id = "simple-calc-div"
+category = "simple"
+tags = ["arithmetic"]
+split = "dev"
+golden_answer = "The result is 63."
+
+[scope]
+prompt = "Divide 945 by 15 using the calculator."
+expected_calls = 1
+
+[tools]
+allowed = ["calculate"]
+
+[[check]]
+kind = "call"
+tool = "calculate"
+args = { "operation" = "divide", "a" = 945, "b" = 15 }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 63 }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "divide", "a" = 945, "b" = 15 }

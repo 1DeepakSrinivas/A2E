@@ -1,0 +1,42 @@
+id = "chain-device-adjust"
+category = "chain"
+tags = ["tier2", "smoke", "devices"]
+split = "dev"
+golden_answer = "The cooler is now at 80."
+
+[scope]
+prompt = "Check the cooler. If its temperature is above 30, set its setting to 80."
+expected_calls = 2
+
+[tools]
+allowed = ["device_status", "set_setting"]
+
+[fixtures.devices]
+"cooler" = { "setting" = 20, "temperature" = 35 }
+
+[[stage]]
+instruction = "Read the cooler status."
+tools = ["device_status"]
+
+[[stage]]
+instruction = "Set the cooler to 80 if it is above 30."
+tools = ["set_setting"]
+
+[[check]]
+kind = "call"
+tool = "set_setting"
+args = { "name" = "cooler", "value" = 80 }
+match = "subset"
+
+[[check]]
+kind = "state"
+path = "/devices/cooler/setting"
+eq = 80
+
+[[golden]]
+tool = "device_status"
+args = { "name" = "cooler" }
+
+[[golden]]
+tool = "set_setting"
+args = { "name" = "cooler", "value" = 80 }

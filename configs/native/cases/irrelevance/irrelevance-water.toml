@@ -1,0 +1,21 @@
+id = "irrelevance-water"
+category = "irrelevance"
+tags = []
+split = "heldout"
+golden_answer = "The formula is H2O."
+
+[scope]
+prompt = "What is the chemical formula of water?"
+expected_calls = 0
+
+[tools]
+allowed = ["unit_convert", "calculate", "regex_extract"]
+distractors = 4
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+regex = "(?i)h2o|h₂o"

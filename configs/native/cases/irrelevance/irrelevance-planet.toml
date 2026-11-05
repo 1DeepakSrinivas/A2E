@@ -1,0 +1,20 @@
+id = "irrelevance-planet"
+category = "irrelevance"
+tags = []
+split = "dev"
+golden_answer = "Jupiter is the largest planet."
+
+[scope]
+prompt = "Which planet is the largest in our solar system?"
+expected_calls = 0
+
+[tools]
+allowed = ["db_lookup", "db_query", "device_list"]
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+contains = "jupiter"

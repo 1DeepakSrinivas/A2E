@@ -1,0 +1,43 @@
+id = "multiple-todo-open"
+category = "multiple"
+tags = ["tier2", "store"]
+split = "heldout"
+golden_answer = "Open todos: Pay rent and Book flights."
+
+[scope]
+prompt = "Which todos are still open?"
+expected_calls = 1
+
+[tools]
+allowed = ["todo_list", "todo_complete", "todo_add"]
+distractors = 8
+
+[[fixtures.todos]]
+title = "Pay rent"
+
+[[fixtures.todos]]
+title = "Water plants"
+done = true
+
+[[fixtures.todos]]
+title = "Book flights"
+
+[[check]]
+kind = "call"
+tool = "todo_list"
+
+[[check]]
+kind = "answer"
+contains = "pay rent"
+
+[[check]]
+kind = "answer"
+contains = "book flights"
+
+[[check]]
+kind = "answer"
+not_contains = "water plants"
+
+[[golden]]
+tool = "todo_list"
+args = { "status" = "open" }

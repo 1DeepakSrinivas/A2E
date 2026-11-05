@@ -218,6 +218,6 @@ impl Server {
 }
 impl Drop for Server {
     fn drop(&mut self) {
-        crate::sdk::kill_group(&mut self.child);
+        crate::process::kill_group(&mut self.child);
     }
 }

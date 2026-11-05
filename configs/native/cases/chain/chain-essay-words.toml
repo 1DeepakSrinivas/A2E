@@ -1,0 +1,44 @@
+id = "chain-essay-words"
+category = "chain"
+tags = ["tier2", "text", "store"]
+split = "heldout"
+golden_answer = "There are 6 words."
+
+[scope]
+prompt = "Count the words in essay.txt and store the count under the key words."
+expected_calls = 3
+
+[tools]
+allowed = ["read_file", "word_count", "kv_set"]
+
+[fixtures.files]
+"essay.txt" = "to be or not to be"
+
+[[stage]]
+instruction = "Read essay.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Count the words."
+tools = ["word_count"]
+
+[[stage]]
+instruction = "Store the count under words."
+tools = ["kv_set"]
+
+[[check]]
+kind = "state"
+path = "/kv/words"
+eq = "6"
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "essay.txt" }
+
+[[golden]]
+tool = "word_count"
+args = { "text" = "to be or not to be" }
+
+[[golden]]
+tool = "kv_set"
+args = { "key" = "words", "value" = "6" }

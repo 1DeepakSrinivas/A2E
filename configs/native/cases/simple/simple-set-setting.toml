@@ -1,0 +1,30 @@
+id = "simple-set-setting"
+category = "simple"
+tags = ["smoke", "devices"]
+split = "dev"
+golden_answer = "The heater is now set to 55."
+
+[scope]
+prompt = "Set the heater setting to 55."
+expected_calls = 1
+
+[tools]
+allowed = ["set_setting"]
+
+[fixtures.devices]
+"heater" = { "setting" = 10, "temperature" = 60 }
+
+[[check]]
+kind = "call"
+tool = "set_setting"
+args = { "name" = "heater", "value" = 55 }
+match = "subset"
+
+[[check]]
+kind = "state"
+path = "/devices/heater/setting"
+eq = 55
+
+[[golden]]
+tool = "set_setting"
+args = { "name" = "heater", "value" = 55 }

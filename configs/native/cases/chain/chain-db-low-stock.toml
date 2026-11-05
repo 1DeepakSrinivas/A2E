@@ -1,0 +1,56 @@
+id = "chain-db-low-stock"
+category = "chain"
+tags = ["tier2", "db", "files"]
+split = "heldout"
+golden_answer = "Wrote the low stock list."
+
+[scope]
+prompt = "Find the products in the database with stock below 5 and write their names, one per line, to low_stock.txt."
+expected_calls = 3
+
+[tools]
+allowed = ["db_schema", "db_query", "write_file"]
+
+[fixtures.db]
+sql_file = "../../fixtures/inventory.sql"
+
+[[stage]]
+instruction = "Inspect the database tables."
+tools = ["db_schema"]
+
+[[stage]]
+instruction = "Query the products with stock below 5."
+tools = ["db_query"]
+
+[[stage]]
+instruction = "Write the names to low_stock.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "low_stock.txt"
+contains = "drill"
+
+[[check]]
+kind = "file"
+path = "low_stock.txt"
+contains = "wrench"
+
+[[check]]
+kind = "file"
+path = "low_stock.txt"
+contains = "sandpaper"
+
+[output]
+files = ["low_stock.txt"]
+
+[[golden]]
+tool = "db_schema"
+
+[[golden]]
+tool = "db_query"
+args = { "sql" = "SELECT name FROM products WHERE stock < 5" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "low_stock.txt", "content" = "drill\nwrench\nsandpaper" }

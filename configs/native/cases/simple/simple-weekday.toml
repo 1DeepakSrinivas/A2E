@@ -1,0 +1,26 @@
+id = "simple-weekday"
+category = "simple"
+tags = ["time"]
+split = "dev"
+golden_answer = "It is a Sunday."
+
+[scope]
+prompt = "Which day of the week is 2026-03-01?"
+expected_calls = 1
+
+[tools]
+allowed = ["weekday"]
+
+[[check]]
+kind = "call"
+tool = "weekday"
+args = { "date" = "2026-03-01" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+contains = "sunday"
+
+[[golden]]
+tool = "weekday"
+args = { "date" = "2026-03-01" }

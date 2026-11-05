@@ -1,0 +1,33 @@
+id = "multiple-csv"
+category = "multiple"
+tags = ["tier2", "text"]
+split = "dev"
+golden_answer = "The nut and washer rows are above 10."
+
+[scope]
+prompt = "Which rows of sales.csv have a quantity above 10?"
+expected_calls = 1
+
+[tools]
+allowed = ["read_file", "csv_filter", "grep_file"]
+
+[fixtures.files]
+"sales.csv" = "name,qty\nbolt,5\nnut,12\nwasher,40"
+
+[[check]]
+kind = "call"
+tool = "csv_filter"
+args = { "path" = "sales.csv", "column" = "qty", "op" = "gt" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+contains = "nut"
+
+[[check]]
+kind = "answer"
+contains = "washer"
+
+[[golden]]
+tool = "csv_filter"
+args = { "path" = "sales.csv", "column" = "qty", "op" = "gt", "value" = "10" }

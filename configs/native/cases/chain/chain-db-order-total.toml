@@ -1,0 +1,47 @@
+id = "chain-db-order-total"
+category = "chain"
+tags = ["tier2", "db", "arithmetic"]
+split = "dev"
+golden_answer = "The total is 99.8."
+
+[scope]
+prompt = "Find the price of the drill in the database and compute the cost of ordering 2 of them. Save only the number to total.txt."
+expected_calls = 3
+
+[tools]
+allowed = ["db_lookup", "calculate", "write_file"]
+
+[fixtures.db]
+sql_file = "../../fixtures/inventory.sql"
+
+[[stage]]
+instruction = "Look up the drill price."
+tools = ["db_lookup"]
+
+[[stage]]
+instruction = "Multiply the price by 2."
+tools = ["calculate"]
+
+[[stage]]
+instruction = "Write the total to total.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "total.txt"
+regex = "^\\s*99\\.80?\\s*$"
+
+[output]
+files = ["total.txt"]
+
+[[golden]]
+tool = "db_lookup"
+args = { "table" = "products", "where" = { "name" = "drill" }, "columns" = ["price"] }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "multiply", "a" = 49.9, "b" = 2 }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "total.txt", "content" = "99.8" }

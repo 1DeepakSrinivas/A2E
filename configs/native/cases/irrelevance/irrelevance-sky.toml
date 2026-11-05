@@ -1,0 +1,20 @@
+id = "irrelevance-sky"
+category = "irrelevance"
+tags = []
+split = "dev"
+golden_answer = "The sky is blue."
+
+[scope]
+prompt = "What colour is the sky on a clear day?"
+expected_calls = 0
+
+[tools]
+allowed = ["device_status", "calculate", "read_file"]
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+contains = "blue"

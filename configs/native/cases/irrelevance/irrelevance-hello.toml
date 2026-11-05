@@ -1,0 +1,21 @@
+id = "irrelevance-hello"
+category = "irrelevance"
+tags = []
+split = "heldout"
+golden_answer = "Hello in Spanish is hola."
+
+[scope]
+prompt = "How do you say hello in Spanish?"
+expected_calls = 0
+
+[tools]
+allowed = ["write_file", "note_add", "search_files"]
+distractors = 4
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+contains = "hola"

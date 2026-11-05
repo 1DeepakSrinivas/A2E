@@ -1,0 +1,41 @@
+id = "chain-move-archive"
+category = "chain"
+tags = ["tier2", "files"]
+split = "dev"
+golden_answer = "Moved the file."
+
+[scope]
+prompt = "Move notes.txt into the archive folder."
+expected_calls = 2
+
+[tools]
+allowed = ["list_dir", "move_file"]
+
+[fixtures.files]
+"notes.txt" = "status: ok"
+"todo.txt" = "later"
+
+[[stage]]
+instruction = "List the files."
+tools = ["list_dir"]
+
+[[stage]]
+instruction = "Move notes.txt to archive/notes.txt."
+tools = ["move_file"]
+
+[[check]]
+kind = "file"
+path = "archive/notes.txt"
+contains = "status"
+
+[[check]]
+kind = "file"
+path = "notes.txt"
+absent = true
+
+[[golden]]
+tool = "list_dir"
+
+[[golden]]
+tool = "move_file"
+args = { "from" = "notes.txt", "to" = "archive/notes.txt" }

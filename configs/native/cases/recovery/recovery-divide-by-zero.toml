@@ -1,0 +1,35 @@
+id = "recovery-divide-by-zero"
+category = "recovery"
+tags = ["wrong-guess"]
+split = "heldout"
+golden_answer = "It cannot be done because the number is zero."
+
+[scope]
+prompt = "Divide 100 by the number in count.txt. If it cannot be done, explain why."
+expected_calls = 2
+
+[tools]
+allowed = ["read_file", "calculate"]
+
+[fixtures.files]
+"count.txt" = "0"
+
+[[stage]]
+instruction = "Read count.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Try the division."
+tools = ["calculate"]
+
+[[check]]
+kind = "answer"
+regex = "(?i)zero|cannot|can't|undefined|not possible|impossible"
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "count.txt" }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "divide", "a" = 100, "b" = 0 }

@@ -1,0 +1,30 @@
+id = "simple-list-dir"
+category = "simple"
+tags = ["files"]
+split = "dev"
+golden_answer = "The docs folder contains guide.txt."
+
+[scope]
+prompt = "List the files in the docs folder."
+expected_calls = 1
+
+[tools]
+allowed = ["list_dir"]
+
+[fixtures.files]
+"readme.txt" = "hi"
+"docs/guide.txt" = "steps"
+
+[[check]]
+kind = "call"
+tool = "list_dir"
+args = { "path" = "docs" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+contains = "guide.txt"
+
+[[golden]]
+tool = "list_dir"
+args = { "path" = "docs" }

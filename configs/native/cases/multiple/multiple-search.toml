@@ -1,0 +1,30 @@
+id = "multiple-search"
+category = "multiple"
+tags = ["tier2"]
+split = "heldout"
+golden_answer = "The file b.txt mentions the invoice."
+
+[scope]
+prompt = "Which file mentions the word invoice?"
+expected_calls = 1
+
+[tools]
+allowed = ["search_files", "read_file", "list_dir"]
+distractors = 2
+
+[fixtures.files]
+"a.txt" = "groceries and milk"
+"b.txt" = "invoice 2231 is due"
+"c.txt" = "holiday plans"
+
+[[check]]
+kind = "call"
+tool = "search_files"
+
+[[check]]
+kind = "answer"
+contains = "b.txt"
+
+[[golden]]
+tool = "search_files"
+args = { "query" = "invoice" }

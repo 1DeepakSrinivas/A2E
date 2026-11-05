@@ -1,0 +1,35 @@
+id = "multiple-kv"
+category = "multiple"
+tags = ["tier2", "store"]
+split = "heldout"
+golden_answer = "The theme is dark."
+
+[scope]
+prompt = "What value is stored under the key theme?"
+expected_calls = 1
+
+[tools]
+allowed = ["kv_get", "kv_list", "kv_set"]
+distractors = 8
+
+[fixtures.kv]
+"theme" = "dark"
+"lang" = "en"
+
+[[check]]
+kind = "call"
+tool = "kv_get"
+args = { "key" = "theme" }
+match = "subset"
+
+[[check]]
+kind = "no_call"
+tool = "kv_set"
+
+[[check]]
+kind = "answer"
+contains = "dark"
+
+[[golden]]
+tool = "kv_get"
+args = { "key" = "theme" }

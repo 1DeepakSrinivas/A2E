@@ -1,0 +1,46 @@
+id = "web-not-found"
+category = "web"
+tags = []
+split = "heldout"
+golden_answer = "The search found nothing about the Zorblax 9000."
+
+[scope]
+prompt = "Search for the release date of the Zorblax 9000 phone. If the search finds nothing relevant, say so instead of guessing."
+expected_calls = 1
+
+[tools]
+allowed = ["web_search", "fetch_page"]
+
+[[fixtures.pages]]
+id = "pi_specs"
+url = "https://www.raspberrypi.com/products/raspberry-pi-3-model-b-plus/"
+title = "Raspberry Pi 3 Model B+ specifications"
+text = "The Raspberry Pi 3 Model B+ has 1 GB of LPDDR2 SDRAM and a 1.4 GHz 64-bit quad-core processor."
+
+[[fixtures.pages]]
+id = "garden"
+url = "https://example.org/gardening"
+title = "Garden notes"
+text = "Plant seedlings after the last frost."
+
+[[fixtures.pages]]
+id = "weather"
+url = "https://example.org/weather"
+title = "Weather report"
+text = "Tomorrow will be sunny with light wind."
+
+[[stage]]
+instruction = "Search for the Zorblax 9000."
+tools = ["web_search"]
+
+[[stage]]
+instruction = "Do not guess if nothing was found."
+tools = ["fetch_page"]
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(no|not|couldn't|could not|unable|cannot|can't|nothing)\\b"
+
+[[golden]]
+tool = "web_search"
+args = { "query" = "Zorblax 9000 release date" }

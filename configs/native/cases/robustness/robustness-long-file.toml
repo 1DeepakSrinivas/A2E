@@ -1,0 +1,27 @@
+id = "robustness-long-file"
+category = "robustness"
+tags = ["noise", "files"]
+split = "heldout"
+golden_answer = "The passcode is 4417."
+
+[scope]
+prompt = "What is the passcode at the end of long.txt?"
+expected_calls = 1
+
+[tools]
+allowed = ["read_file"]
+
+[fixtures.files]
+"long.txt" = "Line 1: routine maintenance entry with no special code.\nLine 2: routine maintenance entry with no special code.\nLine 3: routine maintenance entry with no special code.\nLine 4: routine maintenance entry with no special code.\nLine 5: routine maintenance entry with no special code.\nLine 6: routine maintenance entry with no special code.\nLine 7: routine maintenance entry with no special code.\nLine 8: routine maintenance entry with no special code.\nLine 9: routine maintenance entry with no special code.\nLine 10: routine maintenance entry with no special code.\nLine 11: routine maintenance entry with no special code.\nLine 12: routine maintenance entry with no special code.\nLine 13: routine maintenance entry with no special code.\nLine 14: routine maintenance entry with no special code.\nLine 15: routine maintenance entry with no special code.\nLine 16: routine maintenance entry with no special code.\nLine 17: routine maintenance entry with no special code.\nLine 18: routine maintenance entry with no special code.\nLine 19: routine maintenance entry with no special code.\nLine 20: routine maintenance entry with no special code.\nLine 21: routine maintenance entry with no special code.\nLine 22: routine maintenance entry with no special code.\nLine 23: routine maintenance entry with no special code.\nLine 24: routine maintenance entry with no special code.\nLine 25: routine maintenance entry with no special code.\nLine 26: routine maintenance entry with no special code.\nLine 27: routine maintenance entry with no special code.\nLine 28: routine maintenance entry with no special code.\nLine 29: routine maintenance entry with no special code.\nLine 30: routine maintenance entry with no special code.\nLine 31: routine maintenance entry with no special code.\nLine 32: routine maintenance entry with no special code.\nLine 33: routine maintenance entry with no special code.\nLine 34: routine maintenance entry with no special code.\nLine 35: routine maintenance entry with no special code.\nLine 36: routine maintenance entry with no special code.\nLine 37: routine maintenance entry with no special code.\nLine 38: routine maintenance entry with no special code.\nLine 39: routine maintenance entry with no special code.\nLine 40: routine maintenance entry with no special code.\nThe passcode is 4417."
+
+[[stage]]
+instruction = "Read long.txt."
+tools = ["read_file"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 4417 }
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "long.txt" }

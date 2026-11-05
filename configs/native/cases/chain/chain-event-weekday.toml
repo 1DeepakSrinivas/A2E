@@ -1,0 +1,47 @@
+id = "chain-event-weekday"
+category = "chain"
+tags = ["tier2", "time", "files"]
+split = "heldout"
+golden_answer = "It is a Saturday."
+
+[scope]
+prompt = "Read the event date in event.txt, find out which day of the week it is, and write the day name to day.txt."
+expected_calls = 3
+
+[tools]
+allowed = ["read_file", "weekday", "write_file"]
+
+[fixtures.files]
+"event.txt" = "2026-03-14"
+
+[[stage]]
+instruction = "Read event.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Find the weekday."
+tools = ["weekday"]
+
+[[stage]]
+instruction = "Write the day name to day.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "day.txt"
+regex = "(?i)^\\s*saturday\\s*$"
+
+[output]
+files = ["day.txt"]
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "event.txt" }
+
+[[golden]]
+tool = "weekday"
+args = { "date" = "2026-03-14" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "day.txt", "content" = "Saturday" }

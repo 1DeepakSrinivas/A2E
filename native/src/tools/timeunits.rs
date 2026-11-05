@@ -154,7 +154,7 @@ pub fn register(r: &mut Registry) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{sdk::ToolHost, tools::test_support::host};
+    use crate::tools::test_support::host;
 
     #[test]
     fn civil_conversion_round_trips_across_leap_years() {

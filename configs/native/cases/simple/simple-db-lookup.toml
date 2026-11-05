@@ -1,0 +1,29 @@
+id = "simple-db-lookup"
+category = "simple"
+tags = ["db"]
+split = "dev"
+golden_answer = "There are 5 bolts in stock."
+
+[scope]
+prompt = "How many bolts are in stock? Look it up in the database."
+expected_calls = 1
+
+[tools]
+allowed = ["db_lookup"]
+
+[fixtures.db]
+sql_file = "../../fixtures/inventory.sql"
+
+[[check]]
+kind = "call"
+tool = "db_lookup"
+args = { "table" = "products", "where" = { "name" = "bolt" } }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 5 }
+
+[[golden]]
+tool = "db_lookup"
+args = { "table" = "products", "where" = { "name" = "bolt" } }

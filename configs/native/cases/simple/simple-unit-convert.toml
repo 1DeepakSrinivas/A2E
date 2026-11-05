@@ -1,0 +1,26 @@
+id = "simple-unit-convert"
+category = "simple"
+tags = ["units"]
+split = "heldout"
+golden_answer = "5 km is 3.1069 mi."
+
+[scope]
+prompt = "Convert 5 km to mi."
+expected_calls = 1
+
+[tools]
+allowed = ["unit_convert"]
+
+[[check]]
+kind = "call"
+tool = "unit_convert"
+args = { "value" = 5, "from" = "km", "to" = "mi" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 3.1069, "tol" = 0.001 }
+
+[[golden]]
+tool = "unit_convert"
+args = { "value" = 5, "from" = "km", "to" = "mi" }

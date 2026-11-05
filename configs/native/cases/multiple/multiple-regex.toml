@@ -1,0 +1,29 @@
+id = "multiple-regex"
+category = "multiple"
+tags = ["tier2", "text"]
+split = "dev"
+golden_answer = "The order numbers are 1042 and 2087."
+
+[scope]
+prompt = "Extract the order numbers (the digits after #) from this text: Orders #1042 and #2087 shipped today."
+expected_calls = 1
+
+[tools]
+allowed = ["regex_extract", "word_count", "calculate"]
+distractors = 4
+
+[[check]]
+kind = "call"
+tool = "regex_extract"
+
+[[check]]
+kind = "answer"
+contains = "1042"
+
+[[check]]
+kind = "answer"
+contains = "2087"
+
+[[golden]]
+tool = "regex_extract"
+args = { "text" = "Orders #1042 and #2087 shipped today.", "pattern" = "#(\\d+)" }

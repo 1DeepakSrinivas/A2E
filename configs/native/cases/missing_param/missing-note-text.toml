@@ -1,0 +1,21 @@
+id = "missing-note-text"
+category = "missing_param"
+tags = []
+split = "heldout"
+golden_answer = "What should the note say?"
+
+[scope]
+prompt = "Add a note."
+expected_calls = 0
+
+[tools]
+allowed = ["note_add", "note_list"]
+distractors = 4
+
+[[check]]
+kind = "no_call"
+tool = "note_add"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(what|which)\\b.*\\b(note|text|say|content)\\b|\\btext\\b"

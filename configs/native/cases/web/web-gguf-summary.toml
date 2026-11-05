@@ -1,0 +1,58 @@
+id = "web-gguf-summary"
+category = "web"
+tags = ["judged"]
+split = "heldout"
+golden_answer = "GGUF is a single-file format that stores model weights and metadata (gguf, https://github.com/ggml-org/ggml/blob/master/docs/gguf.md)."
+
+[scope]
+prompt = "Summarise what a GGUF file is, citing the source ID and URL."
+expected_calls = 2
+
+[tools]
+allowed = ["web_search", "fetch_page"]
+
+[[fixtures.pages]]
+id = "gguf"
+url = "https://github.com/ggml-org/ggml/blob/master/docs/gguf.md"
+title = "GGUF file format"
+text = "GGUF is a single-file format that stores model weights and metadata for llama.cpp."
+
+[[fixtures.pages]]
+id = "llama_server"
+url = "https://github.com/ggml-org/llama.cpp/tree/master/tools/server"
+title = "llama-server"
+text = "llama.cpp includes llama-server, an HTTP server that runs GGUF models and offers a completion API on a local port."
+
+[[fixtures.pages]]
+id = "pasta"
+url = "https://example.org/pasta"
+title = "Pasta recipe"
+text = "Boil the pasta for ten minutes and add salt."
+
+[[stage]]
+instruction = "Search for GGUF."
+tools = ["web_search"]
+
+[[stage]]
+instruction = "Retrieve the page."
+tools = ["fetch_page"]
+
+[[check]]
+kind = "fetched_source"
+id = "gguf"
+
+[[check]]
+kind = "answer"
+regex = "(?i)gguf"
+
+[judge]
+enabled = true
+required_facts = ["GGUF is a single-file format", "It stores model weights", "It stores metadata"]
+
+[[golden]]
+tool = "web_search"
+args = { "query" = "GGUF file format" }
+
+[[golden]]
+tool = "fetch_page"
+args = { "source_id" = "gguf" }

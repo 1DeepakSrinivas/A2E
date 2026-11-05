@@ -1,0 +1,56 @@
+id = "chain-difference"
+category = "chain"
+tags = ["tier2", "files", "arithmetic"]
+split = "heldout"
+golden_answer = "Wrote 11."
+
+[scope]
+prompt = "Find the sensor reading file, read its number, subtract 6 using calculate, and write only the result to result.txt."
+expected_calls = 4
+
+[tools]
+allowed = ["search_files", "read_file", "calculate", "write_file"]
+
+[fixtures.files]
+"notes.txt" = "No readings here."
+"sensors/reading.txt" = "17"
+
+[[stage]]
+instruction = "Find the sensor reading file."
+tools = ["search_files"]
+
+[[stage]]
+instruction = "Read the matching file."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Subtract 6 from the reading."
+tools = ["calculate"]
+
+[[stage]]
+instruction = "Write only the result to result.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "result.txt"
+eq = "11"
+
+[output]
+files = ["result.txt"]
+
+[[golden]]
+tool = "search_files"
+args = { "query" = "sensor reading" }
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "sensors/reading.txt" }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "subtract", "a" = 17, "b" = 6 }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "result.txt", "content" = "11" }

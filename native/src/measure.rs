@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::os::unix::process::CommandExt;
 use std::{
-    io::{BufReader, BufWriter, Write},
-    path::Path,
+    io::BufReader,
     process::{Command, Stdio},
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -20,10 +19,25 @@ use std::{
 };
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
+/// One resource reading; `t_ms` counts from the start of monitoring.
+#[derive(Clone, Debug, Default)]
+pub struct Sample {
+    pub t_ms: f64,
+    pub harness_bytes: u64,
+    pub inference_bytes: u64,
+    pub available_bytes: u64,
+    pub cpu_ms: Option<u64>,
+    pub temperature_c: Option<f64>,
+    pub throttled: Option<String>,
+    pub power_w: Option<f64>,
+    pub minor_faults: Option<u64>,
+    pub major_faults: Option<u64>,
+}
+/// Samples kept per interval; summary statistics still cover every sample.
+pub const MAX_SAMPLES: usize = 20_000;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Resources {
     pub harness_peak_bytes: u64,
-    pub tool_peak_bytes: u64,
     pub inference_peak_bytes: u64,
     pub combined_peak_bytes: u64,
     pub available_min_bytes: Option<u64>,
@@ -34,9 +48,10 @@ pub struct Resources {
     pub throttled: Option<String>,
     pub energy_j: Option<f64>,
     pub power_scope: String,
-    pub samples: u64,
+    pub sample_count: u64,
     pub memory_exceeded: bool,
-    pub telemetry_error: Option<String>,
+    #[serde(skip)]
+    pub series: Vec<Sample>,
 }
 /// Device and swap preflight for the baseline.
 pub fn machine(r: &Runtime) -> Result<Value> {
@@ -146,7 +161,7 @@ impl Power {
             let mut b = BufReader::new(stdout);
             let mut watts = 0.;
             let mut seen = false;
-            while let Ok(Some(line)) = crate::sdk::line(&mut b, 8192) {
+            while let Ok(Some(line)) = crate::process::line(&mut b, 8192) {
                 let s = String::from_utf8_lossy(&line);
                 if s.starts_with("*** Sampled") {
                     if seen {
@@ -181,7 +196,7 @@ impl Power {
 }
 impl Drop for Power {
     fn drop(&mut self) {
-        crate::sdk::kill_group(&mut self.child);
+        crate::process::kill_group(&mut self.child);
         if let Some(h) = self.reader.take() {
             let _ = h.join();
         }
@@ -195,13 +210,7 @@ pub struct Monitor {
 }
 impl Monitor {
     /// Background sampling for one loading or task interval.
-    pub fn start(
-        pid: u32,
-        tool_pid: Option<u32>,
-        r: &Runtime,
-        path: &Path,
-        cancel: Arc<AtomicBool>,
-    ) -> Result<Self> {
+    pub fn start(pid: u32, r: &Runtime, cancel: Arc<AtomicBool>) -> Result<Self> {
         // SAFETY: No memory preconditions
         let is_root = unsafe { libc::geteuid() } == 0;
         let power = if r.power != "none" && std::env::consts::OS == "macos" && is_root {
@@ -212,7 +221,6 @@ impl Monitor {
         if r.power == "required" && power.is_none() {
             bail!("power_required: supported telemetry unavailable");
         }
-        let file = std::fs::File::create(path)?;
         let stop = Arc::new(AtomicBool::new(false));
         let exceeded = Arc::new(AtomicBool::new(false));
         let summary = Arc::new(Mutex::new(Resources {
@@ -229,11 +237,10 @@ impl Monitor {
         let stats = summary.clone();
         let r = r.clone();
         let handle = thread::spawn(move || {
-            let mut writer = BufWriter::new(file);
             let start = Instant::now();
             let mut system = System::new();
             let own = std::process::id();
-            let pids = [own, tool_pid.unwrap_or(own), pid].map(Pid::from_u32);
+            let pids = [own, pid].map(Pid::from_u32);
             let mut previous_power: Option<(f64, f64)> = None;
             let mut energy = 0.;
             let mut energy_intervals = 0;
@@ -248,7 +255,7 @@ impl Monitor {
                         .map(|p| p.memory())
                         .unwrap_or(0)
                 };
-                let (h, t, m) = (memory(own), tool_pid.map(memory).unwrap_or(0), memory(pid));
+                let (h, m) = (memory(own), memory(pid));
                 let cpu = pids
                     .iter()
                     .copied()
@@ -275,19 +282,13 @@ impl Monitor {
                     }
                 }
                 previous_power = watts.map(|w| (elapsed, w));
-                let exceeded = h + t + m > r.memory_limit_mb * 1024 * 1024
+                let exceeded = h + m > r.memory_limit_mb * 1024 * 1024
                     || system.available_memory() < r.reserve_mb * 1024 * 1024;
-                let sample = json!({"seconds":elapsed,"harness_bytes":h,"tool_bytes":t,"inference_bytes":m,"available_bytes":system.available_memory(),"cpu_ms":cpu_elapsed,"temperature_c":temp,"throttled":throttled,"power_w":watts,"faults":faults});
-                let write_result = serde_json::to_writer(&mut writer, &sample)
-                    .map_err(std::io::Error::other)
-                    .and_then(|_| writer.write_all(b"\n"))
-                    .and_then(|_| writer.flush());
                 {
                     let mut s = stats.lock().unwrap_or_else(|e| e.into_inner());
                     s.harness_peak_bytes = s.harness_peak_bytes.max(h);
-                    s.tool_peak_bytes = s.tool_peak_bytes.max(t);
                     s.inference_peak_bytes = s.inference_peak_bytes.max(m);
-                    s.combined_peak_bytes = s.combined_peak_bytes.max(h + t + m);
+                    s.combined_peak_bytes = s.combined_peak_bytes.max(h + m);
                     s.available_min_bytes = Some(
                         s.available_min_bytes
                             .map_or(system.available_memory(), |a| {
@@ -301,24 +302,33 @@ impl Monitor {
                         (Some(a), Some(b)) => Some(a.max(b)),
                         (a, b) => a.or(b),
                     };
+                    let (minor, major) = (s.minor_faults, s.major_faults);
+                    if s.series.len() < MAX_SAMPLES {
+                        s.series.push(Sample {
+                            t_ms: elapsed * 1000.,
+                            harness_bytes: h,
+                            inference_bytes: m,
+                            available_bytes: system.available_memory(),
+                            cpu_ms: cpu_elapsed,
+                            temperature_c: temp,
+                            throttled: throttled.clone(),
+                            power_w: watts,
+                            minor_faults: minor,
+                            major_faults: major,
+                        });
+                    }
                     if throttled.is_some() {
                         s.throttled = throttled;
                     }
                     s.energy_j = (energy_intervals > 0).then_some(energy);
-                    s.samples += 1;
+                    s.sample_count += 1;
                     s.memory_exceeded |= exceeded;
-                    if let Err(e) = write_result {
-                        s.telemetry_error = Some(e.to_string());
-                    }
                 }
                 if exceeded || cancel.load(Ordering::Relaxed) {
                     over.store(exceeded, Ordering::Relaxed);
-                    // SAFETY: Process-group IDs from managed children
+                    // SAFETY: Process-group ID from the managed inference server
                     unsafe {
                         libc::kill(-(pid as i32), libc::SIGKILL);
-                        if let Some(p) = tool_pid {
-                            libc::kill(-(p as i32), libc::SIGKILL);
-                        }
                     }
                     break;
                 }
@@ -335,10 +345,7 @@ impl Monitor {
     }
     pub fn finish(mut self) -> Resources {
         self.shutdown();
-        self.summary
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone()
+        std::mem::take(&mut *self.summary.lock().unwrap_or_else(|e| e.into_inner()))
     }
     fn shutdown(&mut self) {
         self.stop.store(true, Ordering::Relaxed);

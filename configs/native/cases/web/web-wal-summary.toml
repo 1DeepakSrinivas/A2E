@@ -1,0 +1,70 @@
+id = "web-wal-summary"
+category = "web"
+tags = ["judged"]
+split = "dev"
+golden_answer = "WAL lets readers continue while a writer commits; changes go to a WAL file and a checkpoint copies them into the database (sqlite_wal, https://www.sqlite.org/wal.html)."
+
+[scope]
+prompt = "Search for how SQLite write-ahead logging works, retrieve the page, and save a short cited summary to wal.txt. Give the same summary as your answer."
+expected_calls = 3
+
+[tools]
+allowed = ["web_search", "fetch_page", "write_file"]
+
+[[fixtures.pages]]
+id = "sqlite_wal"
+url = "https://www.sqlite.org/wal.html"
+title = "SQLite write-ahead logging"
+text = "SQLite write-ahead logging (WAL) lets readers continue while a writer commits. Changes are appended to a separate WAL file and later copied into the database by a checkpoint."
+
+[[fixtures.pages]]
+id = "sqlite_types"
+url = "https://www.sqlite.org/datatype3.html"
+title = "SQLite datatypes"
+text = "SQLite uses dynamic typing, so a column's declared type is only an affinity."
+
+[[fixtures.pages]]
+id = "pasta"
+url = "https://example.org/pasta"
+title = "Pasta recipe"
+text = "Boil the pasta for ten minutes and add salt."
+
+[[stage]]
+instruction = "Search for SQLite WAL."
+tools = ["web_search"]
+
+[[stage]]
+instruction = "Retrieve the WAL page."
+tools = ["fetch_page"]
+
+[[stage]]
+instruction = "Save the cited summary to wal.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "fetched_source"
+id = "sqlite_wal"
+
+[[check]]
+kind = "file"
+path = "wal.txt"
+contains = "WAL"
+
+[output]
+files = ["wal.txt"]
+
+[judge]
+enabled = true
+required_facts = ["Readers continue while a writer commits", "Changes are appended to a WAL file", "A checkpoint copies changes into the database"]
+
+[[golden]]
+tool = "web_search"
+args = { "query" = "SQLite write-ahead logging" }
+
+[[golden]]
+tool = "fetch_page"
+args = { "source_id" = "sqlite_wal" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "wal.txt", "content" = "WAL lets readers continue while a writer commits (sqlite_wal)." }

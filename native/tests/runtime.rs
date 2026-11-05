@@ -1,16 +1,15 @@
-//! Integration tests for the agent loop and real tool subprocesses
+//! Integration tests for the agent loop with in-process tools
 //! Scripted inference, resource limits, retrieval checks, and run recovery
 
 mod support;
 use a2e_native::{
     adapter::{Adapter, Call},
     case::{Case, FinalAnswer},
-    config::{Config, Manifest, Mode, Runtime, Suite, Variant},
+    config::{Catalog, Config, Mode, Runtime, Suite, Variant},
     eval::{evaluate, FailureClass, Observation},
     inference::Inference,
     runner::{select_tools, task_run, Status, TaskExecution},
-    sdk::{ToolHost, ToolProcess},
-    store::Store,
+    store::{Phase, RunKey, Store},
     tools::Builtins,
 };
 use serde_json::json;
@@ -27,10 +26,8 @@ fn repo() -> PathBuf {
         .unwrap()
         .to_owned()
 }
-fn manifest() -> Manifest {
-    let mut m = Manifest::load(&repo().join("configs/native/tools/standard.toml")).unwrap();
-    m.executable = env!("CARGO_BIN_EXE_a2e-native").into();
-    m
+fn catalog() -> Catalog {
+    Catalog::load(&repo().join("configs/native/tools/standard.toml")).unwrap()
 }
 fn suite() -> Suite {
     Suite::load(&repo().join("configs/native/suites/smoke.toml")).unwrap()
@@ -40,7 +37,7 @@ fn task() -> Case {
     s.load_cases(&repo().join("configs/native/suites/smoke.toml"))
         .unwrap()
         .into_iter()
-        .find(|t| t.id.starts_with("copy-"))
+        .find(|t| t.id == "chain-copy")
         .unwrap()
 }
 fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> a2e_native::runner::Outcome {
@@ -58,7 +55,7 @@ fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> a2e_native:
         case: t,
         suite: s,
         variant: v,
-        manifest: &manifest(),
+        catalog: &catalog(),
         ctx: 1024,
         dir: dir.path(),
         cancel: Arc::new(AtomicBool::new(false)),
@@ -201,92 +198,96 @@ fn timeout_keeps_failed_call_cost_and_missing_timings() {
     assert_eq!(out.generated_tokens, None);
 }
 #[test]
-fn real_tool_process_preserves_state_and_exits_on_drop() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut p = ToolProcess::spawn(&manifest(), dir.path(), false).unwrap();
-    let pid = p.pid();
-    p.request("init", "", json!({"fixtures":{}}), Duration::from_secs(2))
+fn slow_tool_past_the_budget_stops_the_attempt() {
+    let mut t = task();
+    t.fixtures.faults =
+        vec![
+            serde_json::from_value(json!({"tool":"read_file","mode":"slow_ms","ms":1200})).unwrap(),
+        ];
+    let server = MockServer::new(
+        vec![call("read_file", json!({"path":"reading.txt"}))],
+        100,
+        Duration::ZERO,
+    );
+    let mut s = suite();
+    s.budget.tool_seconds = 1;
+    let out = execute(&server, &t, &Variant::default(), &s);
+    assert_eq!(out.status, Status::ResourceLimit, "{:?}", out.reason);
+    assert!(out.reason.as_deref().unwrap().contains("tool_timeout"));
+    assert!(out.tool_ms >= 1000.);
+}
+#[test]
+fn oversize_tool_result_stops_the_attempt() {
+    let mut t = task();
+    t.fixtures
+        .files
+        .insert("reading.txt".into(), "x".repeat(3000));
+    let server = MockServer::new(
+        vec![call("read_file", json!({"path":"reading.txt"}))],
+        100,
+        Duration::ZERO,
+    );
+    let mut s = suite();
+    s.budget.tool_output_bytes = 256;
+    let out = execute(&server, &t, &Variant::default(), &s);
+    assert_eq!(out.status, Status::ResourceLimit, "{:?}", out.reason);
+    assert!(out.reason.as_deref().unwrap().contains("output_limit"));
+}
+#[test]
+fn tool_setup_time_is_recorded_and_stays_outside_tool_calls() {
+    let server = MockServer::new(
+        vec![call("final_answer", json!({"answer":"nothing to do"}))],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &task(), &Variant::default(), &suite());
+    assert!(out.tool_setup_ms > 0.);
+    assert_eq!(out.tool_ms, 0.);
+}
+fn key<'a>(case: &'a Case, variant: &'a Variant, job: &'a str, trace: &'a Path) -> RunKey<'a> {
+    RunKey {
+        study: "study",
+        job,
+        phase: Phase::Measured,
+        model: "test",
+        context: 1024,
+        variant,
+        repeat: 0,
+        case,
+        load_id: None,
+        trace,
+    }
+}
+fn study_store(dir: &Path, case: &Case) -> Store {
+    let st = Store::open(&dir.join("native.db")).unwrap();
+    st.study("study", &json!({}), std::slice::from_ref(case))
         .unwrap();
-    assert!(
-        p.request(
-            "call",
-            "write_file",
-            json!({"path":"a.txt","content":"saved"}),
-            Duration::from_secs(2)
-        )
-        .unwrap()
-        .ok
-    );
-    assert_eq!(
-        p.request(
-            "call",
-            "read_file",
-            json!({"path":"a.txt"}),
-            Duration::from_secs(2)
-        )
-        .unwrap()
-        .output["content"],
-        "saved"
-    );
-    drop(p);
-    // SAFETY: signal zero checks whether the child was reaped.
-    assert_eq!(unsafe { libc::kill(pid as i32, 0) }, -1);
+    st
 }
-#[test]
-fn timeout_kills_stalled_tool_and_does_not_hang_drop() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut m = manifest();
-    m.executable = "/bin/sleep".into();
-    m.args = vec!["30".into()];
-    m.timeout_seconds = 1;
-    let mut p = ToolProcess::spawn(&m, dir.path(), false).unwrap();
-    let start = std::time::Instant::now();
-    assert!(p
-        .request("init", "", json!({}), Duration::from_millis(20))
-        .is_err());
-    drop(p);
-    assert!(start.elapsed() < Duration::from_secs(2));
-}
-#[test]
-fn output_limit_rejects_unbounded_tool_stream() {
-    let dir = tempfile::tempdir().unwrap();
-    let mut m = manifest();
-    m.output_limit_bytes = 256;
-    let mut p = ToolProcess::spawn(&m, dir.path(), false).unwrap();
-    p.request(
-        "init",
-        "",
-        json!({"fixtures":{"files":{"a.txt":"x".repeat(3000)}}}),
-        Duration::from_secs(2),
-    )
-    .unwrap();
-    assert!(p
-        .request(
-            "call",
-            "read_file",
-            json!({"path":"a.txt"}),
-            Duration::from_secs(2)
-        )
-        .is_err());
+fn count(st: &Store, table: &str) -> i64 {
+    st.db
+        .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
+        .unwrap()
 }
 #[test]
 fn store_recovers_interrupted_attempt_without_double_counting() {
     let dir = tempfile::tempdir().unwrap();
-    let st = Store::open(&dir.path().join("native.db")).unwrap();
-    st.study("study", &json!({})).unwrap();
-    let meta = json!({"model":"test","variant":{"name":"baseline"},"context":1024,"case":{"id":"t","category":"simple","scope":{"expected_calls":1},"tools":{"allowed":["read_file"]}}});
-    st.begin("study", "job", "measured", &meta, Path::new("trace"))
+    let (case, variant) = (task(), Variant::default());
+    let st = study_store(dir.path(), &case);
+    st.begin(&key(&case, &variant, "job", Path::new("trace")))
         .unwrap();
     assert_eq!(st.recover().unwrap(), 1);
     assert!(st.should_run("study", "job", false).unwrap());
     let id = st
-        .begin("study", "job", "measured", &meta, Path::new("trace2"))
+        .begin(&key(&case, &variant, "job", Path::new("trace2")))
         .unwrap();
-    st.finish(
-        id,
-        &json!({"status":"success","wall_ms":10,"model_calls":1}),
-    )
-    .unwrap();
+    let out = a2e_native::runner::Outcome {
+        status: Status::Success,
+        wall_ms: 10.,
+        model_calls: 1,
+        ..Default::default()
+    };
+    st.finish(id, &out).unwrap();
     assert!(!st.should_run("study", "job", false).unwrap());
     let rows = st.rows().unwrap();
     assert_eq!(rows.len(), 1);
@@ -298,17 +299,129 @@ fn store_recovers_interrupted_attempt_without_double_counting() {
     assert!(st.freeze_judge("study", "different").is_err());
 }
 #[test]
-fn native_store_refuses_legacy_database() {
+fn native_store_refuses_legacy_and_foreign_databases() {
     let dir = tempfile::tempdir().unwrap();
-    let p = dir.path().join("old.db");
-    let c = rusqlite::Connection::open(&p).unwrap();
+    let foreign = dir.path().join("foreign.db");
+    let c = rusqlite::Connection::open(&foreign).unwrap();
     c.execute("CREATE TABLE turns(id INTEGER)", []).unwrap();
-    assert!(Store::open(&p).is_err());
+    drop(c);
+    assert!(Store::open(&foreign).is_err());
+    let old = dir.path().join("old.db");
+    let c = rusqlite::Connection::open(&old).unwrap();
+    c.execute_batch(
+        "CREATE TABLE runs(id INTEGER); PRAGMA application_id=1093813582; PRAGMA user_version=1;",
+    )
+    .unwrap();
+    drop(c);
+    let error = Store::open(&old).err().unwrap().to_string();
+    assert!(error.contains("v1"), "{error}");
+}
+#[test]
+fn finished_attempt_fills_every_table_and_the_views() {
+    let dir = tempfile::tempdir().unwrap();
+    let (case, variant) = (task(), Variant::default());
+    let st = study_store(dir.path(), &case);
+    let server = MockServer::new(
+        vec![
+            call("read_file", json!({"path":"reading.txt"})),
+            call(
+                "write_file",
+                json!({"path":"copy.txt","content":"Reading: 17"}),
+            ),
+            call("final_answer", json!({"answer":"copied"})),
+        ],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &case, &variant, &suite());
+    let id = st
+        .begin(&key(&case, &variant, "job", Path::new("trace")))
+        .unwrap();
+    st.finish(id, &out).unwrap();
+    assert_eq!(count(&st, "turns"), 3);
+    assert_eq!(count(&st, "tool_calls"), 2);
+    assert_eq!(count(&st, "checks"), out.checks.len() as i64);
+    assert!(count(&st, "samples") >= 1);
+    let turn = st
+        .query(
+            "SELECT parse_status,generated_tokens FROM turns WHERE run_id=? ORDER BY idx",
+            [id],
+        )
+        .unwrap();
+    assert_eq!(turn[2]["parse_status"], "final");
+    assert_eq!(turn[0]["generated_tokens"], 12);
+    let tools = st
+        .query("SELECT tool,ok FROM tool_calls ORDER BY idx", [])
+        .unwrap();
+    assert_eq!(tools[0]["tool"], "read_file");
+    assert_eq!(tools[1]["ok"], 1);
+    let run = &st.rows().unwrap()[0];
+    assert_eq!(run["status"], "success");
+    assert_eq!(run["passed"], 1);
+    assert_eq!(run["model_calls"], 3);
+    assert_eq!(run["generated_tokens"], 36);
+    let by_category = st.query("SELECT * FROM v_category_success", []).unwrap();
+    assert_eq!(
+        (&by_category[0]["passes"], &by_category[0]["scored"]),
+        (&json!(1), &json!(1))
+    );
+    assert!(st.query("SELECT * FROM v_resources", []).unwrap().len() == 1);
+}
+#[test]
+fn failed_attempts_appear_in_the_failure_view() {
+    let dir = tempfile::tempdir().unwrap();
+    let (case, variant) = (task(), Variant::default());
+    let st = study_store(dir.path(), &case);
+    let server = MockServer::new(
+        vec![call("final_answer", json!({"answer":"done"}))],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &case, &variant, &suite());
+    let id = st
+        .begin(&key(&case, &variant, "job", Path::new("trace")))
+        .unwrap();
+    st.finish(id, &out).unwrap();
+    let failures = st.query("SELECT * FROM v_failures", []).unwrap();
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0]["attempts"], 1);
+    assert_eq!(st.rows().unwrap()[0]["passed"], 0);
+    let failed = st
+        .query(
+            "SELECT passed FROM checks WHERE run_id=? AND passed=0",
+            [id],
+        )
+        .unwrap();
+    assert!(!failed.is_empty());
+}
+#[test]
+fn harness_overhead_stays_a_small_share_of_wall_time() {
+    let server = MockServer::new(
+        vec![
+            call("read_file", json!({"path":"reading.txt"})),
+            call(
+                "write_file",
+                json!({"path":"copy.txt","content":"Reading: 17"}),
+            ),
+            call("final_answer", json!({"answer":"copied"})),
+        ],
+        100,
+        Duration::from_millis(60),
+    );
+    let out = execute(&server, &task(), &Variant::default(), &suite());
+    assert_eq!(out.status, Status::Success);
+    assert!(out.wall_ms >= 180.);
+    assert!(
+        out.harness_other_ms < out.wall_ms * 0.1,
+        "other {} of wall {}",
+        out.harness_other_ms,
+        out.wall_ms
+    );
 }
 #[test]
 fn every_shipped_suite_validates_and_has_disjoint_splits() {
     let cfg = Config::load(&repo().join("configs/native/models.toml")).unwrap();
-    let m = manifest();
+    let m = catalog();
     for entry in std::fs::read_dir(repo().join("configs/native/suites")).unwrap() {
         let path = entry.unwrap().path();
         let s = Suite::load(&path).unwrap();
@@ -321,7 +434,7 @@ fn every_shipped_suite_validates_and_has_disjoint_splits() {
 fn fixture_queries_generalize_and_fetch_is_task_scoped() {
     let dir = tempfile::tempdir().unwrap();
     let mut tools = Builtins::new(dir.path().into(), false).unwrap();
-    tools.initialize(json!({"fixtures":{"pages":[{"id":"source","url":"https://example.org/specs","title":"Device memory requirements","text":"The device requires 1 GB memory."}]}})).unwrap();
+    tools.initialize(&serde_json::from_value(json!({"pages":[{"id":"source","url":"https://example.org/specs","title":"Device memory requirements","text":"The device requires 1 GB memory."}]})).unwrap()).unwrap();
     assert!(tools
         .call("fetch_page", json!({"source_id":"source"}))
         .is_err());
@@ -373,8 +486,8 @@ fn file_paths_and_html_extraction_keep_tool_data_bounded() {
 }
 
 #[test]
-fn shipped_cases_validate_against_the_standard_manifest() {
-    let registry = manifest();
+fn shipped_cases_validate_against_the_standard_catalog() {
+    let registry = catalog();
     let registry = registry
         .tools
         .iter()
@@ -408,7 +521,7 @@ fn guided_plan_marks_cases_without_a_workflow_not_applicable() {
             ..Default::default()
         },
     ];
-    let plan = a2e_native::runner::plan(&cfg, &s, &[chain, single], &manifest()).unwrap();
+    let plan = a2e_native::runner::plan(&cfg, &s, &[chain, single], &catalog()).unwrap();
     let groups = plan["groups"].as_array().unwrap();
     let guided = groups
         .iter()
@@ -427,7 +540,7 @@ fn guided_plan_marks_cases_without_a_workflow_not_applicable() {
 #[test]
 fn distractors_extend_autonomous_tools_but_not_guided_stages() {
     let mut c = task();
-    let m = manifest();
+    let m = catalog();
     let base = select_tools(&c, &m, &Variant::default(), &[], 0)
         .unwrap()
         .len();
@@ -485,8 +598,8 @@ fn failed_attempts_report_a_failure_class_and_check_results() {
     assert!(out.checks.iter().any(|c| !c.passed));
 }
 #[test]
-fn manifest_and_builtin_registry_list_the_same_tools() {
-    let mut declared = manifest()
+fn catalog_and_builtin_registry_list_the_same_tools() {
+    let mut declared = catalog()
         .tools
         .iter()
         .map(|t| t.name.clone())
@@ -510,7 +623,7 @@ fn sql_file_seeds_resolve_relative_to_the_case_and_validate() {
     };
     let path = dir.path().join("db-1.toml");
     std::fs::write(&path, case("sql_file = \"seed.sql\"")).unwrap();
-    let m = manifest();
+    let m = catalog();
     let registry = m.tools.iter().map(|t| t.name.as_str()).collect();
     let cases = a2e_native::case::load_all(std::slice::from_ref(&path)).unwrap();
     cases[0].validate(&registry).unwrap();
@@ -539,7 +652,7 @@ fn shipped_database_seeds_load() {
     }
 }
 #[test]
-fn database_case_runs_through_the_real_tool_process() {
+fn database_case_runs_through_the_agent_loop() {
     let sql =
         std::fs::read_to_string(repo().join("configs/native/fixtures/inventory.sql")).unwrap();
     let case = Case::from_toml(&format!(
@@ -587,4 +700,195 @@ number = {{ value = 1 }}
         out.checks
     );
     assert_eq!(out.tool_invocations, 1);
+}
+
+#[test]
+fn every_offline_golden_sequence_succeeds_through_the_agent_loop() {
+    let cases = a2e_native::case::load_all(&[repo().join("configs/native/cases")]).unwrap();
+    let s = suite();
+    for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
+        let mut script = case
+            .golden
+            .iter()
+            .map(|g| {
+                call(
+                    &g.tool,
+                    if g.args.is_null() {
+                        json!({})
+                    } else {
+                        g.args.clone()
+                    },
+                )
+            })
+            .collect::<Vec<_>>();
+        script.push(call(
+            "final_answer",
+            json!({"answer":case.golden_answer.clone().unwrap_or_default()}),
+        ));
+        let server = MockServer::new(script, 100, Duration::ZERO);
+        let out = execute(&server, case, &Variant::default(), &s);
+        let want = if case.judge.enabled {
+            Status::AwaitingJudge
+        } else {
+            Status::Success
+        };
+        assert_eq!(
+            out.status, want,
+            "{}: {:?} {:?}",
+            case.id, out.reason, out.checks
+        );
+    }
+}
+
+#[test]
+fn judged_attempt_stores_handoff_material_and_call_records() {
+    let cases = a2e_native::case::load_all(&[repo().join("configs/native/cases/web")]).unwrap();
+    let case = cases.iter().find(|c| c.id == "web-wal-summary").unwrap();
+    let script = case
+        .golden
+        .iter()
+        .map(|g| call(&g.tool, g.args.clone()))
+        .chain([call(
+            "final_answer",
+            json!({"answer":case.golden_answer.clone().unwrap()}),
+        )])
+        .collect::<Vec<_>>();
+    let server = MockServer::new(script, 100, Duration::ZERO);
+    let variant = Variant::default();
+    let out = execute(&server, case, &variant, &suite());
+    assert_eq!(out.status, Status::AwaitingJudge, "{:?}", out.reason);
+    let dir = tempfile::tempdir().unwrap();
+    let st = study_store(dir.path(), case);
+    let id = st
+        .begin(&key(case, &variant, "job", Path::new("trace")))
+        .unwrap();
+    st.finish(id, &out).unwrap();
+    let inputs = st.judge_inputs().unwrap();
+    assert_eq!(inputs.len(), 1);
+    assert_eq!(inputs[0]["calls"].as_array().unwrap().len(), 3);
+    assert_eq!(inputs[0]["calls"][2]["tool"], "write_file");
+    let stored: Case = serde_json::from_value(inputs[0]["case"].clone()).unwrap();
+    let packet = a2e_native::handoff::packet(&stored, &inputs[0]);
+    assert_eq!(packet["prompt"], case.scope.prompt);
+    assert_eq!(packet["evidence"][0]["source_id"], "sqlite_wal");
+    assert_eq!(packet["required_facts"].as_array().unwrap().len(), 3);
+    assert!(packet.get("files").is_none());
+    let record = a2e_native::judge::CallRecord {
+        ok: true,
+        prompt_tokens: Some(900),
+        cost: Some(0.002),
+        ..Default::default()
+    };
+    st.judge_calls(Some(id), "run", "retrieval_summary-v1", &[record])
+        .unwrap();
+    assert_eq!(count(&st, "judge_calls"), 1);
+}
+
+fn recorded_study(dir: &Path, attempts: &[(&str, &str, Vec<String>)]) -> Store {
+    let (case, variant) = (task(), Variant::default());
+    let st = Store::open(&dir.join("native.db")).unwrap();
+    let definition = json!({
+        "suite": {"name":"report-test","split":"heldout","models":["test","other"],"variants":[{"name":"baseline"}]},
+        "runtime": {"memory_limit_mb": 768},
+        "device": "test-device",
+    });
+    st.study("study", &definition, std::slice::from_ref(&case))
+        .unwrap();
+    for (job, model, script) in attempts {
+        let server = MockServer::new(script.clone(), 100, Duration::ZERO);
+        let out = execute(&server, &case, &variant, &suite());
+        let id = st
+            .begin(&RunKey {
+                model,
+                ..key(&case, &variant, job, Path::new("trace"))
+            })
+            .unwrap();
+        st.finish(id, &out).unwrap();
+    }
+    st
+}
+fn solved() -> Vec<String> {
+    vec![
+        call("read_file", json!({"path":"reading.txt"})),
+        call(
+            "write_file",
+            json!({"path":"copy.txt","content":"Reading: 17"}),
+        ),
+        call("final_answer", json!({"answer":"copied"})),
+    ]
+}
+#[test]
+fn report_writes_markdown_and_valid_svg_plots() {
+    let dir = tempfile::tempdir().unwrap();
+    let st = recorded_study(
+        dir.path(),
+        &[
+            ("a", "test", solved()),
+            (
+                "b",
+                "other",
+                vec![call("final_answer", json!({"answer":"done"}))],
+            ),
+        ],
+    );
+    let out = dir.path().join("out");
+    let summary = a2e_native::report::generate(&st, None, Some(&out), dir.path(), None).unwrap();
+    assert_eq!(summary["attempts"], 2);
+    let md = std::fs::read_to_string(out.join("report.md")).unwrap();
+    for section in [
+        "## Headline",
+        "## Success by category",
+        "## Failure classes",
+        "## Latency",
+        "## Memory",
+        "## Failed attempts",
+    ] {
+        assert!(md.contains(section), "missing {section}");
+    }
+    assert!(md.contains("chain-copy"));
+    assert!(md.contains("100.0%") && md.contains("0.0%"));
+    let plots = std::fs::read_dir(out.join("plots"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect::<Vec<_>>();
+    assert!(plots.len() >= 6, "plots: {plots:?}");
+    for p in plots {
+        let svg = std::fs::read_to_string(&p).unwrap();
+        assert!(svg.starts_with("<svg") && svg.trim_end().ends_with("</svg>"));
+        assert_eq!(svg.matches("<text").count(), svg.matches("</text>").count());
+        assert!(
+            !svg.contains("NaN") && !svg.contains("=\"inf") && !svg.contains("-inf"),
+            "{p:?}"
+        );
+        assert!(md.contains(&format!(
+            "plots/{}",
+            p.file_name().unwrap().to_string_lossy()
+        )));
+    }
+}
+#[test]
+fn report_prints_not_available_for_missing_measurements() {
+    let dir = tempfile::tempdir().unwrap();
+    let st = recorded_study(dir.path(), &[("a", "test", solved())]);
+    let out = dir.path().join("out");
+    a2e_native::report::generate(&st, Some("study"), Some(&out), dir.path(), None).unwrap();
+    let md = std::fs::read_to_string(out.join("report.md")).unwrap();
+    assert!(md.contains("n/a"));
+    let thermal = md.split("## Temperature and energy").nth(1).unwrap();
+    assert!(thermal.lines().any(|l| l.contains("| n/a |")), "{thermal}");
+    assert!(!md.contains("## Judge scores"));
+}
+#[test]
+fn report_handles_a_study_without_finished_attempts_and_unknown_studies() {
+    let dir = tempfile::tempdir().unwrap();
+    let st = recorded_study(dir.path(), &[]);
+    let out = dir.path().join("out");
+    let summary = a2e_native::report::generate(&st, None, Some(&out), dir.path(), None).unwrap();
+    assert_eq!(summary["attempts"], 0);
+    let md = std::fs::read_to_string(out.join("report.md")).unwrap();
+    assert!(md.contains("No scored attempts."));
+    assert!(
+        a2e_native::report::generate(&st, Some("missing"), Some(&out), dir.path(), None).is_err()
+    );
+    assert!(a2e_native::report::generate(&st, None, Some(&out), dir.path(), Some(999)).is_err());
 }

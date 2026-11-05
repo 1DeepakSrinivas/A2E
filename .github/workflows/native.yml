@@ -16,10 +16,6 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync --extra bfcl --extra tui --extra plots
-      - run: uv tool run ruff check tests/integration/test_cli.py tests/integration/test_harness_runner.py
-      - run: uv run pytest -m 'not hardware' -q
   pi-build:
     runs-on: ubuntu-latest
     steps:

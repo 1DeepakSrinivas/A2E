@@ -1,0 +1,20 @@
+id = "missing-date-days"
+category = "missing_param"
+tags = []
+split = "dev"
+golden_answer = "How many days should I add?"
+
+[scope]
+prompt = "Add some days to the date 2026-05-01."
+expected_calls = 0
+
+[tools]
+allowed = ["date_add", "weekday"]
+
+[[check]]
+kind = "no_call"
+tool = "date_add"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(how many|which|what)\\b.*\\bdays?\\b|\\bnumber of days\\b"

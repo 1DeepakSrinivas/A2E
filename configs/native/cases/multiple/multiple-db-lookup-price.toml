@@ -1,0 +1,28 @@
+id = "multiple-db-lookup-price"
+category = "multiple"
+tags = ["tier2", "db"]
+split = "heldout"
+golden_answer = "The hammer costs 15.5."
+
+[scope]
+prompt = "Look up the price of the hammer in the database."
+expected_calls = 1
+
+[tools]
+allowed = ["db_schema", "db_lookup", "db_query"]
+distractors = 8
+
+[fixtures.db]
+sql_file = "../../fixtures/inventory.sql"
+
+[[check]]
+kind = "answer"
+number = { "value" = 15.5 }
+
+[[check]]
+kind = "calls_at_most"
+max = 3
+
+[[golden]]
+tool = "db_lookup"
+args = { "table" = "products", "where" = { "name" = "hammer" } }

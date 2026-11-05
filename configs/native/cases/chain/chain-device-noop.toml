@@ -1,0 +1,40 @@
+id = "chain-device-noop"
+category = "chain"
+tags = ["tier2", "devices"]
+split = "dev"
+golden_answer = "No change was needed."
+
+[scope]
+prompt = "Check the cooler. If its temperature is above 30, set its setting to 80. Otherwise change nothing and say so."
+expected_calls = 1
+
+[tools]
+allowed = ["device_status", "set_setting"]
+
+[fixtures.devices]
+"cooler" = { "setting" = 20, "temperature" = 25 }
+
+[[stage]]
+instruction = "Read the cooler status."
+tools = ["device_status"]
+
+[[stage]]
+instruction = "Set the cooler to 80 only if it is above 30."
+tools = ["set_setting"]
+
+[[check]]
+kind = "no_call"
+tool = "set_setting"
+
+[[check]]
+kind = "state"
+path = "/devices/cooler/setting"
+eq = 20
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(no|not|nothing|unchanged|didn't|did not)\\b"
+
+[[golden]]
+tool = "device_status"
+args = { "name" = "cooler" }

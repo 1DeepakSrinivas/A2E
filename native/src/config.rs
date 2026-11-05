@@ -68,6 +68,7 @@ pub struct JudgeConfig {
     pub max_tokens: u32,
     pub timeout_seconds: u64,
     pub max_requests: usize,
+    pub rubrics_dir: String,
 }
 impl Default for JudgeConfig {
     fn default() -> Self {
@@ -77,6 +78,7 @@ impl Default for JudgeConfig {
             max_tokens: 2048,
             timeout_seconds: 120,
             max_requests: 100,
+            rubrics_dir: "configs/native/rubrics".into(),
         }
     }
 }
@@ -372,15 +374,10 @@ fn schema_value<'de, D: serde::Deserializer<'de>>(d: D) -> std::result::Result<V
         Ok(v)
     }
 }
+/// Model-visible tool definitions; every tool must have a built-in handler.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Manifest {
-    pub protocol: u32,
-    pub executable: String,
-    #[serde(default)]
-    pub args: Vec<String>,
-    pub timeout_seconds: u64,
-    pub output_limit_bytes: usize,
+pub struct Catalog {
     pub tools: Vec<ToolSpec>,
 }
 pub fn validate_schema(schema: &Value) -> Result<()> {
@@ -408,17 +405,12 @@ pub fn validate_schema(schema: &Value) -> Result<()> {
     jsonschema::validator_for(schema).map_err(|e| anyhow::anyhow!("{e}"))?;
     Ok(())
 }
-impl Manifest {
+impl Catalog {
     pub fn load(path: &Path) -> Result<Self> {
-        let m: Self = toml::from_str(&std::fs::read_to_string(path)?)?;
-        if m.protocol != 1
-            || m.timeout_seconds == 0
-            || !(256..=65536).contains(&m.output_limit_bytes)
-        {
-            bail!("invalid tool protocol or bounds");
-        }
+        let c: Self = toml::from_str(&std::fs::read_to_string(path)?)?;
+        let handlers = crate::tools::Builtins::names();
         let mut names = BTreeSet::new();
-        for t in &m.tools {
+        for t in &c.tools {
             if t.name.is_empty()
                 || !t
                     .name
@@ -428,9 +420,12 @@ impl Manifest {
             {
                 bail!("invalid or duplicate tool {}", t.name);
             }
+            if !handlers.contains(&t.name.as_str()) {
+                bail!("tool {} has no built-in handler", t.name);
+            }
             validate_schema(&t.parameters)?;
         }
-        Ok(m)
+        Ok(c)
     }
     pub fn specs(&self) -> BTreeMap<String, ToolSpec> {
         self.tools

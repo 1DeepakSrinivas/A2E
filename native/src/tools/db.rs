@@ -209,7 +209,7 @@ pub fn register(r: &mut Registry) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{sdk::ToolHost, tools::test_support::host};
+    use crate::tools::test_support::host;
     use serde_json::json;
 
     const SEED: &str =

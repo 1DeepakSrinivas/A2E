@@ -1,0 +1,29 @@
+id = "simple-read-file"
+category = "simple"
+tags = ["smoke", "files"]
+split = "dev"
+golden_answer = "It says to call the dentist on Monday."
+
+[scope]
+prompt = "Read the file memo.txt and tell me what it says."
+expected_calls = 1
+
+[tools]
+allowed = ["read_file"]
+
+[fixtures.files]
+"memo.txt" = "Call the dentist on Monday."
+
+[[check]]
+kind = "call"
+tool = "read_file"
+args = { "path" = "memo.txt" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+contains = "dentist"
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "memo.txt" }

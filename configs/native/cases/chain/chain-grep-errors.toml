@@ -1,0 +1,44 @@
+id = "chain-grep-errors"
+category = "chain"
+tags = ["tier2", "files", "text"]
+split = "heldout"
+golden_answer = "Saved the errors."
+
+[scope]
+prompt = "Find the ERROR lines in log.txt and save them to errors.txt."
+expected_calls = 2
+
+[tools]
+allowed = ["grep_file", "write_file", "append_file"]
+
+[fixtures.files]
+"log.txt" = "INFO boot\nERROR disk full\nINFO ok\nERROR timeout"
+
+[[stage]]
+instruction = "Find the ERROR lines."
+tools = ["grep_file"]
+
+[[stage]]
+instruction = "Save them to errors.txt."
+tools = ["write_file", "append_file"]
+
+[[check]]
+kind = "file"
+path = "errors.txt"
+contains = "disk full"
+
+[[check]]
+kind = "file"
+path = "errors.txt"
+contains = "timeout"
+
+[output]
+files = ["errors.txt"]
+
+[[golden]]
+tool = "grep_file"
+args = { "path" = "log.txt", "text" = "ERROR" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "errors.txt", "content" = "ERROR disk full\nERROR timeout" }

@@ -1,0 +1,26 @@
+id = "simple-calc-add"
+category = "simple"
+tags = ["smoke", "arithmetic"]
+split = "dev"
+golden_answer = "482 plus 319 is 801."
+
+[scope]
+prompt = "What is 482 plus 319? Use the calculator."
+expected_calls = 1
+
+[tools]
+allowed = ["calculate"]
+
+[[check]]
+kind = "call"
+tool = "calculate"
+args = { "operation" = "add", "a" = 482, "b" = 319 }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 801 }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "add", "a" = 482, "b" = 319 }

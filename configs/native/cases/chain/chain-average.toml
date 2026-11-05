@@ -1,0 +1,64 @@
+id = "chain-average"
+category = "chain"
+tags = ["tier2", "arithmetic"]
+split = "dev"
+golden_answer = "The average is 20."
+
+[scope]
+prompt = "Read a.txt and b.txt, compute the average of the two numbers with the calculator, and write it to avg.txt."
+expected_calls = 5
+
+[tools]
+allowed = ["read_file", "calculate", "write_file"]
+
+[fixtures.files]
+"a.txt" = "10"
+"b.txt" = "30"
+
+[[stage]]
+instruction = "Read a.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Read b.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Add the two numbers."
+tools = ["calculate"]
+
+[[stage]]
+instruction = "Divide the sum by 2."
+tools = ["calculate"]
+
+[[stage]]
+instruction = "Write the average to avg.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "avg.txt"
+eq = "20"
+
+[output]
+files = ["avg.txt"]
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "a.txt" }
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "b.txt" }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "add", "a" = 10, "b" = 30 }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "divide", "a" = 40, "b" = 2 }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "avg.txt", "content" = "20" }

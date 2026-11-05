@@ -1,0 +1,36 @@
+id = "recovery-lookup-retry"
+category = "recovery"
+tags = ["faults", "db"]
+split = "dev"
+golden_answer = "There are 3 pending orders."
+
+[scope]
+prompt = "How many orders have the status pending? Look in the database; retry if the lookup fails."
+expected_calls = 2
+
+[tools]
+allowed = ["db_schema", "db_lookup"]
+
+[fixtures.db]
+sql_file = "../../fixtures/inventory.sql"
+
+[[fixtures.faults]]
+tool = "db_lookup"
+mode = "fail_n"
+n = 1
+
+[[stage]]
+instruction = "Look up the pending orders; retry if it fails."
+tools = ["db_schema", "db_lookup"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 3 }
+
+[[golden]]
+tool = "db_lookup"
+args = { "table" = "orders", "where" = { "status" = "pending" } }
+
+[[golden]]
+tool = "db_lookup"
+args = { "table" = "orders", "where" = { "status" = "pending" } }

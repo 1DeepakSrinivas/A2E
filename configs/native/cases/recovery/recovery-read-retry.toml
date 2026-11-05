@@ -1,0 +1,48 @@
+id = "recovery-read-retry"
+category = "recovery"
+tags = ["smoke", "faults"]
+split = "dev"
+golden_answer = "Copied 42."
+
+[scope]
+prompt = "Read reading.txt. If the read fails temporarily, retry it. Copy the contents to result.txt."
+expected_calls = 3
+
+[tools]
+allowed = ["read_file", "write_file"]
+
+[fixtures.files]
+"reading.txt" = "42"
+
+[[fixtures.faults]]
+tool = "read_file"
+mode = "fail_n"
+n = 1
+
+[[stage]]
+instruction = "Read reading.txt; retry if it fails."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Copy the contents to result.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "result.txt"
+eq = "42"
+
+[output]
+files = ["result.txt"]
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "reading.txt" }
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "reading.txt" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "result.txt", "content" = "42" }

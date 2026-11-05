@@ -1,0 +1,24 @@
+id = "simple-word-count"
+category = "simple"
+tags = ["text"]
+split = "heldout"
+golden_answer = "The text has 5 words."
+
+[scope]
+prompt = "Count the words in this text: the quick brown fox jumps"
+expected_calls = 1
+
+[tools]
+allowed = ["word_count"]
+
+[[check]]
+kind = "call"
+tool = "word_count"
+
+[[check]]
+kind = "answer"
+number = { "value" = 5 }
+
+[[golden]]
+tool = "word_count"
+args = { "text" = "the quick brown fox jumps" }

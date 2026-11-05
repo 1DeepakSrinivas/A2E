@@ -1,6 +1,6 @@
 # A2E
 
-A2E measures how small language models use tools under time, memory, and call budgets. The native Rust runtime targets Raspberry Pi 3B+ and Apple Silicon Mac. The Python runtime runs BFCL v4 and custom tool evaluations on Raspberry Pi 5 and Apple Silicon Mac. Both use llama.cpp for inference.
+A2E measures how small language models use tools under time, memory, and call budgets. The native Rust runtime targets Raspberry Pi 3B+ and Apple Silicon Mac and uses llama.cpp for inference. It is the supported runtime. The Python runtime, which ran BFCL v4 on Raspberry Pi 5 and Apple Silicon Mac, is retired and its files are frozen.
 
 ## Native quick start
 
@@ -15,10 +15,13 @@ builds the Rust CLI, and downloads and verifies the three GGUF files under
 `models/native`. After setup, disable swap for the Pi baseline and run
 `target/release/a2e-native run`.
 
-See the [native guide](docs/NATIVE.md) for Mac setup, tool manifests, experiments,
-and OpenRouter judging.
+See the [native guide](docs/NATIVE.md) for Mac setup, writing cases and tools, the
+results database, reports, and OpenRouter judging. After a run, `target/release/a2e-native report`
+writes a Markdown report with SVG plots.
 
-## Python and BFCL quick start
+## Python and BFCL quick start (retired)
+
+These commands still work on the frozen Python files, but they are no longer maintained.
 
 ```bash
 scripts/setup_pi.sh                            # or scripts/setup_mac.sh on the Mac

@@ -1,0 +1,36 @@
+id = "chain-db-pending-kv"
+category = "chain"
+tags = ["tier2", "db", "store"]
+split = "heldout"
+golden_answer = "There are 3 pending orders."
+
+[scope]
+prompt = "Count the pending orders in the database and store the count under the key pending_orders."
+expected_calls = 2
+
+[tools]
+allowed = ["db_query", "kv_set"]
+
+[fixtures.db]
+sql_file = "../../fixtures/inventory.sql"
+
+[[stage]]
+instruction = "Count the pending orders."
+tools = ["db_query"]
+
+[[stage]]
+instruction = "Store the count under pending_orders."
+tools = ["kv_set"]
+
+[[check]]
+kind = "state"
+path = "/kv/pending_orders"
+eq = "3"
+
+[[golden]]
+tool = "db_query"
+args = { "sql" = "SELECT count(*) FROM orders WHERE status = 'pending'" }
+
+[[golden]]
+tool = "kv_set"
+args = { "key" = "pending_orders", "value" = "3" }

@@ -1,0 +1,44 @@
+id = "chain-kv-counter"
+category = "chain"
+tags = ["tier2", "store", "arithmetic"]
+split = "dev"
+golden_answer = "The counter is now 5."
+
+[scope]
+prompt = "Read the counter stored in the key counter, add 1 to it, and store the new value back under counter."
+expected_calls = 3
+
+[tools]
+allowed = ["kv_get", "calculate", "kv_set"]
+
+[fixtures.kv]
+"counter" = "4"
+
+[[stage]]
+instruction = "Read the counter."
+tools = ["kv_get"]
+
+[[stage]]
+instruction = "Add 1 with the calculator."
+tools = ["calculate"]
+
+[[stage]]
+instruction = "Store the new value."
+tools = ["kv_set"]
+
+[[check]]
+kind = "state"
+path = "/kv/counter"
+eq = "5"
+
+[[golden]]
+tool = "kv_get"
+args = { "key" = "counter" }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "add", "a" = 4, "b" = 1 }
+
+[[golden]]
+tool = "kv_set"
+args = { "key" = "counter", "value" = "5" }

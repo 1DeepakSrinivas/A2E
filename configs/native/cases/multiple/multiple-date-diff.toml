@@ -1,0 +1,27 @@
+id = "multiple-date-diff"
+category = "multiple"
+tags = ["tier2", "time"]
+split = "heldout"
+golden_answer = "There are 42 days."
+
+[scope]
+prompt = "How many days are there between 2026-02-01 and 2026-03-15?"
+expected_calls = 1
+
+[tools]
+allowed = ["date_add", "date_diff", "weekday", "now"]
+distractors = 8
+
+[[check]]
+kind = "call"
+tool = "date_diff"
+args = { "start" = "2026-02-01", "end" = "2026-03-15" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 42 }
+
+[[golden]]
+tool = "date_diff"
+args = { "start" = "2026-02-01", "end" = "2026-03-15" }
