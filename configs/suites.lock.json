@@ -14,6 +14,11 @@
     "jobs": 48,
     "suite_hash": "02a6c31e9966d42f"
   },
+  "bfcl_mini_gemma": {
+    "job_keys_sha": "6788f79fdf8c202e",
+    "jobs": 8,
+    "suite_hash": "73886738f530a2e8"
+  },
   "cache_ablation": {
     "job_keys_sha": "783328cf05579db4",
     "jobs": 80,
