@@ -19,6 +19,7 @@ pub mod rubric;
 pub mod runner;
 pub mod store;
 pub mod tools;
+pub mod upload;
 
 use anyhow::{bail, Result};
 use serde::Serialize;

@@ -78,6 +78,10 @@ enum Commands {
         #[arg(long)]
         run: Option<i64>,
     },
+    Upload {
+        #[arg(long)]
+        status: bool,
+    },
     Judge {
         #[arg(long)]
         db: Option<PathBuf>,
@@ -194,6 +198,16 @@ fn entry() -> Result<()> {
             &a2e_native::config::expand_path(&c.runtime.output_dir),
             run,
         )?,
+        Commands::Upload { status } => {
+            let mut uploader = a2e_native::upload::Uploader::open(
+                &a2e_native::config::expand_path(&c.runtime.output_dir),
+            )?;
+            serde_json::to_value(if status {
+                uploader.status()?
+            } else {
+                uploader.flush()?
+            })?
+        }
         Commands::Judge {
             db: p,
             study,

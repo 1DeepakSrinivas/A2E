@@ -56,6 +56,23 @@ retry unsuccessful attempts. The database and the trace files live under
 `results/native`. Trace files contain prompts, raw model output, tool results,
 and the evidence used for judging.
 
+## Sending results to the cloud
+
+Judging, scoring and reports run in the A2E-Results project, which is checked
+out as the submodule `third_party/a2e-results`. Its `docs/API.md` describes the
+Worker API. After each attempt the runner posts the study, the model load and the
+finished attempt to the Worker. Set `WORKER_URL` and `WRITE_TOKEN` in the shell
+or in `.env` (see `.env.example`).
+
+Every request is written to `results/native/outbox` first and removed once the
+Worker stores it. If the network is down, or the variables are not set, the
+requests stay in the outbox and the run continues. Send them later with
+`target/release/a2e-native upload`, and check what is waiting with
+`upload --status`. A request the Worker refuses for good moves to
+`outbox/rejected` with the error beside it. Resume state is kept in
+`results/native/resume.jsonl`. On a development machine run
+`git submodule update --init` to fetch the submodule; the Pi does not need it.
+
 Latency includes failed attempts. The runtime measures model loading
 separately and records inference and harness RSS. Tools run inside the harness
 process, so harness RSS includes them. Peak RSS comes from the samples. Pi
