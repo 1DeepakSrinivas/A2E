@@ -1,0 +1,23 @@
+id = "missing-setting-value"
+category = "missing_param"
+tags = ["smoke"]
+split = "dev"
+golden_answer = "What setting value should I use for the heater?"
+
+[scope]
+prompt = "Set the heater to a new setting."
+expected_calls = 0
+
+[tools]
+allowed = ["set_setting", "device_status"]
+
+[fixtures.devices]
+"heater" = { "setting" = 10, "temperature" = 60 }
+
+[[check]]
+kind = "no_call"
+tool = "set_setting"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(value|setting|level|number)\\b"

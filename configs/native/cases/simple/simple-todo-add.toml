@@ -1,0 +1,27 @@
+id = "simple-todo-add"
+category = "simple"
+tags = ["store"]
+split = "heldout"
+golden_answer = "Added the todo."
+
+[scope]
+prompt = "Add a todo titled \"Call the plumber\"."
+expected_calls = 1
+
+[tools]
+allowed = ["todo_add"]
+
+[[check]]
+kind = "call"
+tool = "todo_add"
+args = { "title" = "Call the plumber" }
+match = "subset"
+
+[[check]]
+kind = "state"
+path = "/todos/0/title"
+eq = "Call the plumber"
+
+[[golden]]
+tool = "todo_add"
+args = { "title" = "Call the plumber" }

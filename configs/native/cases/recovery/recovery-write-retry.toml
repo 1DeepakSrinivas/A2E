@@ -1,0 +1,37 @@
+id = "recovery-write-retry"
+category = "recovery"
+tags = ["faults"]
+split = "heldout"
+golden_answer = "Wrote status.txt."
+
+[scope]
+prompt = "Write the text done to status.txt. If the write fails temporarily, try again."
+expected_calls = 2
+
+[tools]
+allowed = ["write_file"]
+
+[[fixtures.faults]]
+tool = "write_file"
+mode = "fail_n"
+n = 1
+
+[[stage]]
+instruction = "Write done to status.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "status.txt"
+contains = "done"
+
+[output]
+files = ["status.txt"]
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "status.txt", "content" = "done" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "status.txt", "content" = "done" }

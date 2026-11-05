@@ -1,0 +1,37 @@
+id = "recovery-search-retry"
+category = "recovery"
+tags = ["faults"]
+split = "heldout"
+golden_answer = "The file b.txt mentions invoice."
+
+[scope]
+prompt = "Which file mentions the word invoice? The search may be rate limited; retry if it is."
+expected_calls = 2
+
+[tools]
+allowed = ["search_files"]
+
+[fixtures.files]
+"a.txt" = "groceries"
+"b.txt" = "invoice 2231 is due"
+
+[[fixtures.faults]]
+tool = "search_files"
+mode = "rate_limit"
+n = 1
+
+[[stage]]
+instruction = "Search for invoice."
+tools = ["search_files"]
+
+[[check]]
+kind = "answer"
+contains = "b.txt"
+
+[[golden]]
+tool = "search_files"
+args = { "query" = "invoice" }
+
+[[golden]]
+tool = "search_files"
+args = { "query" = "invoice" }

@@ -1,0 +1,26 @@
+id = "simple-calc-mul"
+category = "simple"
+tags = ["arithmetic"]
+split = "heldout"
+golden_answer = "The product is 888."
+
+[scope]
+prompt = "Multiply 37 by 24 with the calculator."
+expected_calls = 1
+
+[tools]
+allowed = ["calculate"]
+
+[[check]]
+kind = "call"
+tool = "calculate"
+args = { "operation" = "multiply", "a" = 37, "b" = 24 }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 888 }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "multiply", "a" = 37, "b" = 24 }

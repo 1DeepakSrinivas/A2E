@@ -1,0 +1,39 @@
+id = "chain-copy"
+category = "chain"
+tags = ["tier2", "smoke", "files"]
+split = "dev"
+golden_answer = "Copied."
+
+[scope]
+prompt = "Read reading.txt and copy its contents to copy.txt."
+expected_calls = 2
+
+[tools]
+allowed = ["read_file", "write_file"]
+
+[fixtures.files]
+"reading.txt" = "Reading: 17"
+
+[[stage]]
+instruction = "Read reading.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Write the contents to copy.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "copy.txt"
+eq = "Reading: 17"
+
+[output]
+files = ["copy.txt"]
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "reading.txt" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "copy.txt", "content" = "Reading: 17" }

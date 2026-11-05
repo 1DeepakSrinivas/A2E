@@ -1,0 +1,30 @@
+id = "multiple-json"
+category = "multiple"
+tags = ["tier2", "text"]
+split = "heldout"
+golden_answer = "The port is 8080."
+
+[scope]
+prompt = "In config.json, what is the value of network.port?"
+expected_calls = 1
+
+[tools]
+allowed = ["read_file", "json_get", "grep_file"]
+distractors = 2
+
+[fixtures.files]
+"config.json" = "{\"network\":{\"host\":\"pi.local\",\"port\":8080},\"debug\":false}"
+
+[[check]]
+kind = "call"
+tool = "json_get"
+args = { "path" = "config.json", "key" = "network.port" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 8080 }
+
+[[golden]]
+tool = "json_get"
+args = { "path" = "config.json", "key" = "network.port" }

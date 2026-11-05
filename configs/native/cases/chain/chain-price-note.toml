@@ -1,0 +1,41 @@
+id = "chain-price-note"
+category = "chain"
+tags = ["tier2", "db", "store"]
+split = "dev"
+golden_answer = "Saved a note: tape costs 2.75."
+
+[scope]
+prompt = "Look up the price of tape in the database and save a note with that price tagged price."
+expected_calls = 2
+
+[tools]
+allowed = ["db_lookup", "note_add"]
+
+[fixtures.db]
+sql_file = "../../fixtures/inventory.sql"
+
+[[stage]]
+instruction = "Look up the tape."
+tools = ["db_lookup"]
+
+[[stage]]
+instruction = "Save the note."
+tools = ["note_add"]
+
+[[check]]
+kind = "call"
+tool = "note_add"
+args = { "tag" = "price" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+contains = "2.75"
+
+[[golden]]
+tool = "db_lookup"
+args = { "table" = "products", "where" = { "name" = "tape" } }
+
+[[golden]]
+tool = "note_add"
+args = { "text" = "tape costs 2.75", "tag" = "price" }

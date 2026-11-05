@@ -1,0 +1,27 @@
+id = "simple-kv-set"
+category = "simple"
+tags = ["store"]
+split = "dev"
+golden_answer = "Stored."
+
+[scope]
+prompt = "Remember that the wifi password is hunter2. Store it under the key wifi."
+expected_calls = 1
+
+[tools]
+allowed = ["kv_set"]
+
+[[check]]
+kind = "call"
+tool = "kv_set"
+args = { "key" = "wifi", "value" = "hunter2" }
+match = "subset"
+
+[[check]]
+kind = "state"
+path = "/kv/wifi"
+eq = "hunter2"
+
+[[golden]]
+tool = "kv_set"
+args = { "key" = "wifi", "value" = "hunter2" }

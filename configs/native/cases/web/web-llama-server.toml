@@ -1,0 +1,58 @@
+id = "web-llama-server"
+category = "web"
+tags = ["judged"]
+split = "heldout"
+golden_answer = "llama-server is an HTTP server that runs GGUF models and offers a completion API (llama_server, https://github.com/ggml-org/llama.cpp/tree/master/tools/server)."
+
+[scope]
+prompt = "Find out what llama-server is and give a short cited summary."
+expected_calls = 2
+
+[tools]
+allowed = ["web_search", "fetch_page"]
+
+[[fixtures.pages]]
+id = "llama_server"
+url = "https://github.com/ggml-org/llama.cpp/tree/master/tools/server"
+title = "llama-server"
+text = "llama.cpp includes llama-server, an HTTP server that runs GGUF models and offers a completion API on a local port."
+
+[[fixtures.pages]]
+id = "gguf"
+url = "https://github.com/ggml-org/ggml/blob/master/docs/gguf.md"
+title = "GGUF file format"
+text = "GGUF is a single-file format that stores model weights and metadata for llama.cpp."
+
+[[fixtures.pages]]
+id = "weather"
+url = "https://example.org/weather"
+title = "Weather report"
+text = "Tomorrow will be sunny with light wind."
+
+[[stage]]
+instruction = "Search for llama-server."
+tools = ["web_search"]
+
+[[stage]]
+instruction = "Retrieve the page."
+tools = ["fetch_page"]
+
+[[check]]
+kind = "fetched_source"
+id = "llama_server"
+
+[[check]]
+kind = "answer"
+contains = "http"
+
+[judge]
+enabled = true
+required_facts = ["llama-server is an HTTP server", "It runs GGUF models", "It offers a completion API"]
+
+[[golden]]
+tool = "web_search"
+args = { "query" = "llama-server" }
+
+[[golden]]
+tool = "fetch_page"
+args = { "source_id" = "llama_server" }

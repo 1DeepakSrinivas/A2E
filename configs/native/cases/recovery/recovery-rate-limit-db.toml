@@ -1,0 +1,36 @@
+id = "recovery-rate-limit-db"
+category = "recovery"
+tags = ["faults", "db"]
+split = "dev"
+golden_answer = "There are 10 products."
+
+[scope]
+prompt = "How many products are in the database? The query service may rate limit you; retry if it does."
+expected_calls = 2
+
+[tools]
+allowed = ["db_query"]
+
+[fixtures.db]
+sql_file = "../../fixtures/inventory.sql"
+
+[[fixtures.faults]]
+tool = "db_query"
+mode = "rate_limit"
+n = 1
+
+[[stage]]
+instruction = "Count the products."
+tools = ["db_query"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 10 }
+
+[[golden]]
+tool = "db_query"
+args = { "sql" = "SELECT count(*) FROM products" }
+
+[[golden]]
+tool = "db_query"
+args = { "sql" = "SELECT count(*) FROM products" }

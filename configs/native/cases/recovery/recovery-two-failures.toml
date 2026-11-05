@@ -1,0 +1,52 @@
+id = "recovery-two-failures"
+category = "recovery"
+tags = ["faults"]
+split = "heldout"
+golden_answer = "Copied 7."
+
+[scope]
+prompt = "Read reading.txt and copy its contents to result.txt. The read may fail more than once; keep trying."
+expected_calls = 4
+
+[tools]
+allowed = ["read_file", "write_file"]
+
+[fixtures.files]
+"reading.txt" = "7"
+
+[[fixtures.faults]]
+tool = "read_file"
+mode = "fail_n"
+n = 2
+
+[[stage]]
+instruction = "Read reading.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Copy the contents to result.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "result.txt"
+eq = "7"
+
+[output]
+files = ["result.txt"]
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "reading.txt" }
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "reading.txt" }
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "reading.txt" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "result.txt", "content" = "7" }

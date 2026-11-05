@@ -1,0 +1,21 @@
+id = "irrelevance-author"
+category = "irrelevance"
+tags = []
+split = "heldout"
+golden_answer = "William Shakespeare wrote it."
+
+[scope]
+prompt = "Who wrote the play Romeo and Juliet?"
+expected_calls = 0
+
+[tools]
+allowed = ["search_files", "note_search", "kv_get"]
+distractors = 4
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+contains = "shakespeare"

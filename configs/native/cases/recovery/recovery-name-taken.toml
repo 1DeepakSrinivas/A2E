@@ -1,0 +1,43 @@
+id = "recovery-name-taken"
+category = "recovery"
+tags = ["wrong-guess", "files"]
+split = "dev"
+golden_answer = "Moved the draft to final_v2.txt."
+
+[scope]
+prompt = "Move draft.txt to final.txt. If final.txt already exists, move draft.txt to final_v2.txt instead."
+expected_calls = 2
+
+[tools]
+allowed = ["move_file"]
+
+[fixtures.files]
+"draft.txt" = "draft body"
+"final.txt" = "published"
+
+[[stage]]
+instruction = "Try moving draft.txt to final.txt."
+tools = ["move_file"]
+
+[[check]]
+kind = "file"
+path = "final_v2.txt"
+contains = "draft body"
+
+[[check]]
+kind = "file"
+path = "draft.txt"
+absent = true
+
+[[check]]
+kind = "file"
+path = "final.txt"
+contains = "published"
+
+[[golden]]
+tool = "move_file"
+args = { "from" = "draft.txt", "to" = "final.txt" }
+
+[[golden]]
+tool = "move_file"
+args = { "from" = "draft.txt", "to" = "final_v2.txt" }

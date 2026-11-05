@@ -1,0 +1,40 @@
+id = "recovery-find-the-file"
+category = "recovery"
+tags = ["wrong-guess"]
+split = "dev"
+golden_answer = "The total is 4200."
+
+[scope]
+prompt = "Read q3.txt and report the total. The file may be in a subfolder."
+expected_calls = 3
+
+[tools]
+allowed = ["read_file", "list_dir", "search_files"]
+
+[fixtures.files]
+"reports/q3.txt" = "Q3 total: 4200"
+"reports/q2.txt" = "Q2 total: 3900"
+
+[[stage]]
+instruction = "Find where q3.txt is."
+tools = ["search_files", "list_dir"]
+
+[[stage]]
+instruction = "Read the file at its real path."
+tools = ["read_file"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 4200 }
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "q3.txt" }
+
+[[golden]]
+tool = "search_files"
+args = { "query" = "q3 total" }
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "reports/q3.txt" }

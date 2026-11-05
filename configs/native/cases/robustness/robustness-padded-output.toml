@@ -1,0 +1,33 @@
+id = "robustness-padded-output"
+category = "robustness"
+tags = ["noise"]
+split = "dev"
+golden_answer = "The number is 77."
+
+[scope]
+prompt = "Read value.txt and tell me the number it contains."
+expected_calls = 1
+
+[tools]
+allowed = ["read_file"]
+
+[fixtures.files]
+"value.txt" = "The value is 77."
+
+[[fixtures.faults]]
+tool = "read_file"
+mode = "oversize_bytes"
+n = 1
+bytes = 4000
+
+[[stage]]
+instruction = "Read value.txt."
+tools = ["read_file"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 77 }
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "value.txt" }

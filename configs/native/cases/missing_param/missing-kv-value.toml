@@ -1,0 +1,21 @@
+id = "missing-kv-value"
+category = "missing_param"
+tags = []
+split = "heldout"
+golden_answer = "What value should I store under colour?"
+
+[scope]
+prompt = "Store a value under the key colour."
+expected_calls = 0
+
+[tools]
+allowed = ["kv_set", "kv_get"]
+distractors = 4
+
+[[check]]
+kind = "no_call"
+tool = "kv_set"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(what|which)\\b.*\\bvalue\\b|\\bvalue\\b.*\\?"

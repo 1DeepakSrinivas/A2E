@@ -1,0 +1,40 @@
+id = "recovery-device-name"
+category = "recovery"
+tags = ["wrong-guess", "devices"]
+split = "heldout"
+golden_answer = "Set fan_1 to 40."
+
+[scope]
+prompt = "Set the setting of the fan to 40."
+expected_calls = 3
+
+[tools]
+allowed = ["set_setting", "device_list"]
+
+[fixtures.devices]
+"fan_1" = { "setting" = 0 }
+"lamp_1" = { "setting" = 0 }
+
+[[stage]]
+instruction = "List the devices to find the fan's exact name."
+tools = ["device_list"]
+
+[[stage]]
+instruction = "Set the fan to 40."
+tools = ["set_setting"]
+
+[[check]]
+kind = "state"
+path = "/devices/fan_1/setting"
+eq = 40
+
+[[golden]]
+tool = "set_setting"
+args = { "name" = "fan", "value" = 40 }
+
+[[golden]]
+tool = "device_list"
+
+[[golden]]
+tool = "set_setting"
+args = { "name" = "fan_1", "value" = 40 }

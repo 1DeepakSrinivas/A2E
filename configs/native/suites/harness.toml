@@ -1,7 +1,8 @@
 name = "harness"
 models = ["functiongemma-270m", "qwen3-0.6b", "lfm2.5-1.2b-instruct-qad"]
 contexts = [1024]
-cases = ["../cases"]
+cases = ["../cases/multiple", "../cases/chain"]
+tags = ["tier2"]
 split = "heldout"
 web_mode = "fixture"
 warmup = 1

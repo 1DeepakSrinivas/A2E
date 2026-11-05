@@ -37,7 +37,7 @@ fn task() -> Case {
     s.load_cases(&repo().join("configs/native/suites/smoke.toml"))
         .unwrap()
         .into_iter()
-        .find(|t| t.id.starts_with("copy-"))
+        .find(|t| t.id == "chain-copy")
         .unwrap()
 }
 fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> a2e_native::runner::Outcome {
@@ -700,4 +700,42 @@ number = {{ value = 1 }}
         out.checks
     );
     assert_eq!(out.tool_invocations, 1);
+}
+
+#[test]
+fn every_offline_golden_sequence_succeeds_through_the_agent_loop() {
+    let cases = a2e_native::case::load_all(&[repo().join("configs/native/cases")]).unwrap();
+    let s = suite();
+    for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
+        let mut script = case
+            .golden
+            .iter()
+            .map(|g| {
+                call(
+                    &g.tool,
+                    if g.args.is_null() {
+                        json!({})
+                    } else {
+                        g.args.clone()
+                    },
+                )
+            })
+            .collect::<Vec<_>>();
+        script.push(call(
+            "final_answer",
+            json!({"answer":case.golden_answer.clone().unwrap_or_default()}),
+        ));
+        let server = MockServer::new(script, 100, Duration::ZERO);
+        let out = execute(&server, case, &Variant::default(), &s);
+        let want = if case.judge.enabled {
+            Status::AwaitingJudge
+        } else {
+            Status::Success
+        };
+        assert_eq!(
+            out.status, want,
+            "{}: {:?} {:?}",
+            case.id, out.reason, out.checks
+        );
+    }
 }

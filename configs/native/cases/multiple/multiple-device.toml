@@ -1,0 +1,35 @@
+id = "multiple-device"
+category = "multiple"
+tags = ["tier2", "devices"]
+split = "dev"
+golden_answer = "The cooler temperature is 35."
+
+[scope]
+prompt = "Is the cooler too hot? Report its temperature without changing anything."
+expected_calls = 1
+
+[tools]
+allowed = ["device_list", "device_status", "set_setting"]
+distractors = 4
+
+[fixtures.devices]
+"cooler" = { "setting" = 20, "temperature" = 35 }
+"heater" = { "setting" = 5, "temperature" = 60 }
+
+[[check]]
+kind = "call"
+tool = "device_status"
+args = { "name" = "cooler" }
+match = "subset"
+
+[[check]]
+kind = "no_call"
+tool = "set_setting"
+
+[[check]]
+kind = "answer"
+number = { "value" = 35 }
+
+[[golden]]
+tool = "device_status"
+args = { "name" = "cooler" }

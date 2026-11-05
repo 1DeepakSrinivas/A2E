@@ -1,0 +1,20 @@
+id = "irrelevance-capital"
+category = "irrelevance"
+tags = ["smoke"]
+split = "dev"
+golden_answer = "The capital of France is Paris."
+
+[scope]
+prompt = "What is the capital of France?"
+expected_calls = 0
+
+[tools]
+allowed = ["calculate", "read_file", "device_list"]
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+contains = "paris"

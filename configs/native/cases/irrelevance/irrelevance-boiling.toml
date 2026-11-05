@@ -1,0 +1,20 @@
+id = "irrelevance-boiling"
+category = "irrelevance"
+tags = []
+split = "dev"
+golden_answer = "Water boils at 100 degrees Celsius."
+
+[scope]
+prompt = "At what temperature in Celsius does water boil at sea level?"
+expected_calls = 0
+
+[tools]
+allowed = ["unit_convert", "calculate", "device_status"]
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+number = { "value" = 100 }

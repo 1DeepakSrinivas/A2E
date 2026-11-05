@@ -1,0 +1,24 @@
+id = "missing-db-table"
+category = "missing_param"
+tags = []
+split = "heldout"
+golden_answer = "Which table should I look in?"
+
+[scope]
+prompt = "Look up some rows in the database."
+expected_calls = 0
+
+[tools]
+allowed = ["db_schema", "db_lookup"]
+distractors = 4
+
+[fixtures.db]
+sql_file = "../../fixtures/inventory.sql"
+
+[[check]]
+kind = "no_call"
+tool = "db_lookup"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(which|what)\\b.*\\b(table|rows)\\b|\\btable\\b"

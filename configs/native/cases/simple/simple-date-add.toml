@@ -1,0 +1,26 @@
+id = "simple-date-add"
+category = "simple"
+tags = ["time"]
+split = "heldout"
+golden_answer = "It is 2026-03-06."
+
+[scope]
+prompt = "What date is 45 days after 2026-01-20?"
+expected_calls = 1
+
+[tools]
+allowed = ["date_add"]
+
+[[check]]
+kind = "call"
+tool = "date_add"
+args = { "date" = "2026-01-20", "days" = 45 }
+match = "subset"
+
+[[check]]
+kind = "answer"
+contains = "2026-03-06"
+
+[[golden]]
+tool = "date_add"
+args = { "date" = "2026-01-20", "days" = 45 }

@@ -1,0 +1,41 @@
+id = "chain-note-to-todo"
+category = "chain"
+tags = ["tier2", "store"]
+split = "dev"
+golden_answer = "Added the todo."
+
+[scope]
+prompt = "Read the note tagged shopping and add a todo whose title is exactly the note's text."
+expected_calls = 2
+
+[tools]
+allowed = ["note_list", "todo_add"]
+
+[[fixtures.notes]]
+text = "Call mom"
+tag = "family"
+
+[[fixtures.notes]]
+text = "Buy oat milk"
+tag = "shopping"
+
+[[stage]]
+instruction = "List the shopping notes."
+tools = ["note_list"]
+
+[[stage]]
+instruction = "Add the todo."
+tools = ["todo_add"]
+
+[[check]]
+kind = "state"
+path = "/todos/0/title"
+eq = "Buy oat milk"
+
+[[golden]]
+tool = "note_list"
+args = { "tag" = "shopping" }
+
+[[golden]]
+tool = "todo_add"
+args = { "title" = "Buy oat milk" }

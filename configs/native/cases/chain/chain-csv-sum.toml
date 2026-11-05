@@ -1,0 +1,47 @@
+id = "chain-csv-sum"
+category = "chain"
+tags = ["tier2", "text", "arithmetic"]
+split = "heldout"
+golden_answer = "The north total is 25."
+
+[scope]
+prompt = "Sum the qty column for the north region in sales.csv and write the total to north_total.txt."
+expected_calls = 3
+
+[tools]
+allowed = ["csv_filter", "calculate", "write_file"]
+
+[fixtures.files]
+"sales.csv" = "region,qty\nnorth,10\nsouth,7\nnorth,15\neast,3"
+
+[[stage]]
+instruction = "Select the north rows."
+tools = ["csv_filter"]
+
+[[stage]]
+instruction = "Add the quantities."
+tools = ["calculate"]
+
+[[stage]]
+instruction = "Write the total to north_total.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "north_total.txt"
+regex = "^\\s*25\\s*$"
+
+[output]
+files = ["north_total.txt"]
+
+[[golden]]
+tool = "csv_filter"
+args = { "path" = "sales.csv", "column" = "region", "op" = "eq", "value" = "north" }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "add", "a" = 10, "b" = 15 }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "north_total.txt", "content" = "25" }

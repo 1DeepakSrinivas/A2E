@@ -1,0 +1,44 @@
+id = "chain-sensor-max"
+category = "chain"
+tags = ["tier2", "db", "store"]
+split = "dev"
+golden_answer = "The highest reading is 35.2."
+
+[scope]
+prompt = "Find the highest reading of the cooler sensor in the database and store it under the key cooler_max."
+expected_calls = 3
+
+[tools]
+allowed = ["db_lookup", "db_query", "kv_set"]
+
+[fixtures.db]
+sql_file = "../../fixtures/sensors.sql"
+
+[[stage]]
+instruction = "Look up the cooler sensor."
+tools = ["db_lookup"]
+
+[[stage]]
+instruction = "Query its highest reading."
+tools = ["db_query"]
+
+[[stage]]
+instruction = "Store the value under cooler_max."
+tools = ["kv_set"]
+
+[[check]]
+kind = "state"
+path = "/kv/cooler_max"
+eq = "35.2"
+
+[[golden]]
+tool = "db_lookup"
+args = { "table" = "sensors", "where" = { "name" = "cooler" } }
+
+[[golden]]
+tool = "db_query"
+args = { "sql" = "SELECT max(value) FROM readings WHERE sensor_id = 1" }
+
+[[golden]]
+tool = "kv_set"
+args = { "key" = "cooler_max", "value" = "35.2" }

@@ -1,0 +1,66 @@
+id = "web-two-sources"
+category = "web"
+tags = []
+split = "dev"
+golden_answer = "It has 1 GB of RAM (pi_specs) and needs a 5V 2.5A supply (pi_power)."
+
+[scope]
+prompt = "Find the memory of the Raspberry Pi 3 Model B+ and the power supply it needs. Use two pages and report both facts."
+expected_calls = 3
+
+[tools]
+allowed = ["web_search", "fetch_page"]
+
+[[fixtures.pages]]
+id = "pi_specs"
+url = "https://www.raspberrypi.com/products/raspberry-pi-3-model-b-plus/"
+title = "Raspberry Pi 3 Model B+ specifications"
+text = "The Raspberry Pi 3 Model B+ has 1 GB of LPDDR2 SDRAM and a 1.4 GHz 64-bit quad-core processor."
+
+[[fixtures.pages]]
+id = "pi_power"
+url = "https://www.raspberrypi.com/documentation/power/"
+title = "Raspberry Pi 3 Model B+ power supply"
+text = "The Raspberry Pi 3 Model B+ needs a 5V 2.5A micro USB power supply."
+
+[[fixtures.pages]]
+id = "garden"
+url = "https://example.org/gardening"
+title = "Garden notes"
+text = "Plant seedlings after the last frost."
+
+[[stage]]
+instruction = "Search for the Pi memory and power."
+tools = ["web_search"]
+
+[[stage]]
+instruction = "Retrieve the specifications page."
+tools = ["fetch_page"]
+
+[[stage]]
+instruction = "Retrieve the power page."
+tools = ["fetch_page"]
+
+[[check]]
+kind = "fetched_count"
+min = 2
+
+[[check]]
+kind = "answer"
+regex = "(?i)1\\s?gb"
+
+[[check]]
+kind = "answer"
+contains = "2.5"
+
+[[golden]]
+tool = "web_search"
+args = { "query" = "Raspberry Pi 3 Model B+" }
+
+[[golden]]
+tool = "fetch_page"
+args = { "source_id" = "pi_specs" }
+
+[[golden]]
+tool = "fetch_page"
+args = { "source_id" = "pi_power" }

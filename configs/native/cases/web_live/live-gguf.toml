@@ -1,0 +1,40 @@
+id = "live-gguf"
+category = "web"
+tags = ["live"]
+split = "heldout"
+golden_answer = "Summary."
+
+[scope]
+prompt = "Search the web for the GGUF file format and give a short cited summary."
+expected_calls = 2
+
+[tools]
+allowed = ["web_search", "fetch_page"]
+
+[[stage]]
+instruction = "Search the web."
+tools = ["web_search"]
+
+[[stage]]
+instruction = "Retrieve one result."
+tools = ["fetch_page"]
+
+[[check]]
+kind = "fetched_count"
+min = 1
+
+[[check]]
+kind = "answer"
+regex = "."
+
+[judge]
+enabled = true
+required_facts = ["GGUF is a file format for models", "It is used by llama.cpp"]
+
+[[golden]]
+tool = "web_search"
+args = { "query" = "x" }
+
+[[golden]]
+tool = "fetch_page"
+args = { "source_id" = "x" }

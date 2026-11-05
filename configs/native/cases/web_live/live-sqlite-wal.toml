@@ -1,0 +1,40 @@
+id = "live-sqlite-wal"
+category = "web"
+tags = ["live"]
+split = "heldout"
+golden_answer = "Summary."
+
+[scope]
+prompt = "Search the web for SQLite WAL mode and summarise how it differs from the default rollback journal, citing the source."
+expected_calls = 2
+
+[tools]
+allowed = ["web_search", "fetch_page"]
+
+[[stage]]
+instruction = "Search the web."
+tools = ["web_search"]
+
+[[stage]]
+instruction = "Retrieve one result."
+tools = ["fetch_page"]
+
+[[check]]
+kind = "fetched_count"
+min = 1
+
+[[check]]
+kind = "answer"
+regex = "."
+
+[judge]
+enabled = true
+required_facts = ["WAL appends changes to a separate log", "Readers do not block the writer in WAL mode"]
+
+[[golden]]
+tool = "web_search"
+args = { "query" = "x" }
+
+[[golden]]
+tool = "fetch_page"
+args = { "source_id" = "x" }

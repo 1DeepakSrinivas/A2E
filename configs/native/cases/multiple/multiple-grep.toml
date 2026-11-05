@@ -1,0 +1,30 @@
+id = "multiple-grep"
+category = "multiple"
+tags = ["tier2"]
+split = "dev"
+golden_answer = "ERROR appears on line 3."
+
+[scope]
+prompt = "On which line of log.txt does the word ERROR appear?"
+expected_calls = 1
+
+[tools]
+allowed = ["read_file", "grep_file", "word_count"]
+distractors = 4
+
+[fixtures.files]
+"log.txt" = "INFO boot\nINFO ready\nERROR disk full\nINFO done"
+
+[[check]]
+kind = "call"
+tool = "grep_file"
+args = { "path" = "log.txt" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 3 }
+
+[[golden]]
+tool = "grep_file"
+args = { "path" = "log.txt", "text" = "ERROR" }

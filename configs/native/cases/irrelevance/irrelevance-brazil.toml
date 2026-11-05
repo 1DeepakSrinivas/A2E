@@ -1,0 +1,21 @@
+id = "irrelevance-brazil"
+category = "irrelevance"
+tags = []
+split = "heldout"
+golden_answer = "Portuguese is spoken in Brazil."
+
+[scope]
+prompt = "What language is mainly spoken in Brazil?"
+expected_calls = 0
+
+[tools]
+allowed = ["web_search", "fetch_page", "read_file"]
+distractors = 4
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+contains = "portuguese"

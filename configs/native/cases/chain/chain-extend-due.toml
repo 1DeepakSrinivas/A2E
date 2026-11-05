@@ -1,0 +1,47 @@
+id = "chain-extend-due"
+category = "chain"
+tags = ["tier2", "time", "files"]
+split = "dev"
+golden_answer = "The new due date is 2026-03-07."
+
+[scope]
+prompt = "Read the due date in due.txt, add 10 days to it, and write the new date to new_due.txt."
+expected_calls = 3
+
+[tools]
+allowed = ["read_file", "date_add", "write_file"]
+
+[fixtures.files]
+"due.txt" = "2026-02-25"
+
+[[stage]]
+instruction = "Read due.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Add 10 days."
+tools = ["date_add"]
+
+[[stage]]
+instruction = "Write the new date to new_due.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "new_due.txt"
+contains = "2026-03-07"
+
+[output]
+files = ["new_due.txt"]
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "due.txt" }
+
+[[golden]]
+tool = "date_add"
+args = { "date" = "2026-02-25", "days" = 10 }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "new_due.txt", "content" = "2026-03-07" }

@@ -1,0 +1,56 @@
+id = "chain-backup-delete"
+category = "chain"
+tags = ["tier2", "files"]
+split = "heldout"
+golden_answer = "Backed up and deleted."
+
+[scope]
+prompt = "Copy old.txt to backup.txt, then delete old.txt."
+expected_calls = 3
+
+[tools]
+allowed = ["read_file", "write_file", "delete_file"]
+
+[fixtures.files]
+"old.txt" = "legacy data"
+
+[[stage]]
+instruction = "Read old.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Write the contents to backup.txt."
+tools = ["write_file"]
+
+[[stage]]
+instruction = "Delete old.txt."
+tools = ["delete_file"]
+
+[[check]]
+kind = "file"
+path = "backup.txt"
+eq = "legacy data"
+
+[[check]]
+kind = "file"
+path = "old.txt"
+absent = true
+
+[[check]]
+kind = "call_order"
+tools = ["read_file", "write_file", "delete_file"]
+
+[output]
+files = ["backup.txt"]
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "old.txt" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "backup.txt", "content" = "legacy data" }
+
+[[golden]]
+tool = "delete_file"
+args = { "path" = "old.txt" }

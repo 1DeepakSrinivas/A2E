@@ -1,0 +1,24 @@
+id = "missing-delete-path"
+category = "missing_param"
+tags = []
+split = "dev"
+golden_answer = "Which file should I delete?"
+
+[scope]
+prompt = "Delete the file."
+expected_calls = 0
+
+[tools]
+allowed = ["delete_file", "list_dir"]
+
+[fixtures.files]
+"old.txt" = "x"
+"new.txt" = "y"
+
+[[check]]
+kind = "no_call"
+tool = "delete_file"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(which|what)\\b.*\\b(file|path|name)\\b"

@@ -1,0 +1,44 @@
+id = "recovery-slow-tool"
+category = "recovery"
+tags = ["faults"]
+split = "dev"
+golden_answer = "Done."
+
+[scope]
+prompt = "Read slow.txt and write its contents to out.txt. The tool may be slow; wait for it."
+expected_calls = 2
+
+[tools]
+allowed = ["read_file", "write_file"]
+
+[fixtures.files]
+"slow.txt" = "patience"
+
+[[fixtures.faults]]
+tool = "read_file"
+mode = "slow_ms"
+ms = 800
+
+[[stage]]
+instruction = "Read slow.txt."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Write the contents to out.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "out.txt"
+eq = "patience"
+
+[output]
+files = ["out.txt"]
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "slow.txt" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "out.txt", "content" = "patience" }

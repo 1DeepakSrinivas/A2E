@@ -428,6 +428,11 @@ impl Attempt<'_> {
             }
         };
         let executed = entry.ok;
+        // Retrying a failed call is recovery, not a loop
+        if !executed {
+            self.last_call = None;
+            self.repeats = 0;
+        }
         self.out.tool_log.push(entry);
         if let Some(reason) = fatal {
             bail!(reason);

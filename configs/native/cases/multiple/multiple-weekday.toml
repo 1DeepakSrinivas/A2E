@@ -1,0 +1,26 @@
+id = "multiple-weekday"
+category = "multiple"
+tags = ["tier2", "time"]
+split = "dev"
+golden_answer = "It was a Saturday."
+
+[scope]
+prompt = "Which day of the week was 2026-07-04?"
+expected_calls = 1
+
+[tools]
+allowed = ["date_add", "date_diff", "weekday", "now"]
+
+[[check]]
+kind = "call"
+tool = "weekday"
+args = { "date" = "2026-07-04" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+contains = "saturday"
+
+[[golden]]
+tool = "weekday"
+args = { "date" = "2026-07-04" }

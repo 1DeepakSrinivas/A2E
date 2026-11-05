@@ -1,0 +1,27 @@
+id = "multiple-unit"
+category = "multiple"
+tags = ["tier2", "units"]
+split = "heldout"
+golden_answer = "3 kg is 6.6139 lb."
+
+[scope]
+prompt = "How many pounds is 3 kg?"
+expected_calls = 1
+
+[tools]
+allowed = ["unit_convert", "calculate"]
+distractors = 2
+
+[[check]]
+kind = "call"
+tool = "unit_convert"
+args = { "value" = 3, "from" = "kg", "to" = "lb" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 6.6139, "tol" = 0.001 }
+
+[[golden]]
+tool = "unit_convert"
+args = { "value" = 3, "from" = "kg", "to" = "lb" }

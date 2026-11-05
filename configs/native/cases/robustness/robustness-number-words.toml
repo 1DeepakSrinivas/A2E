@@ -1,0 +1,30 @@
+id = "robustness-number-words"
+category = "robustness"
+tags = ["types"]
+split = "heldout"
+golden_answer = "The sum is 50."
+
+[scope]
+prompt = "Add forty-two and eight using the calculator."
+expected_calls = 1
+
+[tools]
+allowed = ["calculate"]
+
+[[stage]]
+instruction = "Add the numbers."
+tools = ["calculate"]
+
+[[check]]
+kind = "call"
+tool = "calculate"
+args = { "operation" = "add", "a" = 42, "b" = 8 }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 50 }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "add", "a" = 42, "b" = 8 }

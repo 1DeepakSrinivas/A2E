@@ -1,0 +1,21 @@
+id = "irrelevance-french"
+category = "irrelevance"
+tags = []
+split = "heldout"
+golden_answer = "It is merci."
+
+[scope]
+prompt = "Translate 'thank you' into French."
+expected_calls = 0
+
+[tools]
+allowed = ["write_file", "kv_set", "note_add"]
+distractors = 4
+
+[[check]]
+kind = "calls_at_most"
+max = 0
+
+[[check]]
+kind = "answer"
+contains = "merci"

@@ -1,0 +1,39 @@
+id = "chain-json-host"
+category = "chain"
+tags = ["tier2", "text", "files"]
+split = "dev"
+golden_answer = "The host is pi.local."
+
+[scope]
+prompt = "Read the server host from config.json and write it to host.txt."
+expected_calls = 2
+
+[tools]
+allowed = ["json_get", "write_file"]
+
+[fixtures.files]
+"config.json" = "{\"server\":{\"host\":\"pi.local\",\"port\":22}}"
+
+[[stage]]
+instruction = "Read the server host from config.json."
+tools = ["json_get"]
+
+[[stage]]
+instruction = "Write the host to host.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "host.txt"
+regex = "^\\s*pi\\.local\\s*$"
+
+[output]
+files = ["host.txt"]
+
+[[golden]]
+tool = "json_get"
+args = { "path" = "config.json", "key" = "server.host" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "host.txt", "content" = "pi.local" }

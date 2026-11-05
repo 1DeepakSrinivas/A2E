@@ -1,0 +1,30 @@
+id = "simple-write-file"
+category = "simple"
+tags = ["files"]
+split = "heldout"
+golden_answer = "Saved to agenda.txt."
+
+[scope]
+prompt = "Save the text 'meeting at 4pm' to agenda.txt."
+expected_calls = 1
+
+[tools]
+allowed = ["write_file"]
+
+[[check]]
+kind = "call"
+tool = "write_file"
+args = { "path" = "agenda.txt" }
+match = "subset"
+
+[[check]]
+kind = "file"
+path = "agenda.txt"
+contains = "meeting at 4pm"
+
+[output]
+files = ["agenda.txt"]
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "agenda.txt", "content" = "meeting at 4pm" }

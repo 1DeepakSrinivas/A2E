@@ -1,0 +1,23 @@
+id = "missing-move-destination"
+category = "missing_param"
+tags = []
+split = "dev"
+golden_answer = "Where should I move report.txt?"
+
+[scope]
+prompt = "Move the file report.txt."
+expected_calls = 0
+
+[tools]
+allowed = ["move_file", "list_dir"]
+
+[fixtures.files]
+"report.txt" = "data"
+
+[[check]]
+kind = "no_call"
+tool = "move_file"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(where|destination|new (name|path|location))\\b"

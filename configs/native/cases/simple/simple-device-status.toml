@@ -1,0 +1,29 @@
+id = "simple-device-status"
+category = "simple"
+tags = ["devices"]
+split = "heldout"
+golden_answer = "The cooler is at 35 degrees."
+
+[scope]
+prompt = "What is the temperature of the cooler?"
+expected_calls = 1
+
+[tools]
+allowed = ["device_status"]
+
+[fixtures.devices]
+"cooler" = { "setting" = 20, "temperature" = 35 }
+
+[[check]]
+kind = "call"
+tool = "device_status"
+args = { "name" = "cooler" }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 35 }
+
+[[golden]]
+tool = "device_status"
+args = { "name" = "cooler" }

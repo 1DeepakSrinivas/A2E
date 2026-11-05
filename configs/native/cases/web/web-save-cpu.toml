@@ -1,0 +1,66 @@
+id = "web-save-cpu"
+category = "web"
+tags = []
+split = "dev"
+golden_answer = "The CPU runs at 1.4 GHz."
+
+[scope]
+prompt = "Find the CPU clock speed of the Raspberry Pi 3 Model B+ and save it to cpu.txt."
+expected_calls = 3
+
+[tools]
+allowed = ["web_search", "fetch_page", "write_file"]
+
+[[fixtures.pages]]
+id = "pi_specs"
+url = "https://www.raspberrypi.com/products/raspberry-pi-3-model-b-plus/"
+title = "Raspberry Pi 3 Model B+ specifications"
+text = "The Raspberry Pi 3 Model B+ has 1 GB of LPDDR2 SDRAM and a 1.4 GHz 64-bit quad-core processor."
+
+[[fixtures.pages]]
+id = "pi_power"
+url = "https://www.raspberrypi.com/documentation/power/"
+title = "Raspberry Pi 3 Model B+ power supply"
+text = "The Raspberry Pi 3 Model B+ needs a 5V 2.5A micro USB power supply."
+
+[[fixtures.pages]]
+id = "garden"
+url = "https://example.org/gardening"
+title = "Garden notes"
+text = "Plant seedlings after the last frost."
+
+[[stage]]
+instruction = "Search for the CPU speed."
+tools = ["web_search"]
+
+[[stage]]
+instruction = "Retrieve the specifications page."
+tools = ["fetch_page"]
+
+[[stage]]
+instruction = "Save the speed to cpu.txt."
+tools = ["write_file"]
+
+[[check]]
+kind = "fetched_source"
+id = "pi_specs"
+
+[[check]]
+kind = "file"
+path = "cpu.txt"
+contains = "1.4"
+
+[output]
+files = ["cpu.txt"]
+
+[[golden]]
+tool = "web_search"
+args = { "query" = "Raspberry Pi 3 Model B+ processor" }
+
+[[golden]]
+tool = "fetch_page"
+args = { "source_id" = "pi_specs" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "cpu.txt", "content" = "1.4 GHz" }

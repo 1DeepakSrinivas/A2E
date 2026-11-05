@@ -1,0 +1,24 @@
+id = "missing-read-path"
+category = "missing_param"
+tags = []
+split = "dev"
+golden_answer = "Which file should I read?"
+
+[scope]
+prompt = "Read the file and tell me what it says."
+expected_calls = 0
+
+[tools]
+allowed = ["read_file", "list_dir"]
+
+[fixtures.files]
+"a.txt" = "alpha"
+"b.txt" = "beta"
+
+[[check]]
+kind = "no_call"
+tool = "read_file"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(which|what)\\b.*\\b(file|path|name)\\b|\\bfile name\\b"

@@ -1,0 +1,33 @@
+id = "multiple-note-search"
+category = "multiple"
+tags = ["tier2", "store"]
+split = "dev"
+golden_answer = "The note says the dentist appointment is on Thursday."
+
+[scope]
+prompt = "Find my note about the dentist."
+expected_calls = 1
+
+[tools]
+allowed = ["note_list", "note_search", "kv_get"]
+distractors = 4
+
+[[fixtures.notes]]
+text = "Dentist appointment on Thursday at 9"
+tag = "health"
+
+[[fixtures.notes]]
+text = "Buy oat milk"
+tag = "shopping"
+
+[[check]]
+kind = "call"
+tool = "note_search"
+
+[[check]]
+kind = "answer"
+contains = "thursday"
+
+[[golden]]
+tool = "note_search"
+args = { "query" = "dentist" }

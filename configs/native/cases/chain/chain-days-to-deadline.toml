@@ -1,0 +1,49 @@
+id = "chain-days-to-deadline"
+category = "chain"
+tags = ["tier2", "time"]
+split = "heldout"
+golden_answer = "There are 9 days left."
+
+[scope]
+prompt = "How many days are there from today until the deadline in deadline.txt?"
+expected_calls = 3
+
+[tools]
+allowed = ["now", "read_file", "date_diff"]
+
+[fixtures]
+clock = "2026-03-01T09:00:00Z"
+
+[fixtures.files]
+"deadline.txt" = "2026-03-10"
+
+[[stage]]
+instruction = "Get today's date."
+tools = ["now"]
+
+[[stage]]
+instruction = "Read the deadline file."
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Count the days between the two dates."
+tools = ["date_diff"]
+
+[[check]]
+kind = "call"
+tool = "date_diff"
+
+[[check]]
+kind = "answer"
+number = { "value" = 9 }
+
+[[golden]]
+tool = "now"
+
+[[golden]]
+tool = "read_file"
+args = { "path" = "deadline.txt" }
+
+[[golden]]
+tool = "date_diff"
+args = { "start" = "2026-03-01", "end" = "2026-03-10" }

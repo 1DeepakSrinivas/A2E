@@ -1,0 +1,21 @@
+id = "missing-multiply-factor"
+category = "missing_param"
+tags = []
+split = "heldout"
+golden_answer = "Which number should I multiply 8 by?"
+
+[scope]
+prompt = "Multiply 8 by a number."
+expected_calls = 0
+
+[tools]
+allowed = ["calculate"]
+distractors = 4
+
+[[check]]
+kind = "no_call"
+tool = "calculate"
+
+[[check]]
+kind = "answer"
+regex = "(?i)\\b(which|what)\\b.*\\bnumber\\b|\\bsecond (number|value)\\b"

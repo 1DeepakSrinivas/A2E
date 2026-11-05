@@ -1,0 +1,26 @@
+id = "simple-calc-sub"
+category = "simple"
+tags = ["arithmetic"]
+split = "heldout"
+golden_answer = "The result is 643."
+
+[scope]
+prompt = "What is 1000 minus 357? Use the calculator."
+expected_calls = 1
+
+[tools]
+allowed = ["calculate"]
+
+[[check]]
+kind = "call"
+tool = "calculate"
+args = { "operation" = "subtract", "a" = 1000, "b" = 357 }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 643 }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "subtract", "a" = 1000, "b" = 357 }
