@@ -484,7 +484,7 @@ The groups are:
 The hardware group is the first place where A2E meets a real llama-server. It checks the parts of the llama-server interface that the fake server copies, e.g., the names of the timing fields in a reply. Run it once on each device before a long run:
 
 ```bash
-export A2E_LLAMA_SERVER=~/a2e-deps/llama.cpp/build/bin/llama-server
+export A2E_LLAMA_SERVER=deps/llama.cpp/build-a2e/bin/llama-server
 export A2E_GGUF=~/models/qwen3-4b-instruct-2507/qwen3-4b-instruct-2507-q5_k_m.gguf
 export A2E_CTX=16384
 uv run a2e test hardware -v

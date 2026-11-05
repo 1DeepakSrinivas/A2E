@@ -50,3 +50,6 @@ bfcl_raw.jsonl
 configs/local.toml
 results/
 models/
+target/
+configs/native/local.toml
+/deps/

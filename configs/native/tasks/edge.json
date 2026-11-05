@@ -1,0 +1,252 @@
+[
+  {
+    "id": "missing-argument-dev",
+    "split": "dev",
+    "family": "edge",
+    "prompt": "A device should be adjusted, but its name and setting have not been supplied. Ask for both values without changing any setting.",
+    "tools": [
+      "device_status",
+      "set_setting"
+    ],
+    "required_calls": 1,
+    "fixtures": {
+      "devices": {
+        "cooler": {
+          "temperature": 35,
+          "setting": 20
+        }
+      }
+    },
+    "checks": [
+      {
+        "kind": "no_call",
+        "key": "set_setting",
+        "expected": null
+      },
+      {
+        "kind": "answer_contains",
+        "key": "",
+        "expected": "name"
+      },
+      {
+        "kind": "answer_contains",
+        "key": "",
+        "expected": "setting"
+      }
+    ],
+    "stages": [
+      {
+        "instruction": "Ask for the missing device name and setting; do not guess.",
+        "tools": [
+          "device_status"
+        ],
+        "successes": 1
+      }
+    ]
+  },
+  {
+    "id": "irrelevant-dev",
+    "split": "dev",
+    "family": "edge",
+    "prompt": "No tool is needed. Reply with exactly ready.",
+    "tools": [
+      "device_list",
+      "search_files"
+    ],
+    "required_calls": 1,
+    "fixtures": {},
+    "checks": [
+      {
+        "kind": "no_call",
+        "key": "device_list",
+        "expected": null
+      },
+      {
+        "kind": "no_call",
+        "key": "search_files",
+        "expected": null
+      },
+      {
+        "kind": "answer_contains",
+        "key": "",
+        "expected": "ready"
+      }
+    ],
+    "stages": [
+      {
+        "instruction": "Give the requested answer without tools.",
+        "tools": [
+          "device_list"
+        ],
+        "successes": 1
+      }
+    ]
+  },
+  {
+    "id": "tool-error-dev",
+    "split": "dev",
+    "family": "edge",
+    "prompt": "Read reading.txt. If the read fails temporarily, retry it once. Copy the contents to result.txt.",
+    "tools": [
+      "read_file",
+      "write_file"
+    ],
+    "required_calls": 2,
+    "fixtures": {
+      "files": {
+        "reading.txt": "42"
+      },
+      "fail_once": {
+        "read_file": 1
+      }
+    },
+    "checks": [
+      {
+        "kind": "file_eq",
+        "key": "result.txt",
+        "expected": "42"
+      }
+    ],
+    "stages": [
+      {
+        "instruction": "Read reading.txt; retry once if it fails temporarily.",
+        "tools": [
+          "read_file"
+        ],
+        "successes": 1
+      },
+      {
+        "instruction": "Copy the returned content to result.txt.",
+        "tools": [
+          "write_file"
+        ],
+        "successes": 1
+      }
+    ]
+  },
+  {
+    "id": "missing-argument-heldout",
+    "split": "heldout",
+    "family": "edge",
+    "prompt": "A device should be adjusted, but its name and setting have not been supplied. Ask for both values without changing any setting.",
+    "tools": [
+      "device_status",
+      "set_setting"
+    ],
+    "required_calls": 1,
+    "fixtures": {
+      "devices": {
+        "cooler": {
+          "temperature": 35,
+          "setting": 20
+        }
+      }
+    },
+    "checks": [
+      {
+        "kind": "no_call",
+        "key": "set_setting",
+        "expected": null
+      },
+      {
+        "kind": "answer_contains",
+        "key": "",
+        "expected": "name"
+      },
+      {
+        "kind": "answer_contains",
+        "key": "",
+        "expected": "setting"
+      }
+    ],
+    "stages": [
+      {
+        "instruction": "Ask for the missing device name and setting; do not guess.",
+        "tools": [
+          "device_status"
+        ],
+        "successes": 1
+      }
+    ]
+  },
+  {
+    "id": "irrelevant-heldout",
+    "split": "heldout",
+    "family": "edge",
+    "prompt": "No tool is needed. Reply with exactly ready.",
+    "tools": [
+      "device_list",
+      "search_files"
+    ],
+    "required_calls": 1,
+    "fixtures": {},
+    "checks": [
+      {
+        "kind": "no_call",
+        "key": "device_list",
+        "expected": null
+      },
+      {
+        "kind": "no_call",
+        "key": "search_files",
+        "expected": null
+      },
+      {
+        "kind": "answer_contains",
+        "key": "",
+        "expected": "ready"
+      }
+    ],
+    "stages": [
+      {
+        "instruction": "Give the requested answer without tools.",
+        "tools": [
+          "device_list"
+        ],
+        "successes": 1
+      }
+    ]
+  },
+  {
+    "id": "tool-error-heldout",
+    "split": "heldout",
+    "family": "edge",
+    "prompt": "Read reading.txt. If the read fails temporarily, retry it once. Copy the contents to result.txt.",
+    "tools": [
+      "read_file",
+      "write_file"
+    ],
+    "required_calls": 2,
+    "fixtures": {
+      "files": {
+        "reading.txt": "42"
+      },
+      "fail_once": {
+        "read_file": 1
+      }
+    },
+    "checks": [
+      {
+        "kind": "file_eq",
+        "key": "result.txt",
+        "expected": "42"
+      }
+    ],
+    "stages": [
+      {
+        "instruction": "Read reading.txt; retry once if it fails temporarily.",
+        "tools": [
+          "read_file"
+        ],
+        "successes": 1
+      },
+      {
+        "instruction": "Copy the returned content to result.txt.",
+        "tools": [
+          "write_file"
+        ],
+        "successes": 1
+      }
+    ]
+  }
+]

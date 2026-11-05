@@ -1,0 +1,140 @@
+[
+  {
+    "id": "web-dev-0",
+    "split": "dev",
+    "family": "web",
+    "prompt": "Search for the official Raspberry Pi 3 Model B+ specifications, retrieve the matching page, and summarize its RAM, processor speed and power supply in at most 80 words. Cite the source ID and URL.",
+    "tools": [
+      "web_search",
+      "fetch_page"
+    ],
+    "required_calls": 2,
+    "fixtures": {
+      "pages": [
+        {
+          "id": "pi_specs",
+          "url": "https://www.raspberrypi.com/products/raspberry-pi-3-model-b-plus/",
+          "title": "Raspberry Pi 3 Model B+ specifications",
+          "text": "The Raspberry Pi 3 Model B+ has 1GB LPDDR2 SDRAM and a 1.4GHz 64-bit quad-core processor. It requires a 5V/2.5A micro USB power supply."
+        },
+        {
+          "id": "pi_software",
+          "url": "https://www.raspberrypi.com/software/",
+          "title": "Raspberry Pi software installation",
+          "text": "Raspberry Pi Imager writes Raspberry Pi OS to a microSD card. Choose the device, operating system and storage before writing the image."
+        },
+        {
+          "id": "irrelevant",
+          "url": "https://example.org/gardening",
+          "title": "Garden notes",
+          "text": "Plant seedlings after the last frost."
+        }
+      ]
+    },
+    "checks": [
+      {
+        "kind": "fetched_url",
+        "key": "",
+        "expected": "https://www.raspberrypi.com/products/raspberry-pi-3-model-b-plus/"
+      }
+    ],
+    "stages": [
+      {
+        "instruction": "Search for the official specifications.",
+        "tools": [
+          "web_search"
+        ],
+        "successes": 1
+      },
+      {
+        "instruction": "Retrieve the relevant search result.",
+        "tools": [
+          "fetch_page"
+        ],
+        "successes": 1
+      },
+      {
+        "instruction": "Summarize the requested facts with source ID and URL.",
+        "tools": [
+          "fetch_page"
+        ],
+        "successes": 1
+      }
+    ],
+    "summary": true,
+    "required_facts": [
+      "1GB LPDDR2 RAM",
+      "1.4GHz processor",
+      "5V/2.5A micro USB power supply"
+    ]
+  },
+  {
+    "id": "web-heldout-0",
+    "split": "heldout",
+    "family": "web",
+    "prompt": "Search for the official Raspberry Pi 3 Model B+ specifications, retrieve the matching page, and summarize its RAM, processor speed and power supply in at most 80 words. Cite the source ID and URL.",
+    "tools": [
+      "web_search",
+      "fetch_page"
+    ],
+    "required_calls": 2,
+    "fixtures": {
+      "pages": [
+        {
+          "id": "pi_specs",
+          "url": "https://www.raspberrypi.com/products/raspberry-pi-3-model-b-plus/",
+          "title": "Raspberry Pi 3 Model B+ specifications",
+          "text": "The Raspberry Pi 3 Model B+ has 1GB LPDDR2 SDRAM and a 1.4GHz 64-bit quad-core processor. It requires a 5V/2.5A micro USB power supply."
+        },
+        {
+          "id": "pi_software",
+          "url": "https://www.raspberrypi.com/software/",
+          "title": "Raspberry Pi software installation",
+          "text": "Raspberry Pi Imager writes Raspberry Pi OS to a microSD card. Choose the device, operating system and storage before writing the image."
+        },
+        {
+          "id": "irrelevant",
+          "url": "https://example.org/gardening",
+          "title": "Garden notes",
+          "text": "Plant seedlings after the last frost."
+        }
+      ]
+    },
+    "checks": [
+      {
+        "kind": "fetched_url",
+        "key": "",
+        "expected": "https://www.raspberrypi.com/products/raspberry-pi-3-model-b-plus/"
+      }
+    ],
+    "stages": [
+      {
+        "instruction": "Search for the official specifications.",
+        "tools": [
+          "web_search"
+        ],
+        "successes": 1
+      },
+      {
+        "instruction": "Retrieve the relevant search result.",
+        "tools": [
+          "fetch_page"
+        ],
+        "successes": 1
+      },
+      {
+        "instruction": "Summarize the requested facts with source ID and URL.",
+        "tools": [
+          "fetch_page"
+        ],
+        "successes": 1
+      }
+    ],
+    "summary": true,
+    "required_facts": [
+      "1GB LPDDR2 RAM",
+      "1.4GHz processor",
+      "5V/2.5A micro USB power supply"
+    ]
+  }
+]

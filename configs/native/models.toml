@@ -1,0 +1,47 @@
+[runtime]
+llama_commit = "6666a7330c5375dc310ddea1f9621a7770430010"
+llama_server = "deps/llama.cpp/build-a2e/bin/llama-server"
+models_dir = "models/native"
+output_dir = "results/native"
+device = "auto"
+threads = 4
+gpu_layers = 0
+memory_limit_mb = 768
+reserve_mb = 128
+sample_ms = 500
+power = "auto"
+
+[judge]
+# Set explicit OpenRouter model and provider IDs in local.toml or the environment.
+model = ""
+provider = ""
+max_tokens = 2048
+max_requests = 100
+timeout_seconds = 120
+
+[[models]]
+id = "functiongemma-270m"
+adapter = "functiongemma"
+quant = "Q4_K_M"
+source = "unsloth/functiongemma-270m-it-GGUF"
+revision = "1de0f7fc7cae0062012c2e91ef02e642c161aa57"
+file = "functiongemma-270m-it-Q4_K_M.gguf"
+sha256 = "7474135cf63b5de86bd29d2feb92c644d48e9df5e1ac31550662af373c67d0fc"
+
+[[models]]
+id = "qwen3-0.6b"
+adapter = "qwen3"
+quant = "Q4_K_M"
+source = "unsloth/Qwen3-0.6B-GGUF"
+revision = "50968a4468ef4233ed78cd7c3de230dd1d61a56b"
+file = "Qwen3-0.6B-Q4_K_M.gguf"
+sha256 = "ac2d97712095a558e31573f62f466a3f9d93990898b0ec79d7c974c1780d524a"
+
+[[models]]
+id = "lfm2.5-1.2b-instruct-qad"
+adapter = "lfm2"
+quant = "QAD_Q4_0"
+source = "LiquidAI/LFM2.5-1.2B-Instruct-GGUF"
+revision = "8ed288026e23958ad9dfa92d53ed773a8eee7125"
+file = "LFM2.5-1.2B-Instruct-QAD-Q4_0.gguf"
+sha256 = "bb741ebb106d543e9de114b843a3d3d73d51c74b5801e69da2abde821a0cb3e1"

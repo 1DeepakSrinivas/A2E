@@ -37,7 +37,7 @@ The tests for the BFCL tool families and web search are `tests/unit/test_agent_t
 ## Running the hardware group
 
 ```bash
-export A2E_LLAMA_SERVER=~/a2e-deps/llama.cpp/build/bin/llama-server
+export A2E_LLAMA_SERVER=deps/llama.cpp/build-a2e/bin/llama-server
 export A2E_GGUF=~/models/qwen3-4b-instruct-2507/qwen3-4b-instruct-2507-q5_k_m.gguf
 export A2E_DEVICE=pi5        # or mac (detected when unset)
 export A2E_CTX=16384         # multi-turn BFCL tests need this

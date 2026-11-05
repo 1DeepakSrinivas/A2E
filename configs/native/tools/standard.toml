@@ -1,0 +1,114 @@
+protocol = 1
+executable = "@self"
+args = ["tool-host"]
+timeout_seconds = 20
+output_limit_bytes = 8192
+
+[[tools]]
+name = "search_files"
+description = "Search local files by keywords."
+
+[tools.parameters]
+type = "object"
+required = ["query"]
+additionalProperties = false
+
+[tools.parameters.properties]
+query = { type = "string", description = "Search terms", maxLength = 1024 }
+
+[[tools]]
+name = "read_file"
+description = "Read a local file."
+
+[tools.parameters]
+type = "object"
+required = ["path"]
+additionalProperties = false
+
+[tools.parameters.properties]
+path = { type = "string", description = "Relative file path", maxLength = 1024 }
+
+[[tools]]
+name = "write_file"
+description = "Write a local file."
+
+[tools.parameters]
+type = "object"
+required = ["path", "content"]
+additionalProperties = false
+
+[tools.parameters.properties]
+path = { type = "string", description = "Relative file path", maxLength = 1024 }
+content = { type = "string", description = "File contents", maxLength = 4096 }
+
+[[tools]]
+name = "calculate"
+description = "Calculate with two numbers."
+
+[tools.parameters]
+type = "object"
+required = ["operation", "a", "b"]
+additionalProperties = false
+
+[tools.parameters.properties]
+operation = { type = "string", description = "Arithmetic operation", enum = ["add", "subtract", "multiply", "divide"] }
+a = { type = "number", description = "First number" }
+b = { type = "number", description = "Second number" }
+
+[[tools]]
+name = "device_list"
+description = "List simulated devices."
+
+[tools.parameters]
+type = "object"
+required = []
+additionalProperties = false
+
+[[tools]]
+name = "device_status"
+description = "Read a simulated device sensor and setting."
+
+[tools.parameters]
+type = "object"
+required = ["name"]
+additionalProperties = false
+
+[tools.parameters.properties]
+name = { type = "string", description = "Device name", maxLength = 1024 }
+
+[[tools]]
+name = "set_setting"
+description = "Change a simulated device setting."
+
+[tools.parameters]
+type = "object"
+required = ["name", "value"]
+additionalProperties = false
+
+[tools.parameters.properties]
+name = { type = "string", description = "Device name", maxLength = 1024 }
+value = { type = "integer", description = "Setting value", minimum = 0, maximum = 100 }
+
+[[tools]]
+name = "web_search"
+description = "Search the web for relevant pages."
+
+[tools.parameters]
+type = "object"
+required = ["query"]
+additionalProperties = false
+
+[tools.parameters.properties]
+query = { type = "string", description = "Search terms", maxLength = 1024 }
+
+[[tools]]
+name = "fetch_page"
+description = "Retrieve a page from the search results."
+
+[tools.parameters]
+type = "object"
+required = ["source_id"]
+additionalProperties = false
+
+[tools.parameters.properties]
+source_id = { type = "string", description = "Source identifier returned by web_search", maxLength = 1024 }

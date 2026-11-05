@@ -1,11 +1,27 @@
 # A2E
 
-A2E measures what it costs to run small language models as tool-calling agents on a Raspberry Pi 5 and an Apple Silicon Mac. It runs models with llama.cpp and records, for every model call, the time spent reading the prompt (prefill), writing the answer (decode), parsing and checking tool calls, and running tools. It also records tokens, prefix cache use, energy, memory, temperature and throttling, and whether the model called the right tools. Accuracy on public data comes from the official Berkeley Function Calling Leaderboard (BFCL v4) checker.
+A2E measures how small language models use tools under time, memory, and call budgets. The native Rust runtime targets Raspberry Pi 3B+ and Apple Silicon Mac. The Python runtime runs BFCL v4 and custom tool evaluations on Raspberry Pi 5 and Apple Silicon Mac. Both use llama.cpp for inference.
 
-## Quick start
+## Native quick start
+
+On the Pi 3B+ with 64-bit Raspberry Pi OS, run this from the project checkout.
 
 ```bash
-LLAMA_COMMIT=<sha> scripts/setup_pi.sh          # or scripts/setup_mac.sh on the Mac
+./setup-pi.sh
+```
+
+The script builds the pinned llama.cpp checkout under `deps/llama.cpp`,
+builds the Rust CLI, and downloads and verifies the three GGUF files under
+`models/native`. After setup, disable swap for the Pi baseline and run
+`target/release/a2e-native run`.
+
+See the [native guide](docs/NATIVE.md) for Mac setup, tool manifests, experiments,
+and OpenRouter judging.
+
+## Python and BFCL quick start
+
+```bash
+scripts/setup_pi.sh                            # or scripts/setup_mac.sh on the Mac
 uv sync --extra bfcl --extra tui
 cp configs/local.example.toml configs/local.toml   # then set llama_server and models_dir
 uv run a2e doctor                                 # check the machine
@@ -30,4 +46,4 @@ On a Mac, run with `sudo -E` to record energy.
 
 ## Status
 
-The system is built and its tests pass against simulated servers. It has not yet been run on real hardware. Run `uv run a2e test hardware` on each device first (see the user guide, section 9).
+The native smoke suite has run against all three models on an Apple Silicon Mac. Run the Pi smoke suite after installation to check its memory and latency limits. The Python path also has a separate `uv run a2e test hardware` group.

@@ -1,0 +1,17 @@
+name = "web_live"
+models = ["functiongemma-270m", "qwen3-0.6b", "lfm2.5-1.2b-instruct-qad"]
+contexts = [1024]
+tasks = ["../tasks/web.json"]
+split = "heldout"
+web_mode = "live"
+warmup = 0
+repeats = 1
+seed = 0
+
+[[variants]]
+name = "autonomous"
+mode = "autonomous"
+
+[[variants]]
+name = "guided"
+mode = "guided"

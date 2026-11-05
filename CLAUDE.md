@@ -1,5 +1,13 @@
 # Working rules for this repository
 
+## Code quality
+
+- Run `cargo fmt --all`, then verify with `cargo fmt --all -- --check` on Rust changes.
+- Run `cargo clippy --workspace --all-targets -- -D warnings` on Rust changes.
+- Run `ruff check` on every Python file created or changed.
+- Fix findings before handing off, and report checks that could not run.
+- Keep comments short and focused on decisions or constraints. Do not add ASCII art or decorative comment separators.
+
 ## Branches
 
 Build each functional area on its own branch. Name it `<area>/<topic>`, and add `-<feature>` when the work is a separate feature inside that area. Use lowercase words joined by hyphens.
@@ -20,5 +28,5 @@ Until the existing work is merged into `main`, start new branches from `claude/u
 
 ## Commits
 
-- Author and committer: `1DeepakSrinivas <90671142+1DeepakSrinivas@users.noreply.github.com>`. Set it with `git config user.name` and `git config user.email` in the repository if it is not already set.
+- Author and committer: `1DeepakSrinivas <90671142+1DeepakSrinivas@users.noreply.github.com>`.
 - Do not add `Co-Authored-By`, `Claude-Session` or any other attribution lines to commit messages or pull requests.
