@@ -215,7 +215,7 @@ pub fn summary(rows: &[Value]) -> Value {
         .filter(|r| r["phase"] == "measured" && r["state"] == "complete")
     {
         let m = &r["metadata"];
-        let k=json!({"study":r["study"],"model":m["model"],"variant":m["variant"],"context":m["context"],"memory_limit_mb":m["memory_limit_mb"],"budget":m["budget"],"family":m["task"]["family"],"required_calls":m["task"]["required_calls"],"available_tools":m["task"]["tools"].as_array().map(Vec::len)}).to_string();
+        let k=json!({"study":r["study"],"model":m["model"],"variant":m["variant"],"context":m["context"],"memory_limit_mb":m["memory_limit_mb"],"budget":m["budget"],"category":m["case"]["category"],"expected_calls":m["case"]["scope"]["expected_calls"],"available_tools":m["case"]["tools"]["allowed"].as_array().map(Vec::len)}).to_string();
         groups.entry(k).or_default().push(r);
     }
     let mut out = Vec::new();
@@ -243,7 +243,7 @@ pub fn summary(rows: &[Value]) -> Value {
             } else {
                 success += usize::from(pass);
                 per_task
-                    .entry(r["metadata"]["task"]["id"].as_str().unwrap_or("").into())
+                    .entry(r["metadata"]["case"]["id"].as_str().unwrap_or("").into())
                     .or_default()
                     .push(if pass { 1. } else { 0. });
             }

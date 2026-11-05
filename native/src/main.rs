@@ -56,6 +56,10 @@ enum Commands {
         #[command(subcommand)]
         command: Tools,
     },
+    Cases {
+        #[command(subcommand)]
+        command: Cases,
+    },
     Results {
         #[arg(long)]
         db: Option<PathBuf>,
@@ -78,6 +82,21 @@ enum Commands {
 #[derive(Subcommand)]
 enum Models {
     Fetch,
+}
+#[derive(Subcommand)]
+enum Cases {
+    Validate {
+        #[arg(default_value = "configs/native/cases")]
+        path: PathBuf,
+        #[arg(long, default_value = "configs/native/tools/standard.toml")]
+        manifest: PathBuf,
+    },
+    List {
+        #[arg(default_value = "configs/native/cases")]
+        path: PathBuf,
+        #[arg(long)]
+        ids: bool,
+    },
 }
 #[derive(Subcommand)]
 enum Tools {
@@ -110,6 +129,9 @@ fn entry() -> Result<()> {
         );
         return Ok(());
     }
+    if let Commands::Cases { command } = &cli.command {
+        return cases(command);
+    }
     let c = Config::load(&cli.config)?;
     let stop = Arc::new(AtomicBool::new(false));
     let flag = stop.clone();
@@ -126,7 +148,7 @@ fn entry() -> Result<()> {
         Commands::Doctor { probe } => doctor(&c, probe, stop)?,
         Commands::Plan { suite, manifest } => {
             let s = Suite::load(&suite)?;
-            a2e_native::runner::plan(&c, &s, &s.load_tasks(&suite)?, &Manifest::load(&manifest)?)?
+            a2e_native::runner::plan(&c, &s, &s.load_cases(&suite)?, &Manifest::load(&manifest)?)?
         }
         Commands::Run {
             suite,
@@ -137,7 +159,7 @@ fn entry() -> Result<()> {
             a2e_native::runner::run(
                 &c,
                 &s,
-                &s.load_tasks(&suite)?,
+                &s.load_cases(&suite)?,
                 &Manifest::load(&manifest)?,
                 retry_failed,
                 stop,
@@ -159,7 +181,34 @@ fn entry() -> Result<()> {
             study,
             calibration,
         } => a2e_native::judge::run(&db(p)?, &c.judge, study.as_deref(), calibration.as_deref())?,
-        Commands::Tools { .. } | Commands::ToolHost => unreachable!(),
+        Commands::Tools { .. } | Commands::Cases { .. } | Commands::ToolHost => unreachable!(),
+    };
+    println!("{}", serde_json::to_string_pretty(&output)?);
+    Ok(())
+}
+/// Case file validation and listing; needs no model configuration.
+fn cases(command: &Cases) -> Result<()> {
+    let output = match command {
+        Cases::Validate { path, manifest } => {
+            let m = Manifest::load(manifest)?;
+            let registry = m.tools.iter().map(|t| t.name.as_str()).collect();
+            let all = a2e_native::case::load_all(std::slice::from_ref(path))?;
+            for case in &all {
+                case.validate(&registry)?;
+            }
+            json!({"valid":true,"summary":a2e_native::case::summary(&all)})
+        }
+        Cases::List { path, ids } => {
+            let all = a2e_native::case::load_all(std::slice::from_ref(path))?;
+            let mut out = a2e_native::case::summary(&all);
+            if *ids {
+                out["cases"] = json!(all
+                    .iter()
+                    .map(|c| json!({"id":c.id,"category":c.category,"split":c.split,"tags":c.tags}))
+                    .collect::<Vec<_>>());
+            }
+            out
+        }
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())

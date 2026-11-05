@@ -1,0 +1,32 @@
+id = "missing-argument-dev"
+category = "missing_param"
+tags = ["migrated", "edge"]
+split = "dev"
+
+[scope]
+expected_calls = 1
+prompt = "A device should be adjusted, but its name and setting have not been supplied. Ask for both values without changing any setting."
+
+[tools]
+allowed = ["device_status", "set_setting"]
+
+[fixtures.devices.cooler]
+setting = 20
+temperature = 35
+
+[[stage]]
+instruction = "Ask for the missing device name and setting; do not guess."
+successes = 1
+tools = ["device_status"]
+
+[[check]]
+kind = "no_call"
+tool = "set_setting"
+
+[[check]]
+contains = "name"
+kind = "answer"
+
+[[check]]
+contains = "setting"
+kind = "answer"

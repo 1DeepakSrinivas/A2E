@@ -2,6 +2,7 @@
 // Runtime settings, model registry, and experiment definitions
 // Local overrides, pinned model downloads, and task and tool schema checks
 
+use crate::case::{self, Case, Split};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -235,13 +236,33 @@ impl Default for Budget {
         }
     }
 }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Mode {
+    #[default]
+    Autonomous,
+    Guided,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextWindow {
+    #[default]
+    Full,
+    Recent,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WebMode {
+    Fixture,
+    Live,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Variant {
     pub name: String,
-    pub mode: String,
+    pub mode: Mode,
     pub filter_top_k: usize,
-    pub context: String,
+    pub context: ContextWindow,
     pub constrained: bool,
     pub repairs: usize,
 }
@@ -249,9 +270,9 @@ impl Default for Variant {
     fn default() -> Self {
         Self {
             name: "baseline".into(),
-            mode: "autonomous".into(),
+            mode: Mode::Autonomous,
             filter_top_k: 0,
-            context: "full".into(),
+            context: ContextWindow::Full,
             constrained: false,
             repairs: 0,
         }
@@ -263,9 +284,11 @@ pub struct Suite {
     pub name: String,
     pub models: Vec<String>,
     pub contexts: Vec<usize>,
-    pub tasks: Vec<String>,
-    pub split: String,
-    pub web_mode: String,
+    pub cases: Vec<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub split: Split,
+    pub web_mode: WebMode,
     pub warmup: usize,
     pub repeats: usize,
     #[serde(default)]
@@ -279,17 +302,12 @@ impl Suite {
         let s: Self = toml::from_str(&std::fs::read_to_string(path)?)?;
         if s.models.is_empty()
             || s.contexts.is_empty()
-            || s.tasks.is_empty()
+            || s.cases.is_empty()
             || s.variants.is_empty()
             || s.repeats == 0
             || s.contexts.iter().any(|n| *n < 256)
         {
             bail!("suite has empty axes or invalid limits");
-        }
-        if !["dev", "heldout"].contains(&s.split.as_str())
-            || !["fixture", "live"].contains(&s.web_mode.as_str())
-        {
-            bail!("invalid suite split or web_mode");
         }
         if s.budget.model_calls == 0
             || s.budget.model_calls > 128
@@ -303,37 +321,28 @@ impl Suite {
         }
         let mut names = BTreeSet::new();
         for v in &s.variants {
-            if !names.insert(&v.name)
-                || !["autonomous", "guided"].contains(&v.mode.as_str())
-                || !["full", "recent"].contains(&v.context.as_str())
-                || v.repairs > 1
-            {
+            if !names.insert(&v.name) || v.repairs > 1 {
                 bail!("invalid or duplicate variant {}", v.name);
             }
         }
         Ok(s)
     }
-    pub fn load_tasks(&self, path: &Path) -> Result<Vec<Task>> {
+    /// Cases for this suite's split and tags; paths resolve against the suite file.
+    pub fn load_cases(&self, path: &Path) -> Result<Vec<Case>> {
         let base = path.parent().unwrap_or(Path::new("."));
-        let mut tasks = Vec::new();
-        let mut ids = BTreeSet::new();
-        for file in &self.tasks {
-            let text = std::fs::read_to_string(base.join(file))?;
-            let batch: Vec<Task> = serde_json::from_str(&text)?;
-            for t in batch.into_iter().filter(|t| t.split == self.split) {
-                if !ids.insert(t.id.clone()) || t.tools.is_empty() || t.prompt.is_empty() {
-                    bail!("duplicate or empty task {}", t.id);
-                }
-                if t.checks.is_empty() {
-                    bail!("task {} has no outcome checks", t.id);
-                }
-                tasks.push(t);
-            }
+        let selectors = self.cases.iter().map(|c| base.join(c)).collect::<Vec<_>>();
+        let cases = case::load_all(&selectors)?
+            .into_iter()
+            .filter(|c| c.split == self.split && self.tags.iter().all(|t| c.tags.contains(t)))
+            .collect::<Vec<_>>();
+        if cases.is_empty() {
+            bail!(
+                "no cases for split {:?} and tags {:?}",
+                self.split,
+                self.tags
+            );
         }
-        if tasks.is_empty() {
-            bail!("no tasks for split {}", self.split);
-        }
-        Ok(tasks)
+        Ok(cases)
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -347,33 +356,6 @@ pub struct Stage {
 fn one() -> usize {
     1
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Check {
-    pub kind: String,
-    pub key: String,
-    pub expected: Value,
-}
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Task {
-    pub id: String,
-    pub split: String,
-    pub family: String,
-    pub prompt: String,
-    pub tools: Vec<String>,
-    pub required_calls: usize,
-    #[serde(default)]
-    pub fixtures: Value,
-    #[serde(default)]
-    pub stages: Vec<Stage>,
-    pub checks: Vec<Check>,
-    #[serde(default)]
-    pub summary: bool,
-    #[serde(default)]
-    pub required_facts: Vec<String>,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ToolSpec {

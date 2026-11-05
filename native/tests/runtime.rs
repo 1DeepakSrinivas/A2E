@@ -4,9 +4,11 @@
 mod support;
 use a2e_native::{
     adapter::{Adapter, Call},
-    config::{Config, Manifest, Runtime, Suite, Task, Variant},
+    case::{Case, FinalAnswer},
+    config::{Config, Manifest, Mode, Runtime, Suite, Variant},
+    eval::{evaluate, FailureClass, Observation},
     inference::Inference,
-    runner::{task_run, TaskExecution},
+    runner::{select_tools, task_run, Status, TaskExecution},
     sdk::{ToolHost, ToolProcess},
     store::Store,
     tools::Builtins,
@@ -33,15 +35,15 @@ fn manifest() -> Manifest {
 fn suite() -> Suite {
     Suite::load(&repo().join("configs/native/suites/smoke.toml")).unwrap()
 }
-fn task() -> Task {
+fn task() -> Case {
     let s = suite();
-    s.load_tasks(&repo().join("configs/native/suites/smoke.toml"))
+    s.load_cases(&repo().join("configs/native/suites/smoke.toml"))
         .unwrap()
         .into_iter()
         .find(|t| t.id.starts_with("copy-"))
         .unwrap()
 }
-fn execute(server: &MockServer, t: &Task, v: &Variant, s: &Suite) -> a2e_native::runner::Outcome {
+fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> a2e_native::runner::Outcome {
     let dir = tempfile::tempdir().unwrap();
     let client = Inference::new(server.url.clone()).unwrap();
     let runtime = Runtime {
@@ -53,7 +55,7 @@ fn execute(server: &MockServer, t: &Task, v: &Variant, s: &Suite) -> a2e_native:
     task_run(TaskExecution {
         client: &client,
         adapter: Adapter::Qwen,
-        task: t,
+        case: t,
         suite: s,
         variant: v,
         manifest: &manifest(),
@@ -68,7 +70,7 @@ fn execute(server: &MockServer, t: &Task, v: &Variant, s: &Suite) -> a2e_native:
 
 #[test]
 fn dependency_chain_checks_final_state_in_both_modes() {
-    for mode in ["autonomous", "guided"] {
+    for mode in [Mode::Autonomous, Mode::Guided] {
         let server = MockServer::new(
             vec![
                 call("read_file", json!({"path":"reading.txt"})),
@@ -85,12 +87,12 @@ fn dependency_chain_checks_final_state_in_both_modes() {
             &server,
             &task(),
             &Variant {
-                mode: mode.into(),
+                mode,
                 ..Default::default()
             },
             &suite(),
         );
-        assert_eq!(out.status, "success");
+        assert_eq!(out.status, Status::Success);
         assert_eq!(out.model_calls, 3);
         assert_eq!(out.tool_invocations, 2);
         assert_eq!(out.generated_tokens, Some(36));
@@ -121,10 +123,12 @@ fn alternative_valid_action_sequence_passes() {
             arguments: json!({"path":"copy.txt","content":"Reading: 17"}),
         },
     ];
-    assert_eq!(
-        a2e_native::runner::checks(&t, &state, &calls, "done").unwrap()[0]["passed"],
-        true
-    );
+    let observation = Observation {
+        calls: &calls,
+        state: &state,
+        answer: "done",
+    };
+    assert!(evaluate(&t, &observation).iter().all(|c| c.passed));
 }
 #[test]
 fn bounded_repair_counts_failed_model_calls() {
@@ -150,7 +154,7 @@ fn bounded_repair_counts_failed_model_calls() {
         },
         &suite(),
     );
-    assert_eq!(out.status, "success");
+    assert_eq!(out.status, Status::Success);
     assert_eq!(out.repairs, 1);
     assert_eq!(out.model_calls, 4);
 }
@@ -162,7 +166,7 @@ fn invalid_arguments_are_not_executed() {
         Duration::ZERO,
     );
     let out = execute(&server, &task(), &Variant::default(), &suite());
-    assert_eq!(out.status, "model_failure", "{:?}", out.reason);
+    assert_eq!(out.status, Status::ModelFailure, "{:?}", out.reason);
     assert_eq!(out.argument_errors, 1);
     assert_eq!(out.tool_invocations, 0);
 }
@@ -170,7 +174,7 @@ fn invalid_arguments_are_not_executed() {
 fn context_budget_prevents_generation() {
     let server = MockServer::new(vec![], 900, Duration::ZERO);
     let out = execute(&server, &task(), &Variant::default(), &suite());
-    assert_eq!(out.status, "resource_limit");
+    assert_eq!(out.status, Status::ResourceLimit);
     assert_eq!(out.model_calls, 0);
     assert_eq!(out.reason.as_deref(), Some("context_budget"));
 }
@@ -191,7 +195,7 @@ fn timeout_keeps_failed_call_cost_and_missing_timings() {
     let mut s = suite();
     s.budget.call_seconds = 1;
     let out = execute(&server, &task(), &Variant::default(), &s);
-    assert_ne!(out.status, "success");
+    assert_ne!(out.status, Status::Success);
     assert_eq!(out.model_calls, 1);
     assert!(out.http_ms >= 900.);
     assert_eq!(out.generated_tokens, None);
@@ -270,7 +274,7 @@ fn store_recovers_interrupted_attempt_without_double_counting() {
     let dir = tempfile::tempdir().unwrap();
     let st = Store::open(&dir.path().join("native.db")).unwrap();
     st.study("study", &json!({})).unwrap();
-    let meta = json!({"model":"test","variant":{"name":"baseline"},"context":1024,"task":{"id":"t","family":"local","required_calls":1,"tools":["read_file"]}});
+    let meta = json!({"model":"test","variant":{"name":"baseline"},"context":1024,"case":{"id":"t","category":"simple","scope":{"expected_calls":1},"tools":{"allowed":["read_file"]}}});
     st.begin("study", "job", "measured", &meta, Path::new("trace"))
         .unwrap();
     assert_eq!(st.recover().unwrap(), 1);
@@ -308,9 +312,9 @@ fn every_shipped_suite_validates_and_has_disjoint_splits() {
     for entry in std::fs::read_dir(repo().join("configs/native/suites")).unwrap() {
         let path = entry.unwrap().path();
         let s = Suite::load(&path).unwrap();
-        let tasks = s.load_tasks(&path).unwrap();
-        assert!(a2e_native::runner::plan(&cfg, &s, &tasks, &m).is_ok());
-        assert!(tasks.iter().all(|t| t.split == s.split));
+        let cases = s.load_cases(&path).unwrap();
+        assert!(a2e_native::runner::plan(&cfg, &s, &cases, &m).is_ok());
+        assert!(cases.iter().all(|c| c.split == s.split));
     }
 }
 #[test]
@@ -366,4 +370,117 @@ fn file_paths_and_html_extraction_keep_tool_data_bounded() {
     );
     assert_eq!(text, "Visible facts");
     assert!(a2e_native::read_bounded(std::io::Cursor::new(vec![0; 1025]), 1024).is_err());
+}
+
+#[test]
+fn shipped_cases_validate_against_the_standard_manifest() {
+    let registry = manifest();
+    let registry = registry
+        .tools
+        .iter()
+        .map(|t| t.name.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    let cases = a2e_native::case::load_all(&[repo().join("configs/native/cases")]).unwrap();
+    assert!(cases.len() >= 48);
+    for c in &cases {
+        c.validate(&registry).unwrap();
+    }
+}
+#[test]
+fn guided_plan_marks_cases_without_a_workflow_not_applicable() {
+    let cfg = Config::load(&repo().join("configs/native/models.toml")).unwrap();
+    let mut chain = task();
+    chain.stages.clear();
+    let single = {
+        let mut c = task();
+        c.id = "single".into();
+        c.category = a2e_native::case::Category::Simple;
+        c.stages.clear();
+        c
+    };
+    chain.id = "chain".into();
+    let mut s = suite();
+    s.variants = vec![
+        Variant::default(),
+        Variant {
+            name: "guided".into(),
+            mode: Mode::Guided,
+            ..Default::default()
+        },
+    ];
+    let plan = a2e_native::runner::plan(&cfg, &s, &[chain, single], &manifest()).unwrap();
+    let groups = plan["groups"].as_array().unwrap();
+    let guided = groups
+        .iter()
+        .find(|g| g["variant"]["name"] == "guided")
+        .unwrap();
+    assert_eq!(
+        (guided["cases"].as_u64(), guided["not_applicable"].as_u64()),
+        (Some(1), Some(1))
+    );
+    let auto = groups
+        .iter()
+        .find(|g| g["variant"]["name"] == "baseline")
+        .unwrap();
+    assert_eq!(auto["not_applicable"], 0);
+}
+#[test]
+fn distractors_extend_autonomous_tools_but_not_guided_stages() {
+    let mut c = task();
+    let m = manifest();
+    let base = select_tools(&c, &m, &Variant::default(), &[], 0)
+        .unwrap()
+        .len();
+    c.tools.distractors = 3;
+    let auto = select_tools(&c, &m, &Variant::default(), &[], 0).unwrap();
+    assert_eq!(auto.len(), base + 3);
+    let guided = Variant {
+        mode: Mode::Guided,
+        ..Default::default()
+    };
+    let stages = c.stage_plan().unwrap();
+    let names = select_tools(&c, &m, &guided, &stages, 0).unwrap();
+    assert_eq!(names.len(), stages[0].tools.len() + 1);
+}
+#[test]
+fn state_only_case_passes_without_a_final_answer_when_optional() {
+    let mut c = task();
+    c.scope.final_answer = FinalAnswer::Optional;
+    let script = vec![
+        call("read_file", json!({"path":"reading.txt"})),
+        call(
+            "write_file",
+            json!({"path":"copy.txt","content":"Reading: 17"}),
+        ),
+    ];
+    let server = MockServer::new(
+        [script.clone(), vec!["<tool_call>x".into(); 8]].concat(),
+        100,
+        Duration::ZERO,
+    );
+    let mut s = suite();
+    s.budget.model_calls = 2;
+    let out = execute(&server, &c, &Variant::default(), &s);
+    assert_eq!(out.status, Status::Success, "{:?}", out.reason);
+    assert!(out.answer.is_none());
+    c.scope.final_answer = FinalAnswer::Required;
+    let server = MockServer::new(script, 100, Duration::ZERO);
+    let out = execute(&server, &c, &Variant::default(), &s);
+    assert_eq!(out.status, Status::ResourceLimit);
+    assert_eq!(out.failure_class, Some(FailureClass::ResourceLimit));
+}
+#[test]
+fn failed_attempts_report_a_failure_class_and_check_results() {
+    let server = MockServer::new(
+        vec![
+            call("write_file", json!({"path":"copy.txt","content":"wrong"})),
+            call("final_answer", json!({"answer":"done"})),
+        ],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &task(), &Variant::default(), &suite());
+    assert_eq!(out.reason.as_deref(), Some("outcome_check_failed"));
+    assert_eq!(out.failure_class, Some(FailureClass::StateMismatch));
+    assert!(out.checks.iter().any(|c| !c.passed));
 }

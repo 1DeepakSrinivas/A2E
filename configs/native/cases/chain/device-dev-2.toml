@@ -1,0 +1,30 @@
+id = "device-dev-2"
+category = "chain"
+tags = ["migrated", "device"]
+split = "dev"
+
+[scope]
+expected_calls = 2
+prompt = "Read the cooler sensor. If its temperature exceeds 30, set its setting to 80. Otherwise leave the setting unchanged."
+
+[tools]
+allowed = ["device_status", "set_setting"]
+
+[fixtures.devices.cooler]
+setting = 20
+temperature = 37
+
+[[stage]]
+instruction = "Read the cooler sensor."
+successes = 1
+tools = ["device_status"]
+
+[[stage]]
+instruction = "Apply the requested conditional setting change."
+successes = 1
+tools = ["set_setting"]
+
+[[check]]
+eq = 80
+kind = "state"
+path = "/devices/cooler/setting"

@@ -1,0 +1,40 @@
+id = "difference-dev-2"
+category = "chain"
+tags = ["migrated", "local"]
+split = "dev"
+
+[scope]
+expected_calls = 4
+prompt = "Find the sensor reading file, read its numeric reading, subtract 8 using calculate, and write only the result to result.txt."
+
+[tools]
+allowed = ["search_files", "read_file", "calculate", "write_file"]
+
+[fixtures.files]
+"notes.txt" = "No readings here."
+"sensors/reading.txt" = "19"
+
+[[stage]]
+instruction = "Find the sensor reading file."
+successes = 1
+tools = ["search_files"]
+
+[[stage]]
+instruction = "Read the matching file."
+successes = 1
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Subtract 8 from the reading."
+successes = 1
+tools = ["calculate"]
+
+[[stage]]
+instruction = "Write only the numeric result to result.txt."
+successes = 1
+tools = ["write_file"]
+
+[[check]]
+eq = "11"
+kind = "file"
+path = "result.txt"

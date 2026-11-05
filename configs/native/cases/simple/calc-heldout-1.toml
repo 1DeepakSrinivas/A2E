@@ -1,0 +1,25 @@
+id = "calc-heldout-1"
+category = "simple"
+tags = ["migrated", "local"]
+split = "heldout"
+
+[scope]
+expected_calls = 1
+prompt = "Use calculate to subtract 7 from 31, then report the result."
+
+[tools]
+allowed = ["calculate", "device_list"]
+
+[[stage]]
+instruction = "Calculate the requested difference."
+successes = 1
+tools = ["calculate"]
+
+[[check]]
+kind = "call"
+tool = "calculate"
+
+[check.args]
+a = 31
+b = 7
+operation = "subtract"

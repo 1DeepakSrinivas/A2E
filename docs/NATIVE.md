@@ -36,8 +36,8 @@ target/release/a2e-native results --json --csv results/native/runs.csv
 ```
 
 Pass a suite file to `plan` or `run`. The native suites cover the development
-smoke run, held-out baseline, harness comparisons, context and tool-count
-boundaries, and live Brave search. Set `BRAVE_SEARCH_API_KEY` for the live
+smoke run, held-out baseline, harness comparisons, context boundaries, and live
+Brave search. Set `BRAVE_SEARCH_API_KEY` for the live
 suite. The other suites use recorded fixture data.
 
 Rerun the same command to resume completed work. Use `--retry-failed` to
@@ -49,6 +49,15 @@ Latency includes failed attempts. The runtime measures model loading separately
 and records inference, harness, and tool process RSS. Peak RSS comes from
 samples. Pi power is unavailable. Mac power comes from privileged
 `powermetrics` samples and covers the reported CPU, GPU, and ANE scope.
+
+## Cases
+
+Each benchmark case is one TOML file under `configs/native/cases/<category>/`.
+A case sets its scope (prompt and call limits), the tools it may use, fixtures,
+typed outcome checks, and optional judge settings. A suite selects cases by
+path, split, and tags. Run `a2e-native cases validate` to check every file
+against the tool manifest and `a2e-native cases list --ids` to see the counts.
+See `configs/native/cases/chain/difference-dev-0.toml` for a worked example.
 
 ## Add a tool
 
@@ -62,8 +71,8 @@ the manifest at it.
 The harness starts the executable once per task. It sends `init`, `call`,
 and `snapshot` requests as JSON lines. The response echoes `protocol` and
 `id` and contains `ok`, `output`, and `error`. Write diagnostics to stderr.
-Use `A2E_TOOL_ROOT` for task files. Register the tool name in a task's
-`tools` list, then run `a2e-native tools validate <manifest>` and pass
+Use `A2E_TOOL_ROOT` for task files. Register the tool name in a case's
+`tools.allowed` list, then run `a2e-native tools validate <manifest>` and pass
 `--manifest <manifest>` to `plan` and `run`. Run tool executables you trust.
 
 ## Score retrieval summaries

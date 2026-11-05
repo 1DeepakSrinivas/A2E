@@ -1,0 +1,29 @@
+id = "copy-heldout-0"
+category = "chain"
+tags = ["migrated", "local"]
+split = "heldout"
+
+[scope]
+expected_calls = 2
+prompt = "Read reading.txt and copy its exact contents to copy.txt."
+
+[tools]
+allowed = ["read_file", "write_file"]
+
+[fixtures.files]
+"reading.txt" = "Reading: 30"
+
+[[stage]]
+instruction = "Read reading.txt."
+successes = 1
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Copy the returned contents into copy.txt."
+successes = 1
+tools = ["write_file"]
+
+[[check]]
+eq = "Reading: 30"
+kind = "file"
+path = "copy.txt"

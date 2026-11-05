@@ -1,7 +1,8 @@
 name = "smoke"
 models = ["functiongemma-270m", "qwen3-0.6b", "lfm2.5-1.2b-instruct-qad"]
 contexts = [1024]
-tasks = ["../tasks/smoke.json"]
+cases = ["../cases"]
+tags = ["smoke"]
 split = "dev"
 web_mode = "fixture"
 warmup = 0

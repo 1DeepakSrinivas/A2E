@@ -1,0 +1,32 @@
+id = "tool-error-dev"
+category = "recovery"
+tags = ["migrated", "edge"]
+split = "dev"
+
+[scope]
+expected_calls = 2
+prompt = "Read reading.txt. If the read fails temporarily, retry it once. Copy the contents to result.txt."
+
+[tools]
+allowed = ["read_file", "write_file"]
+
+[fixtures.fail_once]
+read_file = 1
+
+[fixtures.files]
+"reading.txt" = "42"
+
+[[stage]]
+instruction = "Read reading.txt; retry once if it fails temporarily."
+successes = 1
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Copy the returned content to result.txt."
+successes = 1
+tools = ["write_file"]
+
+[[check]]
+eq = "42"
+kind = "file"
+path = "result.txt"

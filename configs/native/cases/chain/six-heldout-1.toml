@@ -1,0 +1,50 @@
+id = "six-heldout-1"
+category = "chain"
+tags = ["migrated", "local"]
+split = "heldout"
+
+[scope]
+expected_calls = 6
+prompt = "Read first.txt and second.txt, add their numbers using calculate, write the sum to sum.txt, read it back, and copy the verified result to verified.txt."
+
+[tools]
+allowed = ["read_file", "calculate", "write_file", "device_list"]
+
+[fixtures.files]
+"first.txt" = "31"
+"second.txt" = "7"
+
+[[stage]]
+instruction = "Read first.txt and second.txt."
+successes = 2
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Add the two readings."
+successes = 1
+tools = ["calculate"]
+
+[[stage]]
+instruction = "Write the numeric sum to sum.txt."
+successes = 1
+tools = ["write_file"]
+
+[[stage]]
+instruction = "Read sum.txt back."
+successes = 1
+tools = ["read_file"]
+
+[[stage]]
+instruction = "Copy the verified numeric sum to verified.txt."
+successes = 1
+tools = ["write_file"]
+
+[[check]]
+eq = "38"
+kind = "file"
+path = "sum.txt"
+
+[[check]]
+eq = "38"
+kind = "file"
+path = "verified.txt"

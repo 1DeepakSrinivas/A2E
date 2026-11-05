@@ -3,7 +3,9 @@
 // Artifact hashing, bounded reads, and UTF-8-safe text limits
 
 pub mod adapter;
+pub mod case;
 pub mod config;
+pub mod eval;
 pub mod inference;
 pub mod judge;
 pub mod measure;

@@ -1,0 +1,25 @@
+id = "calc-dev-2"
+category = "simple"
+tags = ["migrated", "local"]
+split = "dev"
+
+[scope]
+expected_calls = 1
+prompt = "Use calculate to subtract 8 from 19, then report the result."
+
+[tools]
+allowed = ["calculate", "device_list"]
+
+[[stage]]
+instruction = "Calculate the requested difference."
+successes = 1
+tools = ["calculate"]
+
+[[check]]
+kind = "call"
+tool = "calculate"
+
+[check.args]
+a = 19
+b = 8
+operation = "subtract"
