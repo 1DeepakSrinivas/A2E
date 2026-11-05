@@ -56,8 +56,9 @@ and the evidence used for judging.
 
 ## Sending results to the cloud
 
-Judging, scoring and reports run in the A2E-Results project, which is checked
-out as the submodule `third_party/a2e-results`. Its `docs/API.md` describes the
+Judging, scoring and reports run in the A2E-Results project
+(https://github.com/1DeepakSrinivas/A2E-Results), which is checked out as the
+submodule `a2e-results` in the repository root. Its `docs/API.md` describes the
 Worker API. After each attempt the runner posts the study, the model load and the
 finished attempt to the Worker. Set `WORKER_URL` and `WRITE_TOKEN` in the shell
 or in `.env` (see `.env.example`).
@@ -101,7 +102,7 @@ The four live search cases are in `configs/native/cases/web_live` and run only
 from the `web_live` suite.
 
 Run `a2e-native cases validate` to check every file against the tool
-definitions. When the submodule is checked out, it also checks judge rubric names against `third_party/a2e-results/cli/rubrics`. Run `a2e-native cases list --ids` to see the
+definitions. When the submodule is checked out, it also checks judge rubric names against `a2e-results/cli/rubrics`. Run `a2e-native cases list --ids` to see the
 counts by category and split. See `configs/native/cases/chain/chain-copy.toml`
 for a worked example.
 
@@ -243,8 +244,8 @@ passes `budget.tool_seconds` or returns more than `budget.tool_output_bytes`.
 
 This program only produces results. The A2E-Results project stores them in a
 Cloudflare D1 database and does the judging, scoring, summaries, CSV export and
-reports. See `third_party/a2e-results/README.md` for its commands and
-`third_party/a2e-results/docs/API.md` for the Worker API this program follows.
+reports. See `a2e-results/README.md` for its commands and
+`a2e-results/docs/API.md` for the Worker API this program follows.
 
 Each attempt is posted as one request with its turns, tool calls, checks and
 resource samples. The ids are `<first 12 characters of the study id>-<first 16
@@ -268,7 +269,7 @@ required_facts = ["The fee is 12 dollars."]
 
 The `handoff` list chooses what the judge sees. The fields are `prompt`,
 `answer`, `calls`, `evidence`, `files`, `state_diff`, and `required_facts`. The
-rubric named in the case is a TOML file in `third_party/a2e-results/cli/rubrics`.
+rubric named in the case is a TOML file in `a2e-results/cli/rubrics`.
 A run with a judged case sends its `answer`, `evidence`, `final_state` and tool
 calls, which is all the judge needs.
 

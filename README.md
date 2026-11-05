@@ -17,7 +17,7 @@ builds the Rust CLI, and downloads and verifies the three GGUF files under
 
 See the [native guide](docs/NATIVE.md) for Mac setup, writing cases and tools, and
 sending results to the cloud. Judging, scoring and reports live in the A2E-Results
-project, which is the submodule `third_party/a2e-results`.
+project ([github.com/1DeepakSrinivas/A2E-Results](https://github.com/1DeepakSrinivas/A2E-Results)), which is the submodule `a2e-results`.
 
 ## Python and BFCL quick start (retired)
 

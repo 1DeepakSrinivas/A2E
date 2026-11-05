@@ -271,9 +271,9 @@ fn live_cases_need_no_fixtures_and_fixture_web_cases_have_pages() {
 
 #[test]
 fn every_judged_case_names_a_rubric_of_the_results_project() {
-    let dir = repo().join("third_party/a2e-results/cli/rubrics");
+    let dir = repo().join("a2e-results/cli/rubrics");
     let Ok(entries) = std::fs::read_dir(&dir) else {
-        eprintln!("skipped: submodule third_party/a2e-results is not checked out");
+        eprintln!("skipped: submodule a2e-results is not checked out");
         return;
     };
     let names: Vec<String> = entries

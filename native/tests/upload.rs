@@ -265,9 +265,9 @@ fn check_row(
 
 #[test]
 fn payload_fields_match_the_worker_schema() {
-    let schema = repo().join("third_party/a2e-results/worker/migrations/0001_schema.sql");
+    let schema = repo().join("a2e-results/worker/migrations/0001_schema.sql");
     let Ok(sql) = std::fs::read_to_string(&schema) else {
-        eprintln!("skipped: submodule third_party/a2e-results is not checked out");
+        eprintln!("skipped: submodule a2e-results is not checked out");
         return;
     };
     let tables = schema_columns(&sql);

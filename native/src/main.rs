@@ -73,7 +73,7 @@ enum Cases {
         path: PathBuf,
         #[arg(long, default_value = "configs/native/tools/standard.toml")]
         tools: PathBuf,
-        #[arg(long, default_value = "third_party/a2e-results/cli/rubrics")]
+        #[arg(long, default_value = "a2e-results/cli/rubrics")]
         rubrics: PathBuf,
     },
     List {
