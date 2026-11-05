@@ -60,28 +60,6 @@ impl Default for Runtime {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct JudgeConfig {
-    pub model: String,
-    pub provider: String,
-    pub max_tokens: u32,
-    pub timeout_seconds: u64,
-    pub max_requests: usize,
-    pub rubrics_dir: String,
-}
-impl Default for JudgeConfig {
-    fn default() -> Self {
-        Self {
-            model: String::new(),
-            provider: String::new(),
-            max_tokens: 2048,
-            timeout_seconds: 120,
-            max_requests: 100,
-            rubrics_dir: "configs/native/rubrics".into(),
-        }
-    }
-}
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Roles {
@@ -94,8 +72,6 @@ pub struct Roles {
 pub struct Config {
     #[serde(default)]
     pub runtime: Runtime,
-    #[serde(default)]
-    pub judge: JudgeConfig,
     #[serde(default)]
     pub roles: Roles,
     pub models: Vec<Model>,
@@ -209,12 +185,6 @@ impl Config {
         }
         if let Ok(p) = std::env::var("A2E_NATIVE_OUTPUT_DIR") {
             c.runtime.output_dir = p;
-        }
-        if let Ok(m) = std::env::var("A2E_JUDGE_MODEL") {
-            c.judge.model = m;
-        }
-        if let Ok(p) = std::env::var("A2E_JUDGE_PROVIDER") {
-            c.judge.provider = p;
         }
         let mut names = BTreeSet::new();
         for m in &c.models {

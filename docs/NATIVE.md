@@ -40,9 +40,7 @@ host file and the roles.
 ```bash
 target/release/a2e-native plan
 target/release/a2e-native run
-target/release/a2e-native results
-target/release/a2e-native results --json --csv results/native/runs.csv
-target/release/a2e-native report
+target/release/a2e-native upload --status
 ```
 
 Pass a suite file to `plan` or `run`. The shipped suites are listed in the
@@ -103,7 +101,7 @@ The four live search cases are in `configs/native/cases/web_live` and run only
 from the `web_live` suite.
 
 Run `a2e-native cases validate` to check every file against the tool
-definitions and the rubric files. Run `a2e-native cases list --ids` to see the
+definitions. When the submodule is checked out, it also checks judge rubric names against `third_party/a2e-results/cli/rubrics`. Run `a2e-native cases list --ids` to see the
 counts by category and split. See `configs/native/cases/chain/chain-copy.toml`
 for a worked example.
 
@@ -241,65 +239,24 @@ to check that every definition has a handler and a valid schema. Keep handlers
 bounded in time and output, because the harness stops an attempt when a call
 passes `budget.tool_seconds` or returns more than `budget.tool_output_bytes`.
 
-## Results database
+## Results, judging and reports
 
-Results are stored in SQLite at `results/native/native.sqlite3`. Schema version
-2 uses normal tables, so you can query them directly. A database from the
-earlier layout is refused with a message, and you start a new results
-directory instead.
+This program only produces results. The A2E-Results project stores them in a
+Cloudflare D1 database and does the judging, scoring, summaries, CSV export and
+reports. See `third_party/a2e-results/README.md` for its commands and
+`third_party/a2e-results/docs/API.md` for the Worker API this program follows.
 
-- `studies` and `cases` hold the frozen study definition and each case.
-- `model_loads` holds load time and peak memory for each model start.
-- `runs` has one row per attempt with every headline number as a column.
-- `turns` has one row per model call with token counts and the template,
-  tokenize, request, prefill, decode, and parse times.
-- `tool_calls` has one row per call with its arguments, validity, result, and
-  duration.
-- `checks` has one row per check with its label and result.
-- `samples` has every resource sample, with memory, CPU time, temperature, and
-  power when the device reports them.
-- `judgments`, `run_judgments`, and `judge_calls` hold judge packets, verdicts,
-  and each OpenRouter call with its tokens, time, and cost.
+Each attempt is posted as one request with its turns, tool calls, checks and
+resource samples. The ids are `<first 12 characters of the study id>-<first 16
+of the job>-<attempt>` for a run and `<first 12 of the study>-load-<n>` for a
+model load, so a repeated post stores nothing twice. Samples are written after
+an attempt ends and its wall time is fixed, and the upload runs between
+attempts, so neither changes what is measured. A test checks that time spent
+outside the model, the tools, and parsing stays a small share of wall time.
 
-The views `v_run_summary`, `v_category_success`, `v_failures`, and
-`v_resources` count only the latest attempt of each job. A judged attempt
-counts as a success only when the judge verdict is `pass` and the judge has
-passed calibration.
-
-The harness writes turns, tool calls, checks, and samples in one batch after
-an attempt ends and its wall time is fixed. Storage work therefore does not
-change what is measured. A test checks that time spent outside the model, the
-tools, and parsing stays a small share of wall time.
-
-## Make a report
-
-```bash
-target/release/a2e-native report
-target/release/a2e-native report --study <id> --out reports/mac --run <run-id>
-```
-
-The command reads the newest study unless you pass `--study`, and writes
-`report.md` and a `plots` directory. By default they go to
-`results/native/reports/<study>`. The `--run` option picks which attempt the
-resource timeline shows. Without it, the slowest measured attempt that has
-samples is used.
-
-The report has the study header, a headline table with bootstrap intervals,
-success by category, failure classes, latency, calls and tokens, memory
-against the limit, temperature and energy, judge scores, and a list of failed
-attempts with their failed checks and tool calls. A value that was not
-measured prints as `n/a`. It is never shown as zero.
-
-The seven SVG plots are written by the program with no extra libraries.
-They show success by model and variant, success by category, failure classes,
-wall time, peak memory against the limit, resources over one run, and tokens
-against wall time. Each file is opaque and readable in any viewer.
-
-## Score with a judge
-
-A case can ask for a judge by setting `[judge] enabled = true`. The case then
-ends as `awaiting_judge` once its other checks pass, and it counts as pending
-until the judge has scored it.
+A case asks for a judge by setting `[judge] enabled = true`. The case then ends
+as `awaiting_judge` once its other checks pass, and the cloud judge scores it
+later.
 
 ```toml
 [judge]
@@ -310,27 +267,10 @@ required_facts = ["The fee is 12 dollars."]
 ```
 
 The `handoff` list chooses what the judge sees. The fields are `prompt`,
-`answer`, `calls`, `evidence`, `files`, `state_diff`, and `required_facts`.
-The judge gets only the fields the case lists, and the text in them is marked
-as data, not instructions.
+`answer`, `calls`, `evidence`, `files`, `state_diff`, and `required_facts`. The
+rubric named in the case is a TOML file in `third_party/a2e-results/cli/rubrics`.
+A run with a judged case sends its `answer`, `evidence`, `final_state` and tool
+calls, which is all the judge needs.
 
-A rubric is a TOML file in `configs/native/rubrics`. It has instructions,
-guidance, a `[verdict]` table with `fail_below`, `pass_total`, and `pass_each`,
-and a list of `[[dimensions]]`. Each dimension has five descriptors for the
-scores 0 to 4. The JSON schema for the judge response is built from the
-dimensions, so adding a dimension needs no code change. The rubric hash is
-frozen into the study.
-
-Set `OPENROUTER_API_KEY`, `A2E_JUDGE_MODEL`, and `A2E_JUDGE_PROVIDER`. Choose
-a model and provider that support strict JSON Schema output. Run
-`target/release/a2e-native judge --study <study-id>` after the measured run.
-The command sends the packet for each pending attempt to OpenRouter. Judge
-calls and costs are recorded separately from the edge measurements.
-
-The shipped `retrieval_summary` rubric gives up to 16 points over four
-dimensions. A judgment is provisional until you pass `--calibration <file>`
-with a human-scored set. The JSON file contains `reviewed_by` and at least four
-`cases`. Each case has a `packet`, an `expected_verdict`, and `scores` keyed by
-the rubric dimensions. Calibration needs at least 80% verdict agreement and at
-most 0.75 mean absolute error per dimension. Provisional judgments appear in
-the raw export but not in the success summary.
+Data from an older local `native.sqlite3` is loaded with `bun src/cli.ts import
+--db PATH` in the A2E-Results project.

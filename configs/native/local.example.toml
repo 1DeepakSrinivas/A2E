@@ -6,12 +6,6 @@ models_dir = "models/native"
 memory_limit_mb = 768
 gpu_layers = 0
 
-[judge]
-# Set explicit OpenRouter IDs. No default or fallback model is selected.
-model = ""
-provider = ""
-max_requests = 100
-
 [roles]
 controller = false
 benchmark_target = false

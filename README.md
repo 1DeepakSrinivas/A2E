@@ -15,9 +15,9 @@ builds the Rust CLI, and downloads and verifies the three GGUF files under
 `models/native`. After setup, disable swap for the Pi baseline and run
 `target/release/a2e-native run`.
 
-See the [native guide](docs/NATIVE.md) for Mac setup, writing cases and tools, the
-results database, reports, and OpenRouter judging. After a run, `target/release/a2e-native report`
-writes a Markdown report with SVG plots.
+See the [native guide](docs/NATIVE.md) for Mac setup, writing cases and tools, and
+sending results to the cloud. Judging, scoring and reports live in the A2E-Results
+project, which is the submodule `third_party/a2e-results`.
 
 ## Python and BFCL quick start (retired)
 
