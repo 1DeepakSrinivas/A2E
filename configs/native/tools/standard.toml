@@ -112,3 +112,138 @@ additionalProperties = false
 
 [tools.parameters.properties]
 source_id = { type = "string", description = "Source identifier returned by web_search", maxLength = 1024 }
+
+[[tools]]
+name = "list_dir"
+description = "List the files and folders in a directory."
+parameters = { type = "object", required = [], additionalProperties = false, properties = { path = { type = "string", description = "Directory path, empty for the top level", maxLength = 1024 } } }
+
+[[tools]]
+name = "append_file"
+description = "Add text to the end of a file, creating it if needed."
+parameters = { type = "object", required = ["path", "content"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 }, content = { type = "string", description = "Text to add", maxLength = 4096 } } }
+
+[[tools]]
+name = "move_file"
+description = "Move or rename a file."
+parameters = { type = "object", required = ["from", "to"], additionalProperties = false, properties = { from = { type = "string", description = "Current relative path", maxLength = 1024 }, to = { type = "string", description = "New relative path", maxLength = 1024 } } }
+
+[[tools]]
+name = "delete_file"
+description = "Delete a file."
+parameters = { type = "object", required = ["path"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 } } }
+
+[[tools]]
+name = "grep_file"
+description = "Find the lines of a file that contain some text."
+parameters = { type = "object", required = ["path", "text"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 }, text = { type = "string", description = "Text to find", maxLength = 256 } } }
+
+[[tools]]
+name = "json_get"
+description = "Read one value from a JSON file by key path."
+parameters = { type = "object", required = ["path", "key"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 }, key = { type = "string", description = "Dot path such as items.0.name", maxLength = 256 } } }
+
+[[tools]]
+name = "csv_filter"
+description = "Select the rows of a CSV file where a column matches a value."
+parameters = { type = "object", required = ["path", "column", "op", "value"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 }, column = { type = "string", description = "Column name", maxLength = 128 }, op = { type = "string", description = "Comparison", enum = ["eq", "ne", "gt", "lt", "contains"] }, value = { type = "string", description = "Value to compare with", maxLength = 256 } } }
+
+[[tools]]
+name = "regex_extract"
+description = "Extract the parts of some text that match a regular expression."
+parameters = { type = "object", required = ["text", "pattern"], additionalProperties = false, properties = { text = { type = "string", description = "Text to search", maxLength = 2048 }, pattern = { type = "string", description = "Regular expression, first group is returned", maxLength = 256 } } }
+
+[[tools]]
+name = "word_count"
+description = "Count the words, lines and characters in some text."
+parameters = { type = "object", required = ["text"], additionalProperties = false, properties = { text = { type = "string", description = "Text to count", maxLength = 2048 } } }
+
+[[tools]]
+name = "now"
+description = "Get the current date and time."
+parameters = { type = "object", required = [], additionalProperties = false }
+
+[[tools]]
+name = "date_add"
+description = "Add days to a date."
+parameters = { type = "object", required = ["date", "days"], additionalProperties = false, properties = { date = { type = "string", description = "Date as YYYY-MM-DD", maxLength = 10 }, days = { type = "integer", description = "Days to add, negative to subtract" } } }
+
+[[tools]]
+name = "date_diff"
+description = "Count the days from one date to another."
+parameters = { type = "object", required = ["start", "end"], additionalProperties = false, properties = { start = { type = "string", description = "Start date as YYYY-MM-DD", maxLength = 10 }, end = { type = "string", description = "End date as YYYY-MM-DD", maxLength = 10 } } }
+
+[[tools]]
+name = "weekday"
+description = "Get the weekday of a date."
+parameters = { type = "object", required = ["date"], additionalProperties = false, properties = { date = { type = "string", description = "Date as YYYY-MM-DD", maxLength = 10 } } }
+
+[[tools]]
+name = "unit_convert"
+description = "Convert a value between units of length, mass, data size or temperature."
+parameters = { type = "object", required = ["value", "from", "to"], additionalProperties = false, properties = { value = { type = "number", description = "Value to convert" }, from = { type = "string", description = "Unit to convert from, such as km, lb, GB or c", maxLength = 8 }, to = { type = "string", description = "Unit to convert to", maxLength = 8 } } }
+
+[[tools]]
+name = "kv_set"
+description = "Store a value under a key."
+parameters = { type = "object", required = ["key", "value"], additionalProperties = false, properties = { key = { type = "string", description = "Key", maxLength = 128 }, value = { type = "string", description = "Value", maxLength = 512 } } }
+
+[[tools]]
+name = "kv_get"
+description = "Read the value stored under a key."
+parameters = { type = "object", required = ["key"], additionalProperties = false, properties = { key = { type = "string", description = "Key", maxLength = 128 } } }
+
+[[tools]]
+name = "kv_delete"
+description = "Delete a stored key."
+parameters = { type = "object", required = ["key"], additionalProperties = false, properties = { key = { type = "string", description = "Key", maxLength = 128 } } }
+
+[[tools]]
+name = "kv_list"
+description = "List all stored keys."
+parameters = { type = "object", required = [], additionalProperties = false }
+
+[[tools]]
+name = "note_add"
+description = "Save a note with an optional tag."
+parameters = { type = "object", required = ["text"], additionalProperties = false, properties = { text = { type = "string", description = "Note text", maxLength = 512 }, tag = { type = "string", description = "Optional tag", maxLength = 64 } } }
+
+[[tools]]
+name = "note_list"
+description = "List saved notes, optionally for one tag."
+parameters = { type = "object", required = [], additionalProperties = false, properties = { tag = { type = "string", description = "Tag to filter by", maxLength = 64 } } }
+
+[[tools]]
+name = "note_search"
+description = "Find saved notes that match some words."
+parameters = { type = "object", required = ["query"], additionalProperties = false, properties = { query = { type = "string", description = "Search words", maxLength = 256 } } }
+
+[[tools]]
+name = "todo_add"
+description = "Add an open todo item."
+parameters = { type = "object", required = ["title"], additionalProperties = false, properties = { title = { type = "string", description = "Todo title", maxLength = 512 } } }
+
+[[tools]]
+name = "todo_complete"
+description = "Mark a todo item as done."
+parameters = { type = "object", required = ["id"], additionalProperties = false, properties = { id = { type = "integer", description = "Todo ID", minimum = 1 } } }
+
+[[tools]]
+name = "todo_list"
+description = "List todo items by status."
+parameters = { type = "object", required = [], additionalProperties = false, properties = { status = { type = "string", description = "Status filter", enum = ["open", "done", "all"] } } }
+
+[[tools]]
+name = "db_schema"
+description = "Show the tables and columns of the database."
+parameters = { type = "object", required = [], additionalProperties = false }
+
+[[tools]]
+name = "db_lookup"
+description = "Look up rows in a database table by column values."
+parameters = { type = "object", required = ["table"], additionalProperties = false, properties = { table = { type = "string", description = "Table name", maxLength = 64 }, where = { type = "object", description = "Column values the rows must equal", additionalProperties = { type = ["string", "number", "boolean"] } }, columns = { type = "array", description = "Columns to return, all if omitted", items = { type = "string" }, maxItems = 16 }, limit = { type = "integer", description = "Maximum rows, up to 20", minimum = 1, maximum = 20 } } }
+
+[[tools]]
+name = "db_query"
+description = "Run one read-only SQL SELECT query on the database."
+parameters = { type = "object", required = ["sql"], additionalProperties = false, properties = { sql = { type = "string", description = "A single SELECT statement", maxLength = 512 } } }

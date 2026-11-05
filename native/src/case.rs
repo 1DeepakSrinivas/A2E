@@ -2,7 +2,7 @@
 // Benchmark cases defined in TOML files
 // Typed scope, checks, judge handoff, validation, and directory loading
 
-use crate::config::Stage;
+use crate::{config::Stage, fixtures::Fixtures, tools};
 use anyhow::{bail, Context, Result};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -257,7 +257,7 @@ pub struct Case {
     #[serde(default, rename = "stage")]
     pub stages: Vec<Stage>,
     #[serde(default)]
-    pub fixtures: Value,
+    pub fixtures: Fixtures,
     #[serde(rename = "check")]
     pub checks: Vec<Check>,
     #[serde(default)]
@@ -312,12 +312,35 @@ impl Case {
         for c in &self.checks {
             c.validate(&allowed).with_context(|| format!("case {id}"))?;
         }
+        self.validate_fixtures(&allowed)?;
         if self.judge.enabled && (self.judge.rubric.is_empty() || self.judge.handoff.is_empty()) {
             return fail("judge needs a rubric and handoff fields");
         }
         for g in &self.golden {
             if !allowed.contains(g.tool.as_str()) {
                 return fail(&format!("golden call uses unknown tool {}", g.tool));
+            }
+        }
+        Ok(())
+    }
+    fn validate_fixtures(&self, allowed: &BTreeSet<&str>) -> Result<()> {
+        let (id, f) = (&self.id, &self.fixtures);
+        for name in f.files.keys() {
+            tools::safe_path(Path::new("."), name)
+                .with_context(|| format!("case {id}: fixture file {name}"))?;
+        }
+        if let Some(clock) = &f.clock {
+            tools::parse_date(clock).with_context(|| format!("case {id}: fixture clock"))?;
+        }
+        if let Some(db) = &f.db {
+            let sql = db.sql.as_deref().with_context(|| {
+                format!("case {id}: database seed needs sql or a resolvable sql_file")
+            })?;
+            tools::check_seed(sql).with_context(|| format!("case {id}"))?;
+        }
+        for fault in &f.faults {
+            if !allowed.contains(fault.tool.as_str()) {
+                bail!("case {id}: fault on {} outside tools.allowed", fault.tool);
             }
         }
         Ok(())
@@ -367,8 +390,18 @@ pub fn load_all(selectors: &[PathBuf]) -> Result<Vec<Case>> {
     let mut ids = BTreeSet::new();
     let mut cases = Vec::with_capacity(files.len());
     for f in files {
-        let case = Case::from_toml(&std::fs::read_to_string(&f)?)
+        let mut case = Case::from_toml(&std::fs::read_to_string(&f)?)
             .with_context(|| format!("{}", f.display()))?;
+        if let Some(seed) = case.fixtures.db.as_mut() {
+            if let Some(file) = seed.sql_file.take() {
+                let dir = f.parent().unwrap_or(Path::new("."));
+                let path = dir.join(&file);
+                seed.sql =
+                    Some(std::fs::read_to_string(&path).with_context(|| {
+                        format!("{}: sql_file {}", f.display(), path.display())
+                    })?);
+            }
+        }
         if !ids.insert(case.id.clone()) {
             bail!("duplicate case id {}", case.id);
         }

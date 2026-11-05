@@ -6,6 +6,7 @@ pub mod adapter;
 pub mod case;
 pub mod config;
 pub mod eval;
+pub mod fixtures;
 pub mod inference;
 pub mod judge;
 pub mod measure;

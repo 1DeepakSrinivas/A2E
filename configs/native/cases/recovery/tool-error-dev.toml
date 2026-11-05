@@ -10,8 +10,10 @@ prompt = "Read reading.txt. If the read fails temporarily, retry it once. Copy t
 [tools]
 allowed = ["read_file", "write_file"]
 
-[fixtures.fail_once]
-read_file = 1
+[[fixtures.faults]]
+tool = "read_file"
+mode = "fail_n"
+n = 1
 
 [fixtures.files]
 "reading.txt" = "42"

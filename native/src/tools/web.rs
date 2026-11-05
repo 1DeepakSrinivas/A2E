@@ -1,52 +1,18 @@
-// tools.rs
-// Built-in tools for local files, arithmetic, simulated devices, and web retrieval
-// Task-scoped fixtures, bounded excerpts, and live destination checks
+// tools/web.rs
+// Search and page retrieval from fixtures or live Brave search
+// Task-scoped source IDs, bounded excerpts, and public-destination checks
 
-use crate::{read_bounded, sdk::ToolHost, text_limit};
+use super::words;
+use crate::{fixtures::Page, read_bounded, text_limit};
 use anyhow::{bail, Context, Result};
 use reqwest::{blocking::Client, Url};
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     net::{IpAddr, SocketAddr, ToSocketAddrs},
-    path::{Component, Path, PathBuf},
     time::Duration,
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Page {
-    pub id: String,
-    pub url: String,
-    pub title: String,
-    pub text: String,
-}
-pub fn words(s: &str) -> BTreeSet<String> {
-    s.split(|c: char| !c.is_alphanumeric())
-        .filter(|s| s.len() > 1)
-        .map(|s| s.to_lowercase().trim_end_matches('s').to_string())
-        .collect()
-}
-pub fn safe_path(root: &Path, name: &str) -> Result<PathBuf> {
-    let path = Path::new(name);
-    if name.is_empty()
-        || path
-            .components()
-            .any(|c| !matches!(c, Component::Normal(_)))
-    {
-        bail!("path must stay within the task directory");
-    }
-    let mut p = root.to_owned();
-    for c in path.components() {
-        p.push(c);
-        if p.symlink_metadata()
-            .is_ok_and(|m| m.file_type().is_symlink())
-        {
-            bail!("symlinks are not allowed");
-        }
-    }
-    Ok(p)
-}
 pub fn public_ip(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v) => {
@@ -142,25 +108,17 @@ pub fn html_text(html: &str) -> String {
     }
     parts.join("\n")
 }
-pub struct Builtins {
-    root: PathBuf,
-    files: BTreeSet<String>,
-    devices: BTreeMap<String, Value>,
+pub struct Web {
     pages: Vec<Page>,
     returned: BTreeMap<String, Page>,
     evidence: BTreeMap<String, Page>,
     live: bool,
     requests: usize,
     http: Client,
-    faults: BTreeMap<String, usize>,
 }
-impl Builtins {
-    pub fn new(root: PathBuf, live: bool) -> Result<Self> {
-        std::fs::create_dir_all(&root)?;
+impl Web {
+    pub fn new(live: bool) -> Result<Self> {
         Ok(Self {
-            root,
-            files: BTreeSet::new(),
-            devices: BTreeMap::new(),
             pages: Vec::new(),
             returned: BTreeMap::new(),
             evidence: BTreeMap::new(),
@@ -170,8 +128,16 @@ impl Builtins {
                 .timeout(Duration::from_secs(12))
                 .redirect(reqwest::redirect::Policy::none())
                 .build()?,
-            faults: BTreeMap::new(),
         })
+    }
+    pub fn load(&mut self, pages: Vec<Page>) {
+        self.pages = pages;
+        self.returned.clear();
+        self.evidence.clear();
+        self.requests = 0;
+    }
+    pub fn snapshot(&self) -> Value {
+        json!({"fetched_sources":self.evidence.keys().collect::<Vec<_>>(),"fetched_urls":self.evidence.values().map(|page| &page.url).collect::<Vec<_>>(),"web_requests":self.requests})
     }
     fn take_request(&mut self) -> Result<()> {
         self.requests += 1;
@@ -181,7 +147,7 @@ impl Builtins {
         Ok(())
     }
     /// Stable source IDs across search and retrieval.
-    fn search(&mut self, query: &str) -> Result<Value> {
+    pub fn search(&mut self, query: &str) -> Result<Value> {
         let pages = if self.live {
             self.take_request()?;
             let key =
@@ -232,7 +198,7 @@ impl Builtins {
         Ok(json!({"results":out}))
     }
     /// Page excerpt from a task-scoped search result.
-    fn fetch(&mut self, id: &str) -> Result<Value> {
+    pub fn fetch(&mut self, id: &str) -> Result<Value> {
         let mut page = self
             .returned
             .get(id)
@@ -293,126 +259,13 @@ impl Builtins {
         )
     }
 }
-fn string<'a>(v: &'a Value, key: &str) -> Result<&'a str> {
-    v[key]
-        .as_str()
-        .with_context(|| format!("missing string {key}"))
+pub fn web_search(w: &mut super::World, a: &Value) -> Result<Value> {
+    w.web.search(super::string(a, "query")?)
 }
-impl ToolHost for Builtins {
-    fn initialize(&mut self, args: Value) -> Result<Value> {
-        let f = &args["fixtures"];
-        self.files.clear();
-        self.returned.clear();
-        self.evidence.clear();
-        self.requests = 0;
-        for (name, v) in f["files"].as_object().into_iter().flatten() {
-            let p = safe_path(&self.root, name)?;
-            if let Some(parent) = p.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            std::fs::write(p, v.as_str().context("fixture file must be text")?)?;
-            self.files.insert(name.clone());
-        }
-        self.devices = serde_json::from_value(f.get("devices").cloned().unwrap_or(json!({})))?;
-        self.pages = serde_json::from_value(f.get("pages").cloned().unwrap_or(json!([])))?;
-        self.faults = serde_json::from_value(f.get("fail_once").cloned().unwrap_or(json!({})))?;
-        Ok(json!({"ready":true}))
-    }
-    fn call(&mut self, name: &str, a: Value) -> Result<Value> {
-        if let Some(n) = self.faults.get_mut(name) {
-            if *n > 0 {
-                *n -= 1;
-                bail!("temporary fixture error; retry is permitted");
-            }
-        }
-        match name {
-            "search_files" => {
-                let q = words(string(&a, "query")?);
-                let mut out = Vec::new();
-                for name in &self.files {
-                    let p = safe_path(&self.root, name)?;
-                    let body = String::from_utf8(read_bounded(std::fs::File::open(p)?, 65536)?)?;
-                    if !q.is_disjoint(&words(&format!("{name} {body}"))) {
-                        out.push(name.clone());
-                    }
-                    if out.len() == 8 {
-                        break;
-                    }
-                }
-                Ok(json!({"paths":out}))
-            }
-            "read_file" => {
-                let path = string(&a, "path")?;
-                if !self.files.contains(path) {
-                    bail!("unknown task file");
-                }
-                let body = String::from_utf8(read_bounded(
-                    std::fs::File::open(safe_path(&self.root, path)?)?,
-                    65536,
-                )?)?;
-                Ok(json!({"path":path,"content":text_limit(&body,3000)}))
-            }
-            "write_file" => {
-                let path = string(&a, "path")?;
-                let content = string(&a, "content")?;
-                if content.len() > 4096 {
-                    bail!("file content limit");
-                }
-                let p = safe_path(&self.root, path)?;
-                if let Some(p) = p.parent() {
-                    std::fs::create_dir_all(p)?;
-                }
-                std::fs::write(p, content)?;
-                self.files.insert(path.into());
-                Ok(json!({"written":path}))
-            }
-            "calculate" => {
-                let x = a["a"].as_f64().context("a must be numeric")?;
-                let y = a["b"].as_f64().context("b must be numeric")?;
-                let v = match string(&a, "operation")? {
-                    "add" => x + y,
-                    "subtract" => x - y,
-                    "multiply" => x * y,
-                    "divide" if y != 0. => x / y,
-                    _ => bail!("invalid operation or division by zero"),
-                };
-                if !v.is_finite() {
-                    bail!("nonfinite result");
-                }
-                Ok(json!({"result":v}))
-            }
-            "device_list" => Ok(json!({"devices":self.devices.keys().collect::<Vec<_>>()})),
-            "device_status" => Ok(self
-                .devices
-                .get(string(&a, "name")?)
-                .context("unknown device")?
-                .clone()),
-            "set_setting" => {
-                let value = a["value"].as_i64().context("setting must be an integer")?;
-                if !(0..=100).contains(&value) {
-                    bail!("setting outside permitted range");
-                }
-                let d = self
-                    .devices
-                    .get_mut(string(&a, "name")?)
-                    .context("unknown device")?;
-                d["setting"] = json!(value);
-                Ok(json!({"setting":value}))
-            }
-            "web_search" => self.search(string(&a, "query")?),
-            "fetch_page" => self.fetch(string(&a, "source_id")?),
-            _ => bail!("unknown tool {name}"),
-        }
-    }
-    fn snapshot(&mut self) -> Result<Value> {
-        let mut files = BTreeMap::new();
-        for name in &self.files {
-            let p = safe_path(&self.root, name)?;
-            let bytes = read_bounded(std::fs::File::open(p)?, 65536)?;
-            files.insert(name.clone(), String::from_utf8(bytes)?);
-        }
-        Ok(
-            json!({"files":files,"devices":self.devices,"fetched_sources":self.evidence.keys().collect::<Vec<_>>(),"fetched_urls":self.evidence.values().map(|page| &page.url).collect::<Vec<_>>(),"web_requests":self.requests}),
-        )
-    }
+pub fn fetch_page(w: &mut super::World, a: &Value) -> Result<Value> {
+    w.web.fetch(super::string(a, "source_id")?)
+}
+pub fn register(r: &mut super::Registry) {
+    r.insert("web_search", web_search);
+    r.insert("fetch_page", fetch_page);
 }

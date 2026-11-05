@@ -407,7 +407,7 @@ impl Attempt<'_> {
         let init = self.tools.request(
             "init",
             "",
-            init_args(case.fixtures.clone()),
+            init_args(serde_json::to_value(&case.fixtures)?),
             remaining(self.deadline, suite.budget.tool_seconds)?,
         )?;
         success_output(init)?;

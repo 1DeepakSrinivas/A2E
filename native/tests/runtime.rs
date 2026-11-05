@@ -484,3 +484,107 @@ fn failed_attempts_report_a_failure_class_and_check_results() {
     assert_eq!(out.failure_class, Some(FailureClass::StateMismatch));
     assert!(out.checks.iter().any(|c| !c.passed));
 }
+#[test]
+fn manifest_and_builtin_registry_list_the_same_tools() {
+    let mut declared = manifest()
+        .tools
+        .iter()
+        .map(|t| t.name.clone())
+        .collect::<Vec<_>>();
+    declared.sort();
+    let registered = Builtins::names();
+    assert_eq!(declared, registered);
+}
+#[test]
+fn sql_file_seeds_resolve_relative_to_the_case_and_validate() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("seed.sql"),
+        "CREATE TABLE t(a INTEGER); INSERT INTO t VALUES (1);",
+    )
+    .unwrap();
+    let case = |sql: &str| {
+        format!(
+            "id = \"db-1\"\ncategory = \"simple\"\nsplit = \"dev\"\n[scope]\nprompt = \"Count rows.\"\n[tools]\nallowed = [\"db_query\"]\n[fixtures.db]\n{sql}\n[[check]]\nkind = \"call\"\ntool = \"db_query\"\n"
+        )
+    };
+    let path = dir.path().join("db-1.toml");
+    std::fs::write(&path, case("sql_file = \"seed.sql\"")).unwrap();
+    let m = manifest();
+    let registry = m.tools.iter().map(|t| t.name.as_str()).collect();
+    let cases = a2e_native::case::load_all(std::slice::from_ref(&path)).unwrap();
+    cases[0].validate(&registry).unwrap();
+    assert!(cases[0]
+        .fixtures
+        .db
+        .as_ref()
+        .unwrap()
+        .sql
+        .as_ref()
+        .unwrap()
+        .contains("INSERT"));
+    std::fs::write(&path, case("sql_file = \"missing.sql\"")).unwrap();
+    assert!(a2e_native::case::load_all(std::slice::from_ref(&path)).is_err());
+    std::fs::write(&path, case("sql = \"NOT SQL\"")).unwrap();
+    let bad = a2e_native::case::load_all(&[path]).unwrap();
+    assert!(bad[0].validate(&registry).is_err());
+}
+#[test]
+fn shipped_database_seeds_load() {
+    for name in ["inventory", "sensors"] {
+        let sql =
+            std::fs::read_to_string(repo().join(format!("configs/native/fixtures/{name}.sql")))
+                .unwrap();
+        a2e_native::tools::check_seed(&sql).unwrap();
+    }
+}
+#[test]
+fn database_case_runs_through_the_real_tool_process() {
+    let sql =
+        std::fs::read_to_string(repo().join("configs/native/fixtures/inventory.sql")).unwrap();
+    let case = Case::from_toml(&format!(
+        r#"
+id = "db-e2e"
+category = "simple"
+split = "dev"
+[scope]
+prompt = "How many tools are out of stock?"
+[tools]
+allowed = ["db_lookup", "db_query"]
+[fixtures.db]
+sql = """{sql}"""
+[[check]]
+kind = "call"
+tool = "db_lookup"
+args = {{ table = "products", where = {{ stock = 0 }} }}
+match = "subset"
+[[check]]
+kind = "answer"
+number = {{ value = 1 }}
+"#
+    ))
+    .unwrap();
+    let server = MockServer::new(
+        vec![
+            call(
+                "db_lookup",
+                json!({"table":"products","where":{"stock":0},"columns":["name"]}),
+            ),
+            call(
+                "final_answer",
+                json!({"answer":"1 item (wrench) is out of stock"}),
+            ),
+        ],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &case, &Variant::default(), &suite());
+    assert_eq!(
+        out.status,
+        Status::Success,
+        "{:?} {:?}",
+        out.reason,
+        out.checks
+    );
+    assert_eq!(out.tool_invocations, 1);
+}
