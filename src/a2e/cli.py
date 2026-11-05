@@ -231,6 +231,27 @@ def results_task_resources(exp: list[int] = typer.Option(None, help="experiment 
         df.to_csv(csv, index=False)
 
 
+@results_app.command("efficiency")
+def results_efficiency(view: str = typer.Argument("summary", help="summary | frontier | budget | grammar | stages"),
+                       exp: list[int] = typer.Option(None, help="experiment id(s); default all"),
+                       by: str = typer.Option("", help="comma-separated grouping fields"),
+                       db: Path = typer.Option(None), csv: Path = typer.Option(None, help="also write to this csv")) -> None:
+    """Success per joule: joules per task and per success, Pareto front, budget curves, grammar effect, stage energy."""
+    from a2e import efficiency as E
+    st, ids, groups = _store(db), exp or None, [b for b in by.split(",") if b] or None
+    views = {"summary": lambda: E.efficiency(st, ids, groups),
+             "frontier": lambda: E.pareto_front(E.efficiency(st, ids, groups)),
+             "budget": lambda: E.budget_curve(st, ids, by=groups),
+             "grammar": lambda: E.grammar_effect(st, ids),
+             "stages": lambda: E.stage_energy(st, ids, groups)}
+    if view not in views:
+        raise typer.BadParameter(f"view must be one of {', '.join(views)}")
+    df = views[view]()
+    _print_df(df, "No measured runs with energy and scored tasks.")
+    if csv is not None and not df.empty:
+        df.to_csv(csv, index=False)
+
+
 @results_app.command("stability")
 def results_stability(exp: list[int] = typer.Option(None), db: Path = typer.Option(None)) -> None:
     """Decode speed drift over long sessions and the first task where it drops (thermal knee)."""

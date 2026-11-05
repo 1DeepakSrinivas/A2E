@@ -39,6 +39,9 @@ def test_run_smoke_suite_then_every_results_command(env, tmp_path):
     res = ok(["results", "resources", "--csv", str(tmp_path / "res.csv")])
     assert "power_p95_w" in res and "rss_max_mb" in res and (tmp_path / "res.csv").exists()
     assert "energy_j" in ok(["results", "task-resources"])
+    for view in ("summary", "frontier", "budget", "grammar", "stages"):
+        ok(["results", "efficiency", view])
+    assert "view must be one of" in runner.invoke(app, ["results", "efficiency", "nope"]).output
     ok(["results", "report", "1", "--out", str(tmp_path / "r.md")])
     assert "## Latency and throughput" in (tmp_path / "r.md").read_text()
     files = ok(["results", "export", str(tmp_path / "exp"), "--fmt", "csv"])
