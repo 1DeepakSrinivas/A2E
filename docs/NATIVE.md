@@ -61,7 +61,10 @@ Judging, scoring and reports run in the A2E-Results project
 submodule `a2e-results` in the repository root. Its `docs/API.md` describes the
 Worker API. After each attempt the runner posts the study, the model load and the
 finished attempt to the Worker. Set `WORKER_URL` and `WRITE_TOKEN` in the shell
-or in `.env` (see `.env.example`).
+or in `.env` (see `.env.example`). To avoid copying them, set `A2E_RESULTS_ENV` in
+`.env` to the a2e-results `.env` file (e.g. `../a2e-results/.env`). The runner
+reads only those two variables from that file, and it stops with an error if the
+file is missing.
 
 Every request is written to `results/native/outbox` first and removed once the
 Worker stores it. If the network is down, or the variables are not set, the
@@ -102,7 +105,7 @@ The four live search cases are in `configs/native/cases/web_live` and run only
 from the `web_live` suite.
 
 Run `a2e-native cases validate` to check every file against the tool
-definitions. When the submodule is checked out, it also checks judge rubric names against `a2e-results/cli/rubrics`. Run `a2e-native cases list --ids` to see the
+definitions. When the submodule is checked out, it also checks judge rubric names against `a2e-results/rubrics`. Run `a2e-native cases list --ids` to see the
 counts by category and split. See `configs/native/cases/chain/chain-copy.toml`
 for a worked example.
 
@@ -269,7 +272,7 @@ required_facts = ["The fee is 12 dollars."]
 
 The `handoff` list chooses what the judge sees. The fields are `prompt`,
 `answer`, `calls`, `evidence`, `files`, `state_diff`, and `required_facts`. The
-rubric named in the case is a TOML file in `a2e-results/cli/rubrics`.
+rubric named in the case is a TOML file in `a2e-results/rubrics`.
 A run with a judged case sends its `answer`, `evidence`, `final_state` and tool
 calls, which is all the judge needs.
 

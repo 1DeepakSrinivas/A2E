@@ -73,7 +73,7 @@ enum Cases {
         path: PathBuf,
         #[arg(long, default_value = "configs/native/tools/standard.toml")]
         tools: PathBuf,
-        #[arg(long, default_value = "a2e-results/cli/rubrics")]
+        #[arg(long, default_value = "a2e-results/rubrics")]
         rubrics: PathBuf,
     },
     List {
@@ -97,7 +97,7 @@ fn main() {
     }
 }
 fn entry() -> Result<()> {
-    a2e_native::dotenv::load(std::path::Path::new(".env"))?;
+    a2e_native::dotenv::load_startup(std::path::Path::new(".env"))?;
     let cli = Cli::parse();
     if let Commands::Tools {
         command: Tools::Validate { tools },
