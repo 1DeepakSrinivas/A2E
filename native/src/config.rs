@@ -105,13 +105,14 @@ pub struct Config {
     pub host_file: Option<PathBuf>,
 }
 
-/// Device identity as `user@hostname`; `A2E_HOST_ID` overrides it.
+/// Device identity as `user@hostname` without the domain suffix; `A2E_HOST_ID` overrides it.
 pub fn host_id() -> String {
     if let Ok(id) = std::env::var("A2E_HOST_ID") {
         return id;
     }
     let user = std::env::var("USER").unwrap_or_default();
-    let host = sysinfo::System::host_name().unwrap_or_default();
+    let full = sysinfo::System::host_name().unwrap_or_default();
+    let host = full.split('.').next().unwrap_or_default();
     format!("{user}@{host}")
 }
 
