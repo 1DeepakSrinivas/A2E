@@ -78,7 +78,7 @@ No external meter is used, so the energy numbers cannot be checked against a ref
 - The energy numbers are software estimates with no external check. The Pi model uses CPU usage alone, so it misses the effect of memory traffic and of the frequency governor, and llama.cpp is memory-bound.
 - Each model uses its own call format through its adapter, so accuracy may differ from the numbers its authors publish.
 - Three measured repeats limit the statistics. Increase repeats where intervals overlap on a claim that matters.
-- The case library has 108 cases, so some cells are small and their intervals are wide.
+- The case library has 134 cases, so some cells are small and their intervals are wide.
 - Related work may already cover part of this. Read TinyLLM (arXiv 2511.22138) and SWEnergy (arXiv 2512.09543) before submission.
 
 ## Amendments
