@@ -216,7 +216,7 @@ impl Web {
                     .build()?;
                 let r = client
                     .get(url.clone())
-                    .header("User-Agent", "A2E-native/0.1")
+                    .header("User-Agent", "A2E/0.1")
                     .send()?;
                 if r.status().is_redirection() {
                     let next = r

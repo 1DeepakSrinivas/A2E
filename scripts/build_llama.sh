@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-pin="$(sed -n 's/^llama_commit = "\([0-9a-f]*\)"$/\1/p' "$repo_dir/configs/native/models.toml")"
+pin="$(sed -n 's/^llama_commit = "\([0-9a-f]*\)"$/\1/p' "$repo_dir/configs/models.toml")"
 commit="${LLAMA_COMMIT:-$pin}"
 deps_dir="${A2E_HOME:-$repo_dir/deps}"
 source_dir="$deps_dir/llama.cpp"

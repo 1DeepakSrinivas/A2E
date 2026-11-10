@@ -1,7 +1,7 @@
 //! Shipped benchmark cases: every case must be solvable and not trivially passable
 //! Golden calls replay through the real tools and checks
 
-use a2e_native::{
+use a2e::{
     adapter::Call,
     case::{load_all, Case, Category, Check},
     config::Catalog,
@@ -9,26 +9,23 @@ use a2e_native::{
     tools::Builtins,
 };
 use serde_json::{json, Value};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 fn repo() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_owned()
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 fn library() -> Vec<Case> {
-    load_all(&[repo().join("configs/native/cases")]).unwrap()
+    load_all(&[repo().join("configs/cases")]).unwrap()
 }
 fn catalog() -> Catalog {
-    Catalog::load(&repo().join("configs/native/tools/standard.toml")).unwrap()
+    Catalog::load(&repo().join("configs/tools/standard.toml")).unwrap()
 }
 /// Workspace tree generated once per test process.
 fn sandbox() -> &'static std::path::Path {
     static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
     DIR.get_or_init(|| {
         let dir = tempfile::tempdir().unwrap();
-        a2e_native::sandbox::init(dir.path(), a2e_native::sandbox::DEFAULT_SEED, false).unwrap();
+        a2e::sandbox::init(dir.path(), a2e::sandbox::DEFAULT_SEED, false).unwrap();
         dir
     })
     .path()
@@ -103,10 +100,7 @@ fn library_covers_every_category_with_both_splits() {
     for (category, minimum) in want {
         let of = cases.iter().filter(|c| c.category == category);
         assert!(of.clone().count() >= minimum, "{category:?}");
-        for split in [
-            a2e_native::case::Split::Dev,
-            a2e_native::case::Split::Heldout,
-        ] {
+        for split in [a2e::case::Split::Dev, a2e::case::Split::Heldout] {
             assert!(
                 of.clone().any(|c| c.split == split),
                 "{category:?} {split:?}"
