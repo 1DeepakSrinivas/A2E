@@ -1,4 +1,4 @@
-# Native runtime
+# A2E guide
 
 The Rust CLI runs FunctionGemma 270M Q4_K_M, Qwen3-0.6B Q4_K_M, and
 LFM2.5-1.2B-Instruct QAD Q4_0 on a Pi 3B+ or Apple Silicon Mac. The model
@@ -16,17 +16,17 @@ line tools, run the following from the project directory.
 ```bash
 bash scripts/build_llama.sh
 cargo build --release --locked
-target/release/a2e-native models fetch
-target/release/a2e-native doctor --probe
+target/release/a2e models fetch
+target/release/a2e doctor --probe
 ```
 
 The checkout and build live under `deps/llama.cpp`. Git ignores the local
 dependencies, models, and results. Run setup on each machine to build for its
-architecture. Copy `configs/native/local.example.toml` to
-`configs/native/local.toml` to override machine settings. A different memory
+architecture. Copy `configs/local.example.toml` to
+`configs/local.toml` to override machine settings. A different memory
 limit or GPU setting produces a separate study.
 
-Each device has an optional file `configs/native/hosts/<user>@<hostname>.toml`,
+Each device has an optional file `configs/hosts/<user>@<hostname>.toml`,
 for example `deepak@RPi.toml`. The CLI loads the file that matches the current
 user and hostname, or the one named by `A2E_HOST_ID`. The file can hold any
 setting from the models file plus a `[roles]` table with the booleans
@@ -38,9 +38,9 @@ host file and the roles.
 ## Run and read results
 
 ```bash
-target/release/a2e-native plan
-target/release/a2e-native run
-target/release/a2e-native upload --status
+target/release/a2e plan
+target/release/a2e run
+target/release/a2e upload --status
 ```
 
 Pass a suite file to `plan` or `run`. The shipped suites are listed in the
@@ -51,7 +51,7 @@ other suites use recorded fixture data.
 
 Run the same command again to resume completed work. Use `--retry-failed` to
 retry unsuccessful attempts. The database and the trace files live under
-`results/native`. Trace files contain prompts, raw model output, tool results,
+`results`. Trace files contain prompts, raw model output, tool results,
 and the evidence used for judging.
 
 ## Sending results to the cloud
@@ -66,29 +66,36 @@ or in `.env` (see `.env.example`). To avoid copying them, set `A2E_RESULTS_ENV` 
 reads only those two variables from that file, and it stops with an error if the
 file is missing.
 
-Every request is written to `results/native/outbox` first and removed once the
+Every request is written to `results/outbox` first and removed once the
 Worker stores it. If the network is down, or the variables are not set, the
 requests stay in the outbox and the run continues. Send them later with
-`target/release/a2e-native upload`, and check what is waiting with
+`target/release/a2e upload`, and check what is waiting with
 `upload --status`. A request the Worker refuses for good moves to
 `outbox/rejected` with the error beside it. Resume state is kept in
-`results/native/resume.jsonl`. On a development machine run
+`results/resume.jsonl`. On a development machine run
 `git submodule update --init` to fetch the submodule; the Pi does not need it.
 
 Latency includes failed attempts. The runtime measures model loading
 separately and records inference and harness RSS. Tools run inside the harness
-process, so harness RSS includes them. Peak RSS comes from the samples. Pi
-power is unavailable. Mac power comes from privileged `powermetrics` samples
-and covers the reported CPU, GPU, and ANE scope.
+process, so harness RSS includes them. Peak RSS comes from the samples. CPU
+time is the total CPU time of the inference and harness processes.
+
+Mac power comes from privileged `powermetrics` samples and covers the reported
+CPU, GPU, and ANE scope. The Pi 3B+ has no power sensor, so its power is
+modeled. Every 500 ms the runner reads whole-system CPU usage and puts it into
+the published Joular `rbp3b+1.3` polynomial, and it adds up the watts over time
+to get joules. The `power_scope` field of each result says `modeled` for these
+values, and they are an estimate, not a measurement. Set `power = "none"` to
+turn the model off. `power = "required"` accepts only measured power, so it
+fails on the Pi.
 
 Greedy decoding is used for every attempt. Repeats measure how latency, memory,
 and temperature vary. They do not measure variation in success.
 
 ## Cases
 
-Each benchmark case is one TOML file under `configs/native/cases/<category>/`.
-The library has 134 cases. The categories follow the BFCL families that suit
-models under 2 billion parameters.
+Each benchmark case is one TOML file under `configs/cases/<category>/`.
+The library has 134 cases in nine categories.
 
 | Category | Cases | What it checks |
 |---|---|---|
@@ -102,12 +109,12 @@ models under 2 billion parameters.
 | web | 8 | Search and fetch over recorded pages |
 | files | 26 | Finding, reading, and changing files in the generated workspace |
 
-The four live search cases are in `configs/native/cases/web_live` and run only
+The four live search cases are in `configs/cases/web_live` and run only
 from the `web_live` suite.
 
-Run `a2e-native cases validate` to check every file against the tool
-definitions. When the submodule is checked out, it also checks judge rubric names against `a2e-results/rubrics`. Run `a2e-native cases list --ids` to see the
-counts by category and split. See `configs/native/cases/chain/chain-copy.toml`
+Run `a2e cases validate` to check every file against the tool
+definitions. When the submodule is checked out, it also checks judge rubric names against `a2e-results/rubrics`. Run `a2e cases list --ids` to see the
+counts by category and split. See `configs/cases/chain/chain-copy.toml`
 for a worked example.
 
 ### Case file
@@ -157,7 +164,7 @@ The `[fixtures]` table sets the starting state of one attempt. It can hold
 `files`, `devices`, `pages`, `kv`, `notes`, `todos`, a `clock` timestamp, and a
 `db` seed. The database seed is SQL text, either inline as `sql` or as a
 `sql_file` path relative to the case file. The seeds in
-`configs/native/fixtures` are loaded into an in-memory SQLite database for each
+`configs/fixtures` are loaded into an in-memory SQLite database for each
 attempt.
 
 Use `[[fixtures.faults]]` to break a tool on purpose. Each entry names a `tool`
@@ -216,16 +223,16 @@ you add a case.
 The `files` cases work in a generated workspace of about 295 files and 1.7 MB, with hidden files, deep folders,
 rotated logs, near-duplicate names, names with spaces and accents, a read-only file, a binary file, a file over the
 read limit, and a file with injected instructions. The tree is the same for the same seed and generator version.
-Facts that cases check, such as a passcode or a port, are fixed in `native/src/sandbox/facts.rs`. Only the filler text
+Facts that cases check, such as a passcode or a port, are fixed in `src/sandbox/facts.rs`. Only the filler text
 changes with the seed.
 
 Build and check the tree with:
 
 ```
 scripts/init_sandbox.sh            # writes ./sandbox (or $A2E_SANDBOX), then verifies it
-a2e-native sandbox init --force    # rebuild
-a2e-native sandbox verify          # compare the tree with sandbox/manifest.json
-a2e-native sandbox info
+a2e sandbox init --force           # rebuild
+a2e sandbox verify                 # compare the tree with sandbox/manifest.json
+a2e sandbox info
 scripts/sync_sandbox.sh pi@host    # copy a tree built elsewhere to a Pi and verify it there
 ```
 
@@ -268,15 +275,15 @@ All tools are Rust functions that run inside the harness process, so there is
 no tool executable, protocol, or second process to measure. A tool has two
 parts.
 
-1. A handler in `native/src/tools/<domain>.rs`. It is a function
+1. A handler in `src/tools/<domain>.rs`. It is a function
    `fn(&mut World, &Value) -> Result<Value>` that you register by name in the
    module's `register` function. `World` holds the task state, e.g. files,
    stores, the clock, the database, and pages.
-2. A definition in `configs/native/tools/standard.toml` with the name, the
+2. A definition in `configs/tools/standard.toml` with the name, the
    description, and the JSON Schema for the arguments. This is what the model
    sees, so wording changes can be tried without rebuilding.
 
-Then list the tool in a case's `tools.allowed`. Run `a2e-native tools validate`
+Then list the tool in a case's `tools.allowed`. Run `a2e tools validate`
 to check that every definition has a handler and a valid schema. Keep handlers
 bounded in time and output, because the harness stops an attempt when a call
 passes `budget.tool_seconds` or returns more than `budget.tool_output_bytes`.
@@ -313,6 +320,3 @@ The `handoff` list chooses what the judge sees. The fields are `prompt`,
 rubric named in the case is a TOML file in `a2e-results/rubrics`.
 A run with a judged case sends its `answer`, `evidence`, `final_state` and tool
 calls, which is all the judge needs.
-
-Data from an older local `native.sqlite3` is loaded with `bun src/cli.ts import
---db PATH` in the A2E-Results project.

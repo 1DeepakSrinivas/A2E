@@ -4,7 +4,6 @@
 
 - Run `cargo fmt --all`, then verify with `cargo fmt --all -- --check` on Rust changes.
 - Run `cargo clippy --workspace --all-targets -- -D warnings` on Rust changes.
-- Run `ruff check` on every Python file created or changed.
 - Fix findings before handing off, and report checks that could not run.
 - Keep comments short and focused on decisions or constraints. Do not add ASCII art or decorative comment separators.
 
@@ -16,7 +15,7 @@ Build each functional area on its own branch. Name it `<area>/<topic>`, and add 
 |---|---|---|
 | `core` | harness, runner, store, server and client, suites | `core/harness-agentic-loop`, `core/runner-resume` |
 | `metrics` | power, thermal, memory sampling, energy | `metrics/power-usb-meter` |
-| `benchmarks` | BFCL, custom tasks, bench and perf | `benchmarks/bfcl-multi-turn` |
+| `benchmarks` | cases, suites, bench and perf | `benchmarks/web-cases` |
 | `results` | results queries, reports, plots, exports | `results/plots` |
 | `ui` | CLI and TUI | `ui/tui-run-tab` |
 | `testing` | tests and test tooling | `testing/unit-tests`, `testing/hardware-tests` |
