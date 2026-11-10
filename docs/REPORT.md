@@ -21,7 +21,7 @@ A2E measures how small language models use tools on small devices. For each mode
 
 **Out of scope.**
 - Models above 2 billion parameters, because they do not fit in 1 GB.
-- Power on the Pi. The Pi 3B+ has no power sensor, so Pi power is reported as unavailable.
+- Measured power on the Pi. The Pi 3B+ has no power sensor, so its power is modeled from CPU usage (section 7).
 - Judging and scoring beyond the local checks. The A2E-Results project does those (see section 8).
 
 ## 3. Experiment definition
@@ -100,7 +100,8 @@ Only one run holds the runtime lock at a time, so two runs cannot disturb each o
 - **Tokens.** Prompt and generated tokens per call, and prompt tokens served from the prefix cache, as reported by `llama-server`.
 - **Memory.** Resident memory of the inference process and of the harness process is sampled every 500 ms. Tools run inside the harness, so harness memory includes them. Peak memory comes from the samples.
 - **Temperature.** On the Pi, the SoC temperature and the throttle flags from `vcgencmd get_throttled`.
-- **Power.** On the Mac, privileged `powermetrics` samples give CPU, GPU and ANE power. They exclude memory, the display and power-supply losses. On the Pi, power is unavailable.
+- **CPU time.** Total CPU time of the inference and harness processes, on both devices.
+- **Power.** On the Mac, privileged `powermetrics` samples give CPU, GPU and ANE power. They exclude memory, the display and power-supply losses. On the Pi, which has no power sensor, power is modeled: every 500 ms the runner puts whole-system CPU usage into the Joular `rbp3b+1.3` polynomial and sums the watts over time. The result is labeled `modeled` in `power_scope`. The model was fitted by its authors on another unit with a 32-bit OS, and its error on this unit is unknown.
 
 Missing data stays missing. A power or timing value that could not be read is never stored as zero, and a software estimate is never described as measured energy.
 
@@ -130,7 +131,7 @@ After each attempt the runner posts the study, the model load and the attempt to
 ## 11. Known limits
 
 - Greedy decoding with one prompt format per model means accuracy can differ from the numbers each model's authors publish.
-- Mac power covers CPU, GPU and ANE only, so it is not comparable with a wall-meter reading, and it is not comparable with the Pi, which has no power reading.
+- Mac power covers CPU, GPU and ANE only, so it is not comparable with a wall-meter reading, and it is not comparable with the modeled Pi values, which are an estimate from CPU usage alone.
 - A 1 GB Pi has little free memory. Swap changes timing, so it must be off for measured runs.
 - Live search results change over time, so the `web_live` suite cannot be repeated exactly. It is scored on the tool path and the final answer only.
 - With three measured repeats, intervals on latency and memory are wide for small groups.

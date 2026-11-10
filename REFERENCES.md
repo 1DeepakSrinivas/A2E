@@ -33,10 +33,17 @@ Status: Verified for file names and hashes by the download script. License and t
 - **Status:** From memory. The assumptions are exercised against a real build by the smoke suite.
 - **Where used:** `src/inference.rs`.
 
+### Joular power model for the Pi 3B+
+- **Source:** https://github.com/joular/powermodels, file `Raspberry Pi/rbp3b+1.3/rbp3b+1.3.json`, read 2026-11-10. The data is under the Open Database License (ODbL) 1.0, so keep this attribution.
+- **Method:** the model comes from Noureddine and Kanso, "Automated Power Modeling of Computing Devices: Implementation and Use Case for Raspberry Pis". The title is from a search summary and is not checked against the paper.
+- **Use:** a degree 9 polynomial of CPU usage (0 to 1) with an intercept of 2.484 W. It gives 2.48 W at idle and 5.27 W at full load.
+- **Status:** Verified for the coefficients, which were copied from the file. The model was fitted on a 32-bit OS, A2E uses a 64-bit OS, and the error on this unit is unknown.
+- **Where used:** `src/measure.rs`. Values are labeled `modeled` in `power_scope`.
+
 ### Raspberry Pi thermal data
 - **Sources:** `/sys/class/thermal/thermal_zone0/temp` and `vcgencmd get_throttled`.
 - **Status:** From memory. Output format unverified on hardware.
-- **Where used:** `src/measure.rs`. Pi power is not measured.
+- **Where used:** `src/measure.rs`.
 
 ### Apple powermetrics
 - **Source:** macOS `man powermetrics`. It needs root, which `scripts/setup_mac_telemetry.sh` arranges.
@@ -108,7 +115,7 @@ summary**. Read each paper in full before citing it.
 
 ## 5. Measurement caveats to cite alongside results
 
-- Mac power is a software estimate from `powermetrics`. Pi power is not measured.
+- Mac power is a software estimate from `powermetrics`. Pi power is modeled from CPU usage and is not measured.
 - The Pi and Mac use different scopes, so any cross-device comparison must say so.
 - All models get tool instructions in their own call format through the adapters, so accuracy can differ from each model's published numbers.
 

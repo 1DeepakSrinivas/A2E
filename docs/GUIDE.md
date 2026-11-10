@@ -77,9 +77,17 @@ requests stay in the outbox and the run continues. Send them later with
 
 Latency includes failed attempts. The runtime measures model loading
 separately and records inference and harness RSS. Tools run inside the harness
-process, so harness RSS includes them. Peak RSS comes from the samples. Pi
-power is unavailable. Mac power comes from privileged `powermetrics` samples
-and covers the reported CPU, GPU, and ANE scope.
+process, so harness RSS includes them. Peak RSS comes from the samples. CPU
+time is the total CPU time of the inference and harness processes.
+
+Mac power comes from privileged `powermetrics` samples and covers the reported
+CPU, GPU, and ANE scope. The Pi 3B+ has no power sensor, so its power is
+modeled. Every 500 ms the runner reads whole-system CPU usage and puts it into
+the published Joular `rbp3b+1.3` polynomial, and it adds up the watts over time
+to get joules. The `power_scope` field of each result says `modeled` for these
+values, and they are an estimate, not a measurement. Set `power = "none"` to
+turn the model off. `power = "required"` accepts only measured power, so it
+fails on the Pi.
 
 Greedy decoding is used for every attempt. Repeats measure how latency, memory,
 and temperature vary. They do not measure variation in success.

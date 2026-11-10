@@ -24,10 +24,11 @@ The runner records each attempt. The A2E-Results project computes the measures f
 | `seconds_per_success` | Wall time of all attempts, failures included, divided by the number that passed. Empty when none passed. |
 | `waste_share` | Share of wall time that went into attempts that failed. |
 | `peak_rss` | Highest resident memory of the inference process plus the harness, from the samples. |
-| `joules_per_success` | Mac only. Energy of all attempts, failures included, divided by the number that passed. |
+| `cpu_seconds_per_success` | Both devices. CPU time of the inference and harness processes over all attempts, failures included, divided by the number that passed. |
+| `joules_per_success` | Energy of all attempts, failures included, divided by the number that passed. Measured on the Mac and modeled on the Pi, and the two are never pooled. |
 | `parse_failure_share` | Share of failed attempts whose failure class is `parse_failure`. |
 
-Energy is the software estimate from `powermetrics`, which covers CPU, GPU and ANE and leaves out memory, the display and the power supply. The Pi 3B+ has no power reading, so energy results are reported for the Mac only and always with this scope.
+On the Mac, energy is the software estimate from `powermetrics`, which covers CPU, GPU and ANE and leaves out memory, the display and the power supply. The Pi 3B+ has no power sensor and the study uses no external meter. On the Pi, energy is modeled by putting whole-system CPU usage into the published Joular `rbp3b+1.3` polynomial, and it is labeled `modeled`. The model was fitted by its authors on another unit with a 32-bit OS, so its error on this unit is unknown. Pi energy is reported as an estimate with that statement, and Pi cost comparisons rest on `cpu_seconds_per_success` and `seconds_per_success`, which are measured.
 
 ## Factors
 
@@ -45,6 +46,7 @@ Each can be shown wrong by the data.
 - **H3, constrained decoding removes parse failures.** The constrained variant has a lower `parse_failure_share` than the autonomous variant for every model. Refuted if any model does not improve.
 - **H4, the harness is a small share of time.** Time outside the model, the tools and parsing is under 5% of wall time on both devices. Refuted if either device is at 5% or more.
 - **H5, time and energy rank the models alike.** On the Mac, `joules_per_success` ranks the three models in the same order as `seconds_per_success`. Refuted if the order differs.
+- **H6, CPU time stands in for energy on the Pi.** On the Pi, `cpu_seconds_per_success` ranks the three models in the same order as modeled `joules_per_success`. Refuted if the order differs. The model uses CPU usage alone, so agreement shows only that the two views are consistent, not that the energy is right.
 
 ## Decision rules for the harness
 
@@ -58,7 +60,7 @@ Each can be shown wrong by the data.
 
 ## Analysis plan
 
-1. Configurations with no energy readings are dropped from every energy result and listed.
+1. Configurations with no energy readings are dropped from every energy result and listed. Measured Mac energy and modeled Pi energy are never shown on one axis without the label.
 2. Success rate against `seconds_per_success` is drawn per device, with the spread over repeats as error bars. A configuration is on the front only if no other has lower or equal time and higher or equal success, with one strict.
 3. Variant effects are paired. They compare the same model, device and case, with only the variant changed.
 4. Greedy decoding gives the same answer on each repeat, so repeats are used for time, memory and temperature, not for success. Report the intervals, and do not claim a difference smaller than the repeat-to-repeat spread.
@@ -66,11 +68,14 @@ Each can be shown wrong by the data.
 
 ## Validation of the energy numbers
 
-Before the main sweep, compare the `powermetrics` energy with a wall meter on the Mac, over at least 3 workloads (idle, prefill-heavy, decode-heavy) and a subset of agent runs. Report the ratio and its spread. If the software estimate is off by more than 15% in either direction, report all energy results with a correction and the uncorrected values side by side.
+No external meter is used, so the energy numbers cannot be checked against a reference. Both are reported as software estimates, and the Pi value has no known error. The only checks are internal.
+
+- On the Pi, confirm that the modeled power at idle is close to the model's intercept of 2.48 W and that it rises with CPU usage.
+- On the Mac, confirm that `powermetrics` power at idle is lower than during a prefill-heavy and a decode-heavy workload.
 
 ## Known threats
 
-- The energy numbers are software estimates, which is why the validation step comes first.
+- The energy numbers are software estimates with no external check. The Pi model uses CPU usage alone, so it misses the effect of memory traffic and of the frequency governor, and llama.cpp is memory-bound.
 - Each model uses its own call format through its adapter, so accuracy may differ from the numbers its authors publish.
 - Three measured repeats limit the statistics. Increase repeats where intervals overlap on a claim that matters.
 - The case library has 108 cases, so some cells are small and their intervals are wide.
