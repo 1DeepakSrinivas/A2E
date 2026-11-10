@@ -123,6 +123,32 @@ fn cpu_time_ms(pid: u32) -> Option<u64> {
 fn cpu_time_ms(_pid: u32) -> Option<u64> {
     None
 }
+const PI_MODEL_SCOPE: &str = "modeled: Joular rbp3b+1.3 polynomial of whole-system CPU usage; not measured, error unknown on this unit";
+// Joular rbp3b+1.3 CPU model (ODbL): watts = intercept + sum(c[i] * usage^(i+1)), usage in 0 to 1
+const PI_MODEL_INTERCEPT: f64 = 2.484_396_997_449_118_2;
+const PI_MODEL_COEFFICIENTS: [f64; 9] = [
+    2.933542,
+    -150.400134,
+    2278.690310,
+    -15008.559279,
+    51537.315529,
+    -98756.887779,
+    106478.929766,
+    -60432.910139,
+    14053.677709,
+];
+fn pi_model_watts(usage: f64) -> f64 {
+    let u = usage.clamp(0., 1.);
+    PI_MODEL_INTERCEPT
+        + PI_MODEL_COEFFICIENTS
+            .iter()
+            .rev()
+            .fold(0., |acc, c| (acc + c) * u)
+}
+fn is_pi3bplus() -> bool {
+    std::fs::read_to_string("/proc/device-tree/model")
+        .is_ok_and(|m| m.contains("Raspberry Pi 3 Model B Plus"))
+}
 fn pi_thermal() -> (Option<f64>, Option<String>) {
     let temp = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp")
         .ok()
@@ -221,12 +247,15 @@ impl Monitor {
         if r.power == "required" && power.is_none() {
             bail!("power_required: supported telemetry unavailable");
         }
+        let modeled = power.is_none() && r.power == "auto" && is_pi3bplus();
         let stop = Arc::new(AtomicBool::new(false));
         let exceeded = Arc::new(AtomicBool::new(false));
         let summary = Arc::new(Mutex::new(Resources {
             power_scope: if power.is_some() {
                 "powermetrics CPU+GPU+ANE; software-reported estimate; excludes DRAM/display/PSU"
                     .into()
+            } else if modeled {
+                PI_MODEL_SCOPE.into()
             } else {
                 "unavailable".into()
             },
@@ -246,9 +275,16 @@ impl Monitor {
             let mut energy_intervals = 0;
             let mut initial_cpu = None;
             let mut initial_faults = None;
+            let mut cpu_primed = false;
             while !done.load(Ordering::Relaxed) {
                 system.refresh_memory();
                 system.refresh_processes(ProcessesToUpdate::Some(&pids), true);
+                // CPU usage needs two refreshes, so the first sample has no modeled power
+                let usage = modeled.then(|| {
+                    system.refresh_cpu_usage();
+                    let ready = std::mem::replace(&mut cpu_primed, true);
+                    ready.then(|| f64::from(system.global_cpu_usage()) / 100.)
+                });
                 let memory = |p: u32| {
                     system
                         .process(Pid::from_u32(p))
@@ -274,7 +310,8 @@ impl Monitor {
                     .as_ref()
                     .and_then(|p| *p.latest.lock().unwrap_or_else(|e| e.into_inner()))
                     .filter(|(at, _)| at.elapsed() < Duration::from_secs(2))
-                    .map(|(_, w)| w);
+                    .map(|(_, w)| w)
+                    .or_else(|| usage.flatten().map(pi_model_watts));
                 if let (Some((at, old)), Some(w)) = (previous_power, watts) {
                     if elapsed - at <= 2. {
                         energy += (elapsed - at) * (old + w) / 2.;
@@ -358,5 +395,17 @@ impl Monitor {
 impl Drop for Monitor {
     fn drop(&mut self) {
         self.shutdown();
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::pi_model_watts;
+
+    #[test]
+    fn pi_model_matches_the_published_endpoints() {
+        assert!((pi_model_watts(0.) - 2.484397).abs() < 1e-6);
+        assert!((pi_model_watts(1.) - 5.274).abs() < 1e-3);
+        assert_eq!(pi_model_watts(-1.), pi_model_watts(0.));
+        assert_eq!(pi_model_watts(2.), pi_model_watts(1.));
     }
 }
