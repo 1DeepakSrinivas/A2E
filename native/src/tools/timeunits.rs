@@ -16,7 +16,7 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146097 + doe - 719468
 }
 /// Civil date for days since 1970-01-01.
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
+pub(super) fn civil_from_days(z: i64) -> (i64, i64, i64) {
     let z = z + 719468;
     let era = z.div_euclid(146097);
     let doe = z.rem_euclid(146097);

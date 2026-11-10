@@ -4,6 +4,7 @@
 
 mod db;
 mod files;
+mod fs;
 mod misc;
 mod store;
 mod text;
@@ -45,6 +46,7 @@ fn string<'a>(v: &'a Value, key: &str) -> Result<&'a str> {
 fn registry() -> Registry {
     let mut r = Registry::new();
     files::register(&mut r);
+    fs::register(&mut r);
     text::register(&mut r);
     timeunits::register(&mut r);
     store::register(&mut r);
@@ -57,6 +59,10 @@ fn registry() -> Registry {
 struct World {
     root: PathBuf,
     files: BTreeSet<String>,
+    dirs: BTreeSet<String>,
+    touched: BTreeSet<String>,
+    written: usize,
+    sandboxed: bool,
     devices: BTreeMap<String, Value>,
     kv: BTreeMap<String, String>,
     notes: Vec<Note>,
@@ -67,6 +73,7 @@ struct World {
 }
 pub struct Builtins {
     world: World,
+    sandbox_base: Option<PathBuf>,
     handlers: Registry,
     faults: Vec<(Fault, usize)>,
 }
@@ -77,6 +84,10 @@ impl Builtins {
             world: World {
                 root,
                 files: BTreeSet::new(),
+                dirs: BTreeSet::new(),
+                touched: BTreeSet::new(),
+                written: 0,
+                sandboxed: false,
                 devices: BTreeMap::new(),
                 kv: BTreeMap::new(),
                 notes: Vec::new(),
@@ -85,6 +96,7 @@ impl Builtins {
                 db: None,
                 web: web::Web::new(live)?,
             },
+            sandbox_base: None,
             handlers: registry(),
             faults: Vec::new(),
         })
@@ -105,17 +117,36 @@ impl Builtins {
     }
 }
 impl Builtins {
+    /// Directory holding the generated workspace tree that sandboxed cases copy.
+    pub fn set_sandbox_base(&mut self, base: Option<PathBuf>) {
+        self.sandbox_base = base;
+    }
     /// Resets task state from fixtures.
     pub fn initialize(&mut self, fixtures: &Fixtures) -> Result<()> {
         let w = &mut self.world;
         w.files.clear();
+        w.dirs.clear();
+        w.touched.clear();
+        w.written = 0;
+        w.sandboxed = fixtures.sandbox.is_some();
+        if let Some(profile) = &fixtures.sandbox {
+            if profile != "workspace" {
+                bail!("unknown sandbox profile {profile}");
+            }
+            let base = self
+                .sandbox_base
+                .as_ref()
+                .context("sandbox base is not set; run scripts/init_sandbox.sh")?;
+            crate::sandbox::copy_into(base, &w.root)?;
+            fs::index(w)?;
+        }
         for (name, body) in &fixtures.files {
             let p = safe_path(&w.root, name)?;
             if let Some(parent) = p.parent() {
                 std::fs::create_dir_all(parent)?;
             }
             std::fs::write(p, body)?;
-            w.files.insert(name.clone());
+            fs::track(w, name);
         }
         w.devices = fixtures.devices.clone();
         w.kv = fixtures.kv.clone();
@@ -166,11 +197,13 @@ impl Builtins {
         let w = &self.world;
         let mut files = BTreeMap::new();
         for name in &w.files {
+            if w.sandboxed && !w.touched.contains(name) {
+                files.insert(name.clone(), Value::Null);
+                continue;
+            }
             let p = safe_path(&w.root, name)?;
-            files.insert(
-                name.clone(),
-                String::from_utf8(read_bounded(std::fs::File::open(p)?, 65536)?)?,
-            );
+            let bytes = read_bounded(std::fs::File::open(p)?, 65536)?;
+            files.insert(name.clone(), json!(String::from_utf8_lossy(&bytes)));
         }
         let mut state = w.web.snapshot();
         state["files"] = json!(files);

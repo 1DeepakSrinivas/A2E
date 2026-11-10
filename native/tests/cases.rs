@@ -23,6 +23,16 @@ fn library() -> Vec<Case> {
 fn catalog() -> Catalog {
     Catalog::load(&repo().join("configs/native/tools/standard.toml")).unwrap()
 }
+/// Workspace tree generated once per test process.
+fn sandbox() -> &'static std::path::Path {
+    static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
+    DIR.get_or_init(|| {
+        let dir = tempfile::tempdir().unwrap();
+        a2e_native::sandbox::init(dir.path(), a2e_native::sandbox::DEFAULT_SEED, false).unwrap();
+        dir
+    })
+    .path()
+}
 fn is_live(case: &Case) -> bool {
     case.tags.iter().any(|t| t == "live")
 }
@@ -30,6 +40,7 @@ fn is_live(case: &Case) -> bool {
 fn replay(case: &Case, calls: &[(String, Value)], answer: &str) -> Vec<CheckResult> {
     let dir = tempfile::tempdir().unwrap();
     let mut tools = Builtins::new(dir.path().into(), false).unwrap();
+    tools.set_sandbox_base(Some(sandbox().join("base")));
     tools.initialize(&case.fixtures).unwrap();
     let observed = calls
         .iter()
@@ -87,6 +98,7 @@ fn library_covers_every_category_with_both_splits() {
         (Category::Recovery, 12),
         (Category::Robustness, 8),
         (Category::Web, 12),
+        (Category::Files, 20),
     ];
     for (category, minimum) in want {
         let of = cases.iter().filter(|c| c.category == category);

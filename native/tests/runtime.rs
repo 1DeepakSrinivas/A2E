@@ -267,8 +267,19 @@ fn harness_overhead_stays_a_small_share_of_wall_time() {
         out.wall_ms
     );
 }
+/// Generates the workspace tree once and points `A2E_SANDBOX` at it.
+fn use_sandbox() {
+    static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
+    let dir = DIR.get_or_init(|| {
+        let dir = tempfile::tempdir().unwrap();
+        a2e_native::sandbox::init(dir.path(), a2e_native::sandbox::DEFAULT_SEED, false).unwrap();
+        dir
+    });
+    std::env::set_var("A2E_SANDBOX", dir.path());
+}
 #[test]
 fn every_shipped_suite_validates_and_has_disjoint_splits() {
+    use_sandbox();
     let cfg = Config::load(&repo().join("configs/native/models.toml")).unwrap();
     let m = catalog();
     for entry in std::fs::read_dir(repo().join("configs/native/suites")).unwrap() {
@@ -553,6 +564,7 @@ number = {{ value = 1 }}
 
 #[test]
 fn every_offline_golden_sequence_succeeds_through_the_agent_loop() {
+    use_sandbox();
     let cases = a2e_native::case::load_all(&[repo().join("configs/native/cases")]).unwrap();
     let s = suite();
     for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {

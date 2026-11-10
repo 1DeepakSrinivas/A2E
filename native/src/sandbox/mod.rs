@@ -20,6 +20,11 @@ pub const DEFAULT_SEED: u64 = 1;
 /// 2026-01-01T00:00:00Z in seconds since the epoch; file ages count from here.
 const BASE_EPOCH: u64 = 1_767_225_600;
 
+/// Sandbox folder from `A2E_SANDBOX`, default `sandbox`.
+pub fn default_dir() -> PathBuf {
+    std::env::var_os("A2E_SANDBOX").map_or_else(|| PathBuf::from("sandbox"), PathBuf::from)
+}
+
 pub enum Kind {
     Dir,
     File {
