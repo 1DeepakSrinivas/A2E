@@ -164,10 +164,13 @@ pub fn evaluate(case: &Case, obs: &Observation) -> Vec<CheckResult> {
                 regex,
                 json_eq,
                 absent,
+                present,
             } => {
                 let body = files.get(path).and_then(Value::as_str);
                 let passed = if *absent {
                     files.get(path).is_none()
+                } else if *present {
+                    files.get(path).is_some()
                 } else if let Some(want) = eq {
                     body == Some(want.as_str())
                 } else if let Some(part) = contains {
@@ -356,6 +359,8 @@ mod tests {
             ("path = \"j.json\"\njson_eq = { x = 1 }", true),
             ("path = \"gone.txt\"\nabsent = true", true),
             ("path = \"a.txt\"\nabsent = true", false),
+            ("path = \"a.txt\"\npresent = true", true),
+            ("path = \"gone.txt\"\npresent = true", false),
             ("path = \"gone.txt\"\ncontains = \"x\"", false),
         ];
         for (body, want) in checks {

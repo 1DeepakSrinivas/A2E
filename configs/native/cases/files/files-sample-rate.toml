@@ -1,0 +1,31 @@
+id = "files-sample-rate"
+category = "files"
+tags = ["workspace", "grep", "deep"]
+split = "heldout"
+golden_answer = "The sample rate is 250 Hz."
+
+[scope]
+prompt = "What sample rate does the sensor-fw project use? Look in its source."
+expected_calls = 1
+
+[tools]
+allowed = ["grep", "find", "cat", "ls"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Search the sensor-fw project."
+tools = ["grep", "find"]
+
+[[stage]]
+instruction = "Read the value."
+tools = ["cat", "grep"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 250 }
+
+[[golden]]
+tool = "grep"
+args = { "pattern" = "SAMPLE_RATE", "path" = "projects/sensor-fw", "recursive" = true }

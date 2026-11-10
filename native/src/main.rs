@@ -61,6 +61,29 @@ enum Commands {
         #[arg(long)]
         status: bool,
     },
+    Sandbox {
+        #[command(subcommand)]
+        command: Sandbox,
+    },
+}
+#[derive(Subcommand)]
+enum Sandbox {
+    Init {
+        #[arg(long, default_value_t = a2e_native::sandbox::DEFAULT_SEED)]
+        seed: u64,
+        #[arg(long, default_value = "sandbox")]
+        out: PathBuf,
+        #[arg(long)]
+        force: bool,
+    },
+    Verify {
+        #[arg(long, default_value = "sandbox")]
+        dir: PathBuf,
+    },
+    Info {
+        #[arg(long, default_value = "sandbox")]
+        dir: PathBuf,
+    },
 }
 #[derive(Subcommand)]
 enum Models {
@@ -73,7 +96,7 @@ enum Cases {
         path: PathBuf,
         #[arg(long, default_value = "configs/native/tools/standard.toml")]
         tools: PathBuf,
-        #[arg(long, default_value = "a2e-results/cli/rubrics")]
+        #[arg(long, default_value = "a2e-results/rubrics")]
         rubrics: PathBuf,
     },
     List {
@@ -97,7 +120,7 @@ fn main() {
     }
 }
 fn entry() -> Result<()> {
-    a2e_native::dotenv::load(std::path::Path::new(".env"))?;
+    a2e_native::dotenv::load_startup(std::path::Path::new(".env"))?;
     let cli = Cli::parse();
     if let Commands::Tools {
         command: Tools::Validate { tools },
@@ -112,6 +135,15 @@ fn entry() -> Result<()> {
     }
     if let Commands::Cases { command } = &cli.command {
         return cases(command);
+    }
+    if let Commands::Sandbox { command } = &cli.command {
+        let manifest = match command {
+            Sandbox::Init { seed, out, force } => a2e_native::sandbox::init(out, *seed, *force)?,
+            Sandbox::Verify { dir } => a2e_native::sandbox::verify(dir)?,
+            Sandbox::Info { dir } => a2e_native::sandbox::read_manifest(dir)?,
+        };
+        println!("{}", serde_json::to_string_pretty(&manifest)?);
+        return Ok(());
     }
     let c = Config::load(&cli.config)?;
     let stop = Arc::new(AtomicBool::new(false));
@@ -151,7 +183,9 @@ fn entry() -> Result<()> {
                 uploader.flush()?
             })?
         }
-        Commands::Tools { .. } | Commands::Cases { .. } => unreachable!(),
+        Commands::Tools { .. } | Commands::Cases { .. } | Commands::Sandbox { .. } => {
+            unreachable!()
+        }
     };
     println!("{}", serde_json::to_string_pretty(&output)?);
     Ok(())

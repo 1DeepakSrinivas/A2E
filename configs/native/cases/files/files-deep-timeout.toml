@@ -1,0 +1,27 @@
+id = "files-deep-timeout"
+category = "files"
+tags = ["workspace", "grep", "deep"]
+split = "heldout"
+golden_answer = "The session timeout is 45 minutes."
+
+[scope]
+prompt = "What is the session timeout for the login handler in the webapp project?"
+expected_calls = 1
+
+[tools]
+allowed = ["grep", "find", "cat", "ls"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Search the webapp project."
+tools = ["grep", "find"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 45 }
+
+[[golden]]
+tool = "grep"
+args = { "pattern" = "session timeout", "path" = "projects/webapp", "recursive" = true, "ignore_case" = true }

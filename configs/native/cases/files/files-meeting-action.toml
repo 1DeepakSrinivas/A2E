@@ -1,0 +1,35 @@
+id = "files-meeting-action"
+category = "files"
+tags = ["workspace", "ls"]
+split = "heldout"
+golden_answer = "The invoice goes to Dana."
+
+[scope]
+prompt = "Find the March 2026 meeting notes and say who the invoice goes to."
+expected_calls = 2
+
+[tools]
+allowed = ["ls", "cat", "grep"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "List the March notes."
+tools = ["ls"]
+
+[[stage]]
+instruction = "Read the meeting notes."
+tools = ["cat"]
+
+[[check]]
+kind = "answer"
+contains = "Dana"
+
+[[golden]]
+tool = "ls"
+args = { "path" = "notes/2026-03" }
+
+[[golden]]
+tool = "cat"
+args = { "path" = "notes/2026-03/meeting.txt" }

@@ -1,0 +1,27 @@
+id = "files-peak-temp"
+category = "files"
+tags = ["workspace", "json"]
+split = "heldout"
+golden_answer = "The peak is 78.2."
+
+[scope]
+prompt = "What is peak_temp_c in data/sensors.json?"
+expected_calls = 1
+
+[tools]
+allowed = ["json_get", "cat"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Read the value."
+tools = ["json_get", "cat"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 78.2 }
+
+[[golden]]
+tool = "json_get"
+args = { "path" = "data/sensors.json", "key" = "peak_temp_c" }

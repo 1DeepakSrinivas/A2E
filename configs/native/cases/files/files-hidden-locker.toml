@@ -1,0 +1,41 @@
+id = "files-hidden-locker"
+category = "files"
+tags = ["workspace", "hidden"]
+split = "heldout"
+golden_answer = "The locker code is 5827."
+
+[scope]
+prompt = "A hidden file in the home folder holds a locker code. What is the code?"
+expected_calls = 2
+
+[tools]
+allowed = ["ls", "cat", "grep"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "List the home folder including hidden names."
+tools = ["ls"]
+
+[[stage]]
+instruction = "Read the hidden file."
+tools = ["cat"]
+
+[[check]]
+kind = "call"
+tool = "ls"
+args = { "all" = true }
+match = "subset"
+
+[[check]]
+kind = "answer"
+number = { "value" = 5827 }
+
+[[golden]]
+tool = "ls"
+args = { "path" = "home", "all" = true }
+
+[[golden]]
+tool = "cat"
+args = { "path" = "home/.hidden_notes" }

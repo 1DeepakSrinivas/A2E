@@ -63,6 +63,8 @@ fn one() -> usize {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Fixtures {
+    /// Name of the generated workspace tree copied into the task directory.
+    pub sandbox: Option<String>,
     pub files: BTreeMap<String, String>,
     pub devices: BTreeMap<String, Value>,
     pub pages: Vec<Page>,

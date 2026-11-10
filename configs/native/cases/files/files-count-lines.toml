@@ -1,0 +1,27 @@
+id = "files-count-lines"
+category = "files"
+tags = ["workspace", "wc", "tier2"]
+split = "dev"
+golden_answer = "It has 6 lines."
+
+[scope]
+prompt = "How many lines does data/inventory.csv have?"
+expected_calls = 1
+
+[tools]
+allowed = ["wc", "cat", "ls"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Count the lines."
+tools = ["wc"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 6 }
+
+[[golden]]
+tool = "wc"
+args = { "path" = "data/inventory.csv" }

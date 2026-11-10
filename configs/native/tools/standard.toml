@@ -242,3 +242,73 @@ parameters = { type = "object", required = ["table"], additionalProperties = fal
 name = "db_query"
 description = "Run one read-only SQL SELECT query on the database."
 parameters = { type = "object", required = ["sql"], additionalProperties = false, properties = { sql = { type = "string", description = "A single SELECT statement", maxLength = 512 } } }
+
+[[tools]]
+name = "ls"
+description = "List the files and folders in a directory. Hidden names need all."
+parameters = { type = "object", required = [], additionalProperties = false, properties = { path = { type = "string", description = "Directory path, empty for the top level", maxLength = 1024 }, all = { type = "boolean", description = "Also show hidden names that start with a dot" }, long = { type = "boolean", description = "Show size and modified date" } } }
+
+[[tools]]
+name = "tree"
+description = "Show a directory as an indented tree."
+parameters = { type = "object", required = [], additionalProperties = false, properties = { path = { type = "string", description = "Directory path, empty for the top level", maxLength = 1024 }, depth = { type = "integer", description = "Levels to show", minimum = 1, maximum = 3 } } }
+
+[[tools]]
+name = "find"
+description = "Find files and folders by name under a directory."
+parameters = { type = "object", required = [], additionalProperties = false, properties = { path = { type = "string", description = "Directory to search, empty for the top level", maxLength = 1024 }, name = { type = "string", description = "Name pattern with * and ?, such as *.log", maxLength = 256 }, type = { type = "string", description = "f for files, d for folders", enum = ["f", "d"] }, min_size = { type = "integer", description = "Smallest file size in bytes", minimum = 0 }, newer_than = { type = "string", description = "Only files modified after this file", maxLength = 1024 } } }
+
+[[tools]]
+name = "grep"
+description = "Find the lines that contain some text in a file or in every file under a folder."
+parameters = { type = "object", required = ["pattern"], additionalProperties = false, properties = { pattern = { type = "string", description = "Text to find", maxLength = 256 }, path = { type = "string", description = "File or folder, empty for the top level", maxLength = 1024 }, recursive = { type = "boolean", description = "Search every file under a folder" }, ignore_case = { type = "boolean", description = "Ignore upper and lower case" }, files_only = { type = "boolean", description = "Return only the names of matching files" }, regex = { type = "boolean", description = "Treat the pattern as a regular expression" } } }
+
+[[tools]]
+name = "cat"
+description = "Show lines of a file, 50 at a time."
+parameters = { type = "object", required = ["path"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 }, offset = { type = "integer", description = "First line to show, starting at 1", minimum = 1 }, limit = { type = "integer", description = "Number of lines, at most 100", minimum = 1, maximum = 100 } } }
+
+[[tools]]
+name = "head"
+description = "Show the first lines of a file."
+parameters = { type = "object", required = ["path"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 }, lines = { type = "integer", description = "Number of lines", minimum = 1, maximum = 50 } } }
+
+[[tools]]
+name = "tail"
+description = "Show the last lines of a file."
+parameters = { type = "object", required = ["path"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 }, lines = { type = "integer", description = "Number of lines", minimum = 1, maximum = 50 } } }
+
+[[tools]]
+name = "wc"
+description = "Count the lines, words, and bytes of a file."
+parameters = { type = "object", required = ["path"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 } } }
+
+[[tools]]
+name = "stat"
+description = "Show the kind, size, modified date, and read-only flag of a path."
+parameters = { type = "object", required = ["path"], additionalProperties = false, properties = { path = { type = "string", description = "Relative path", maxLength = 1024 } } }
+
+[[tools]]
+name = "mkdir"
+description = "Create a folder, including missing parent folders."
+parameters = { type = "object", required = ["path"], additionalProperties = false, properties = { path = { type = "string", description = "Relative folder path", maxLength = 1024 } } }
+
+[[tools]]
+name = "cp"
+description = "Copy a file to a new path."
+parameters = { type = "object", required = ["from", "to"], additionalProperties = false, properties = { from = { type = "string", description = "Existing relative file path", maxLength = 1024 }, to = { type = "string", description = "New relative file path", maxLength = 1024 } } }
+
+[[tools]]
+name = "touch"
+description = "Create an empty file, or update the modified date of an existing one."
+parameters = { type = "object", required = ["path"], additionalProperties = false, properties = { path = { type = "string", description = "Relative file path", maxLength = 1024 } } }
+
+[[tools]]
+name = "rm"
+description = "Remove a file or an empty folder."
+parameters = { type = "object", required = ["path"], additionalProperties = false, properties = { path = { type = "string", description = "Relative path", maxLength = 1024 } } }
+
+[[tools]]
+name = "diff"
+description = "Compare two text files line by line."
+parameters = { type = "object", required = ["a", "b"], additionalProperties = false, properties = { a = { type = "string", description = "First relative file path", maxLength = 1024 }, b = { type = "string", description = "Second relative file path", maxLength = 1024 } } }

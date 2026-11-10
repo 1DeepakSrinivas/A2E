@@ -1,0 +1,36 @@
+id = "files-append-note"
+category = "files"
+tags = ["workspace", "write"]
+split = "heldout"
+golden_answer = "Added."
+
+[scope]
+prompt = "Add the line 'checked' to the end of notes/2026-03/meeting.txt."
+expected_calls = 1
+
+[tools]
+allowed = ["append_file", "cat"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Append the line."
+tools = ["append_file"]
+
+[[check]]
+kind = "file"
+path = "notes/2026-03/meeting.txt"
+contains = "checked"
+
+[[check]]
+kind = "file"
+path = "notes/2026-03/meeting.txt"
+contains = "send the invoice to Dana by Friday"
+
+[output]
+files = ["notes/2026-03/meeting.txt"]
+
+[[golden]]
+tool = "append_file"
+args = { "path" = "notes/2026-03/meeting.txt", "content" = "\nchecked" }

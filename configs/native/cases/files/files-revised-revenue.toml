@@ -1,0 +1,31 @@
+id = "files-revised-revenue"
+category = "files"
+tags = ["workspace", "grep", "distractor"]
+split = "dev"
+golden_answer = "report_final_v2.txt gives 134."
+
+[scope]
+prompt = "Which report in archive/old has the revised Q3 revenue, and what is the figure?"
+expected_calls = 1
+
+[tools]
+allowed = ["grep", "ls", "cat"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Search archive/old for the revised report."
+tools = ["grep", "ls"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 134 }
+
+[[check]]
+kind = "answer"
+contains = "report_final_v2.txt"
+
+[[golden]]
+tool = "grep"
+args = { "pattern" = "revised", "path" = "archive/old", "recursive" = true }

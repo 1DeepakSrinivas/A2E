@@ -1,0 +1,35 @@
+id = "files-accented-name"
+category = "files"
+tags = ["workspace", "names", "tier2"]
+split = "dev"
+golden_answer = "An espresso costs 3.20."
+
+[scope]
+prompt = "What does an espresso cost on the cafe menu file in archive/old?"
+expected_calls = 2
+
+[tools]
+allowed = ["find", "ls", "cat"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Find the menu file."
+tools = ["find", "ls"]
+
+[[stage]]
+instruction = "Read it."
+tools = ["cat"]
+
+[[check]]
+kind = "answer"
+contains = "3.20"
+
+[[golden]]
+tool = "find"
+args = { "path" = "archive/old", "name" = "*menu*" }
+
+[[golden]]
+tool = "cat"
+args = { "path" = "archive/old/café menu.txt" }

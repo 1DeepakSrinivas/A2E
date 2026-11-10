@@ -1,0 +1,31 @@
+id = "files-copy-config"
+category = "files"
+tags = ["workspace", "write", "tier2"]
+split = "dev"
+golden_answer = "Copied."
+
+[scope]
+prompt = "Copy home/.config/app/settings.ini to scratch/settings.ini."
+expected_calls = 1
+
+[tools]
+allowed = ["cp", "cat", "write_file", "ls"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Copy the file."
+tools = ["cp"]
+
+[[check]]
+kind = "file"
+path = "scratch/settings.ini"
+contains = "api_port = 8431"
+
+[output]
+files = ["scratch/settings.ini"]
+
+[[golden]]
+tool = "cp"
+args = { "from" = "home/.config/app/settings.ini", "to" = "scratch/settings.ini" }

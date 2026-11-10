@@ -1,0 +1,31 @@
+id = "files-touch-flag"
+category = "files"
+tags = ["workspace", "write"]
+split = "dev"
+golden_answer = "Created."
+
+[scope]
+prompt = "Create an empty file named scratch/done.flag."
+expected_calls = 1
+
+[tools]
+allowed = ["touch", "write_file"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Create the file."
+tools = ["touch", "write_file"]
+
+[[check]]
+kind = "file"
+path = "scratch/done.flag"
+eq = ""
+
+[output]
+files = ["scratch/done.flag"]
+
+[[golden]]
+tool = "touch"
+args = { "path" = "scratch/done.flag" }

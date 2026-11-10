@@ -23,6 +23,7 @@ pub enum Category {
     Recovery,
     Robustness,
     Web,
+    Files,
 }
 impl Category {
     /// Categories that need no hand-written workflow stages.
@@ -159,6 +160,8 @@ pub enum Check {
         json_eq: Option<Value>,
         #[serde(default)]
         absent: bool,
+        #[serde(default)]
+        present: bool,
     },
     State {
         path: String,
@@ -204,13 +207,15 @@ impl Check {
                 regex,
                 json_eq,
                 absent,
+                present,
                 path,
             } => {
                 let set = usize::from(eq.is_some())
                     + usize::from(contains.is_some())
                     + usize::from(regex.is_some())
                     + usize::from(json_eq.is_some())
-                    + usize::from(*absent);
+                    + usize::from(*absent)
+                    + usize::from(*present);
                 if set != 1 || path.is_empty() {
                     bail!("file check {path} needs a path and exactly one matcher");
                 }
@@ -288,6 +293,14 @@ impl Case {
         }
         if self.tools.allowed.is_empty() {
             return fail("tools.allowed is empty");
+        }
+        if self
+            .fixtures
+            .sandbox
+            .as_deref()
+            .is_some_and(|p| p != "workspace")
+        {
+            return fail("unknown sandbox profile");
         }
         let mut allowed = BTreeSet::new();
         for t in &self.tools.allowed {

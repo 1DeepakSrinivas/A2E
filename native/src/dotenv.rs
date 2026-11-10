@@ -1,5 +1,5 @@
 // dotenv.rs
-// Loads KEY=VALUE pairs from a .env file into the process environment
+// Loads KEY=VALUE pairs from .env files into the process environment
 // Variables already set in the environment take precedence over the file
 
 use anyhow::{Context, Result};
@@ -44,12 +44,36 @@ pub fn load(path: &Path) -> Result<()> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
     };
-    for (key, value) in parse(&text) {
-        if std::env::var_os(&key).is_none() {
+    set_missing(&text, |_| true);
+    Ok(())
+}
+
+/// Sets only the listed variables from the file when they are not already set. The file must exist.
+pub fn load_only(path: &Path, keys: &[&str]) -> Result<()> {
+    let text =
+        std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    set_missing(&text, |key| keys.contains(&key));
+    Ok(())
+}
+
+/// Variables the runner takes from the file named by `A2E_RESULTS_ENV`.
+const RESULTS_KEYS: [&str; 2] = ["WORKER_URL", "WRITE_TOKEN"];
+
+/// Loads `path`, then the file named by `A2E_RESULTS_ENV` (the a2e-results `.env`) for `RESULTS_KEYS` only.
+pub fn load_startup(path: &Path) -> Result<()> {
+    load(path)?;
+    if let Some(shared) = std::env::var_os("A2E_RESULTS_ENV") {
+        load_only(Path::new(&shared), &RESULTS_KEYS)?;
+    }
+    Ok(())
+}
+
+fn set_missing(text: &str, wanted: impl Fn(&str) -> bool) {
+    for (key, value) in parse(text) {
+        if wanted(&key) && std::env::var_os(&key).is_none() {
             std::env::set_var(key, value);
         }
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -94,5 +118,20 @@ mod tests {
         assert_eq!(std::env::var("A2E_DOTENV_TEST_SET").unwrap(), "kept");
         assert_eq!(std::env::var("A2E_DOTENV_TEST_NEW").unwrap(), "fresh");
         load(&dir.path().join("absent.env")).unwrap();
+    }
+
+    #[test]
+    fn load_only_takes_the_listed_keys_and_needs_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("shared.env");
+        std::fs::write(
+            &file,
+            "A2E_DOTENV_ONLY_WANTED=yes\nA2E_DOTENV_ONLY_SKIPPED=no\n",
+        )
+        .unwrap();
+        load_only(&file, &["A2E_DOTENV_ONLY_WANTED"]).unwrap();
+        assert_eq!(std::env::var("A2E_DOTENV_ONLY_WANTED").unwrap(), "yes");
+        assert!(std::env::var_os("A2E_DOTENV_ONLY_SKIPPED").is_none());
+        assert!(load_only(&dir.path().join("absent.env"), &[]).is_err());
     }
 }

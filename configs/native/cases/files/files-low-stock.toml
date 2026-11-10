@@ -1,0 +1,27 @@
+id = "files-low-stock"
+category = "files"
+tags = ["workspace", "csv", "tier2"]
+split = "dev"
+golden_answer = "sprocket-77 is low."
+
+[scope]
+prompt = "Which item in data/inventory.csv has fewer than 5 units in stock?"
+expected_calls = 1
+
+[tools]
+allowed = ["csv_filter", "cat"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Filter the rows with low quantity."
+tools = ["csv_filter"]
+
+[[check]]
+kind = "answer"
+contains = "sprocket-77"
+
+[[golden]]
+tool = "csv_filter"
+args = { "path" = "data/inventory.csv", "column" = "qty", "op" = "lt", "value" = "5" }

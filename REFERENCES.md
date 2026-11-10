@@ -244,7 +244,25 @@ summary**. Read each paper in full before citing it.
 
 ---
 
+## 8. Workspace and file-system tool design
+
+Found by web search on 2026-11-10. Only search summaries were read. Status: **From summary**. Read each source in
+full before citing it.
+
+- **BFCL V3 multi-turn** (https://gorilla.cs.berkeley.edu/blogs/13_bfcl_v3_multi_turn.html): a simulated file system
+  with typed `ls`, `cd`, `cat`, `grep`, `find`, `head`, `tail`, `wc`, `sort`, `diff`, `mv`, `cp`, `mkdir`, `touch`,
+  `rm` and `du` tools, scored by comparing the final state. Exact tool arguments need to be checked in the BFCL
+  repository.
+- **SWE-agent** (arXiv 2405.15793, https://princeton-nlp.github.io/SWE-agent/background/aci): the agent-computer
+  interface. A file viewer window of about 100 lines worked best, search results are summarised, and the agent gets
+  clear feedback on bad commands. The "withhold results above 50 matches" detail comes from one secondary source.
+- **Terminal-Bench** (arXiv 2601.11868): each task is a prepared container with an instruction and tests that pass only
+  if the final state is right.
+- **xAFS** (https://huggingface.co/datasets/supermemory/xAFS): agentic retrieval over file systems from 5 to about
+  10,000 files. **CoDA-Bench** (secondary report only): over 1,000 data files with distractors similar to the target.
+
 ## Change log
+- 2026-11-10: added section 8, workspace and file-system tool design.
 - 2026-10-29: added harness-effect references to section 7.
 - 2026-10-29: added section 7, related work for the success-per-joule study.
 - 2026-10-28: BFCL file system and math tools, curated small file systems, Brave Search API for live web search.

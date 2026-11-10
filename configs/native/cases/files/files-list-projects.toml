@@ -1,0 +1,35 @@
+id = "files-list-projects"
+category = "files"
+tags = ["workspace", "ls", "tier2"]
+split = "dev"
+golden_answer = "The projects are webapp, sensor-fw and notes-cli."
+
+[scope]
+prompt = "Which projects are in the projects folder?"
+expected_calls = 1
+
+[tools]
+allowed = ["ls", "tree", "find"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "List the projects folder."
+tools = ["ls", "tree"]
+
+[[check]]
+kind = "answer"
+contains = "webapp"
+
+[[check]]
+kind = "answer"
+contains = "sensor-fw"
+
+[[check]]
+kind = "answer"
+contains = "notes-cli"
+
+[[golden]]
+tool = "ls"
+args = { "path" = "projects" }

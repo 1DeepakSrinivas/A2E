@@ -61,7 +61,10 @@ Judging, scoring and reports run in the A2E-Results project
 submodule `a2e-results` in the repository root. Its `docs/API.md` describes the
 Worker API. After each attempt the runner posts the study, the model load and the
 finished attempt to the Worker. Set `WORKER_URL` and `WRITE_TOKEN` in the shell
-or in `.env` (see `.env.example`).
+or in `.env` (see `.env.example`). To avoid copying them, set `A2E_RESULTS_ENV` in
+`.env` to the a2e-results `.env` file (e.g. `../a2e-results/.env`). The runner
+reads only those two variables from that file, and it stops with an error if the
+file is missing.
 
 Every request is written to `results/native/outbox` first and removed once the
 Worker stores it. If the network is down, or the variables are not set, the
@@ -84,7 +87,7 @@ and temperature vary. They do not measure variation in success.
 ## Cases
 
 Each benchmark case is one TOML file under `configs/native/cases/<category>/`.
-The library has 108 cases. The categories follow the BFCL families that suit
+The library has 134 cases. The categories follow the BFCL families that suit
 models under 2 billion parameters.
 
 | Category | Cases | What it checks |
@@ -97,12 +100,13 @@ models under 2 billion parameters.
 | recovery | 12 | Recovering from failed calls, slow tools, and large results |
 | robustness | 8 | Ignoring instructions inside files, pages, and database rows |
 | web | 8 | Search and fetch over recorded pages |
+| files | 26 | Finding, reading, and changing files in the generated workspace |
 
 The four live search cases are in `configs/native/cases/web_live` and run only
 from the `web_live` suite.
 
 Run `a2e-native cases validate` to check every file against the tool
-definitions. When the submodule is checked out, it also checks judge rubric names against `a2e-results/cli/rubrics`. Run `a2e-native cases list --ids` to see the
+definitions. When the submodule is checked out, it also checks judge rubric names against `a2e-results/rubrics`. Run `a2e-native cases list --ids` to see the
 counts by category and split. See `configs/native/cases/chain/chain-copy.toml`
 for a worked example.
 
@@ -177,8 +181,8 @@ when every check passes. A case with no judge ends as `success` or a failure.
 - `no_call` fails if the tool is called at all.
 - `call_order` needs the listed tools to appear in that order.
 - `calls_at_most` bounds the total number of tool calls.
-- `file` checks a file with `eq`, `contains`, `regex`, `json_eq`, or
-  `absent = true`.
+- `file` checks a file with `eq`, `contains`, `regex`, `json_eq`,
+  `absent = true`, or `present = true`.
 - `state` compares a JSON pointer into the final state, e.g.
   `/devices/fan_1/setting`, with `eq`.
 - `answer` checks the final answer with `contains`, `not_contains`, `regex`,
@@ -206,6 +210,43 @@ Every case lists `[[golden]]` calls that solve it. The test suite replays them
 through the real agent loop and requires each offline case to succeed. This
 keeps a case from being impossible to solve. Write the golden calls first when
 you add a case.
+
+## Workspace sandbox
+
+The `files` cases work in a generated workspace of about 295 files and 1.7 MB, with hidden files, deep folders,
+rotated logs, near-duplicate names, names with spaces and accents, a read-only file, a binary file, a file over the
+read limit, and a file with injected instructions. The tree is the same for the same seed and generator version.
+Facts that cases check, such as a passcode or a port, are fixed in `native/src/sandbox/facts.rs`. Only the filler text
+changes with the seed.
+
+Build and check the tree with:
+
+```
+scripts/init_sandbox.sh            # writes ./sandbox (or $A2E_SANDBOX), then verifies it
+a2e-native sandbox init --force    # rebuild
+a2e-native sandbox verify          # compare the tree with sandbox/manifest.json
+a2e-native sandbox info
+scripts/sync_sandbox.sh pi@host    # copy a tree built elsewhere to a Pi and verify it there
+```
+
+`setup-pi.sh` runs `scripts/init_sandbox.sh`. The tree is not committed. `run` and `plan` refuse to start when a
+suite uses it and `verify` fails. The tree hash is part of the study id, so a different tree starts a new study.
+
+A case opts in with `sandbox = "workspace"` under `[fixtures]`. Each attempt gets its own copy of the tree, and
+`[fixtures.files]` is written on top of it. The copy time counts as tool setup, not as a tool call. Set
+`A2E_SANDBOX_TMP` to a folder on tmpfs, such as `/dev/shm`, to keep the copies off the SD card. The agent is told that
+its workspace is the sandbox root and that every path is relative to it.
+
+The file tools are `ls` (with `all` and `long`), `tree`, `find`, `grep`, `cat`, `head`, `tail`, `wc`, `stat`, `mkdir`,
+`cp`, `touch`, `rm`, and `diff`, next to the older `read_file`, `write_file`, `append_file`, `move_file`,
+`delete_file`, and `list_dir`. Results are capped, and a capped result says to narrow the query. `read_file` stops at
+64 KiB, while `cat` and the other new readers work in line windows up to 1 MiB. Writes share a quota of 256 KiB per
+attempt, and read-only files cannot be changed or removed.
+
+The state used by checks lists every file, but a file that the attempt did not touch is `null`. Use `present = true`
+to check that such a file is still there, and `absent = true` to check that a file was removed.
+
+Run the cases with the `files_dev` and `files_heldout` suites.
 
 ## Suites
 
@@ -269,7 +310,7 @@ required_facts = ["The fee is 12 dollars."]
 
 The `handoff` list chooses what the judge sees. The fields are `prompt`,
 `answer`, `calls`, `evidence`, `files`, `state_diff`, and `required_facts`. The
-rubric named in the case is a TOML file in `a2e-results/cli/rubrics`.
+rubric named in the case is a TOML file in `a2e-results/rubrics`.
 A run with a judged case sends its `answer`, `evidence`, `final_state` and tool
 calls, which is all the judge needs.
 

@@ -13,6 +13,7 @@ pub mod measure;
 pub mod process;
 pub mod record;
 pub mod runner;
+pub mod sandbox;
 pub mod store;
 pub mod tools;
 pub mod upload;

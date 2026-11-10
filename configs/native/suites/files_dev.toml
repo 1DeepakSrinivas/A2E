@@ -1,0 +1,17 @@
+name = "files_dev"
+models = ["functiongemma-270m", "qwen3-0.6b", "lfm2.5-1.2b-instruct-qad"]
+contexts = [2048]
+cases = ["../cases/files"]
+split = "dev"
+web_mode = "fixture"
+warmup = 0
+repeats = 1
+seed = 0
+
+[[variants]]
+name = "autonomous"
+mode = "autonomous"
+
+[[variants]]
+name = "guided"
+mode = "guided"

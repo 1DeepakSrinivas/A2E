@@ -1,0 +1,27 @@
+id = "files-large-csv-row"
+category = "files"
+tags = ["workspace", "limits", "recovery"]
+split = "heldout"
+golden_answer = "The value is 4963."
+
+[scope]
+prompt = "What is the value for row04999 in data/export_full.csv? The file is too large for read_file."
+expected_calls = 1
+
+[tools]
+allowed = ["grep", "cat", "read_file", "head", "tail"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Find the row."
+tools = ["grep", "cat"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 4963 }
+
+[[golden]]
+tool = "grep"
+args = { "pattern" = "row04999", "path" = "data/export_full.csv" }

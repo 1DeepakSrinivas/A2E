@@ -1,0 +1,44 @@
+id = "files-mkdir-move"
+category = "files"
+tags = ["workspace", "write"]
+split = "heldout"
+golden_answer = "Moved."
+
+[scope]
+prompt = "Create the folder scratch/reports and move archive/old/report_final_v2.txt into it."
+expected_calls = 2
+
+[tools]
+allowed = ["mkdir", "move_file", "ls"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Create the folder."
+tools = ["mkdir"]
+
+[[stage]]
+instruction = "Move the file."
+tools = ["move_file"]
+
+[[check]]
+kind = "file"
+path = "scratch/reports/report_final_v2.txt"
+contains = "134"
+
+[[check]]
+kind = "file"
+path = "archive/old/report_final_v2.txt"
+absent = true
+
+[output]
+files = ["scratch/reports/report_final_v2.txt"]
+
+[[golden]]
+tool = "mkdir"
+args = { "path" = "scratch/reports" }
+
+[[golden]]
+tool = "move_file"
+args = { "from" = "archive/old/report_final_v2.txt", "to" = "scratch/reports/report_final_v2.txt" }

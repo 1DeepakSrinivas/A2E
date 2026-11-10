@@ -1,0 +1,27 @@
+id = "files-newest-report"
+category = "files"
+tags = ["workspace", "ls", "distractor"]
+split = "heldout"
+golden_answer = "report_final_v2.txt is the newest."
+
+[scope]
+prompt = "Which of the report files in archive/old was modified most recently?"
+expected_calls = 1
+
+[tools]
+allowed = ["ls", "stat", "find"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "List archive/old with dates."
+tools = ["ls", "stat"]
+
+[[check]]
+kind = "answer"
+contains = "report_final_v2.txt"
+
+[[golden]]
+tool = "ls"
+args = { "path" = "archive/old", "long" = true }

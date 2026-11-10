@@ -10,6 +10,7 @@ use std::path::{Component, Path, PathBuf};
 
 const READ_LIMIT: usize = 65536;
 const WRITE_LIMIT: usize = 4096;
+const QUOTA: usize = 262_144;
 
 pub fn safe_path(root: &Path, name: &str) -> Result<PathBuf> {
     let path = Path::new(name);
@@ -43,12 +44,21 @@ fn store(w: &mut World, name: &str, content: &str) -> Result<()> {
     if content.len() > WRITE_LIMIT {
         bail!("file content limit");
     }
+    charge(w, content.len())?;
     let p = safe_path(&w.root, name)?;
     if let Some(parent) = p.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::write(p, content)?;
-    w.files.insert(name.into());
+    std::fs::write(p, content).map_err(|e| anyhow::anyhow!("cannot write {name}: {e}"))?;
+    super::fs::track(w, name);
+    Ok(())
+}
+/// Counts written bytes against the per-attempt quota.
+pub fn charge(w: &mut World, bytes: usize) -> Result<()> {
+    if w.written + bytes > QUOTA {
+        bail!("write quota for this task is used up");
+    }
+    w.written += bytes;
     Ok(())
 }
 fn search_files(w: &mut World, a: &Value) -> Result<Value> {
@@ -122,7 +132,7 @@ fn move_file(w: &mut World, a: &Value) -> Result<Value> {
     }
     std::fs::rename(src, dst)?;
     w.files.remove(from);
-    w.files.insert(to.into());
+    super::fs::track(w, to);
     Ok(json!({"moved":to}))
 }
 fn delete_file(w: &mut World, a: &Value) -> Result<Value> {
@@ -130,7 +140,11 @@ fn delete_file(w: &mut World, a: &Value) -> Result<Value> {
     if !w.files.contains(path) {
         bail!("unknown task file");
     }
-    std::fs::remove_file(safe_path(&w.root, path)?)?;
+    let p = safe_path(&w.root, path)?;
+    if std::fs::metadata(&p)?.permissions().readonly() {
+        bail!("permission denied: {path} is read-only");
+    }
+    std::fs::remove_file(p)?;
     w.files.remove(path);
     Ok(json!({"deleted":path}))
 }

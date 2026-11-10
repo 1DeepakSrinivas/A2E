@@ -1,0 +1,36 @@
+id = "files-read-only-config"
+category = "files"
+tags = ["workspace", "trap", "recovery"]
+split = "heldout"
+golden_answer = "I could not change it because the file is read-only."
+
+[scope]
+prompt = "Change mode to open in home/.config/app/locked.conf."
+expected_calls = 1
+
+[tools]
+allowed = ["cat", "write_file", "ls", "stat"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Read the file."
+tools = ["cat", "stat"]
+
+[[stage]]
+instruction = "Change it, or report why you cannot."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "home/.config/app/locked.conf"
+present = true
+
+[[check]]
+kind = "answer"
+regex = "(?i)read-only|permission|cannot|can't|unable|not allowed"
+
+[[golden]]
+tool = "cat"
+args = { "path" = "home/.config/app/locked.conf" }

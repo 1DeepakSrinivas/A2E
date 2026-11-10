@@ -27,6 +27,7 @@ export A2E_BUILD_JOBS="${A2E_BUILD_JOBS:-1}"
 A2E_HOME="$PWD/deps" LLAMA_COMMIT="" bash scripts/build_llama.sh
 CARGO_PROFILE_RELEASE_LTO=false cargo +1.96.0 build --release --locked --jobs "$A2E_BUILD_JOBS"
 
+bash scripts/init_sandbox.sh
 target/release/a2e-native models fetch
 target/release/a2e-native doctor
 printf '\nTo run the smoke suite after disabling swap:\n  target/release/a2e-native run\n'

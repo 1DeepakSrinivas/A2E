@@ -1,0 +1,27 @@
+id = "files-spaced-name"
+category = "files"
+tags = ["workspace", "names"]
+split = "heldout"
+golden_answer = "Q2 revenue is 98."
+
+[scope]
+prompt = "Read the file named 'old report.txt' in archive/old and tell me the Q2 revenue."
+expected_calls = 1
+
+[tools]
+allowed = ["cat", "ls", "find"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Read the file."
+tools = ["cat"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 98 }
+
+[[golden]]
+tool = "cat"
+args = { "path" = "archive/old/old report.txt" }
