@@ -153,6 +153,15 @@ fn remaining(deadline: Instant, max: u64) -> Result<Duration> {
     }
     Ok(d.min(Duration::from_secs(max)))
 }
+/// Bytes of a tool result kept on the attempt record for the judge.
+const TOOL_OUTPUT_BYTES: usize = 4096;
+fn truncate(text: &str, max: usize) -> &str {
+    let mut end = text.len().min(max);
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
 /// Tools visible for the current workflow stage; distractors only in autonomous mode.
 pub fn select_tools(
     case: &Case,
@@ -276,6 +285,7 @@ impl Attempt<'_> {
             &self.x.adapter.template_request(&messages, specs),
             remaining(self.deadline, suite.budget.call_seconds)?,
         )?;
+        let prompt = self.x.adapter.normalize_prompt(prompt);
         self.turn.template_ms = t.elapsed().as_secs_f64() * 1000.;
         let t = Instant::now();
         let prompt_len = self.x.client.tokens(
@@ -326,7 +336,14 @@ impl Attempt<'_> {
         } else {
             self.x
                 .adapter
-                .parse_generation(&completion.text, completion.raw["stopping_word"].as_str())
+                .parse_generation_flagged(
+                    &completion.text,
+                    completion.raw["stopping_word"].as_str(),
+                )
+                .map(|(action, leading_text)| {
+                    self.turn.leading_text = leading_text;
+                    action
+                })
         };
         self.turn.parse_ms = t.elapsed().as_secs_f64() * 1000.;
         action
@@ -380,6 +397,8 @@ impl Attempt<'_> {
             validate_ms: t.elapsed().as_secs_f64() * 1000.,
             ms: 0.,
             output_bytes: 0,
+            output: None,
+            output_truncated: false,
             error: None,
         };
         let signature = crate::canonical_hash(&call)?;
@@ -432,6 +451,9 @@ impl Attempt<'_> {
             }
         };
         let executed = entry.ok;
+        let text = output.to_string();
+        entry.output_truncated = text.len() > TOOL_OUTPUT_BYTES;
+        entry.output = Some(truncate(&text, TOOL_OUTPUT_BYTES).to_string());
         // Retrying a failed call is recovery, not a loop
         if !executed {
             self.last_call = None;
@@ -775,7 +797,7 @@ pub fn run(
         };
         artifacts.insert(id, json!({"model":m,"sha256":hash}));
     }
-    let mut definition = json!({"suite":suite,"cases":cases,"tools":catalog,"runtime":config.runtime,"artifacts":artifacts,"device":machine["device"],"kernel":machine["kernel"],"arch":machine["arch"],"total_memory_bytes":machine["total_memory_bytes"],"runtime_version":env!("CARGO_PKG_VERSION"),"binary_sha256":crate::hash_file(&std::env::current_exe()?)?});
+    let mut definition = json!({"suite":suite,"cases":cases,"tools":catalog,"runtime":config.runtime,"artifacts":artifacts,"device":machine["device"],"kernel":machine["kernel"],"arch":machine["arch"],"total_memory_bytes":machine["total_memory_bytes"],"runtime_version":env!("CARGO_PKG_VERSION"),"parse_rules":crate::adapter::PARSE_RULES,"binary_sha256":crate::hash_file(&std::env::current_exe()?)?});
     if let Some(m) = &sandbox {
         definition["sandbox"] = json!({"version":m.version,"seed":m.seed,"sha256":m.sha256});
     }
