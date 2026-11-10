@@ -1,0 +1,35 @@
+id = "files-config-port"
+category = "files"
+tags = ["workspace", "find", "tier2"]
+split = "dev"
+golden_answer = "api_port is 8431."
+
+[scope]
+prompt = "What is api_port in the settings.ini file somewhere under home?"
+expected_calls = 2
+
+[tools]
+allowed = ["find", "cat", "ls", "grep"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Find settings.ini."
+tools = ["find", "ls", "grep"]
+
+[[stage]]
+instruction = "Read it and give api_port."
+tools = ["cat"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 8431 }
+
+[[golden]]
+tool = "find"
+args = { "name" = "settings.ini" }
+
+[[golden]]
+tool = "cat"
+args = { "path" = "home/.config/app/settings.ini" }

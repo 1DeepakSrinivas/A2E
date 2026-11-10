@@ -1,0 +1,39 @@
+id = "files-write-figure"
+category = "files"
+tags = ["workspace", "write", "tier2"]
+split = "dev"
+golden_answer = "Saved."
+
+[scope]
+prompt = "Read archive/old/report_final_v2.txt and save its Q3 revenue line to scratch/q3.txt."
+expected_calls = 2
+
+[tools]
+allowed = ["cat", "write_file", "grep"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Read the report."
+tools = ["cat", "grep"]
+
+[[stage]]
+instruction = "Save the line."
+tools = ["write_file"]
+
+[[check]]
+kind = "file"
+path = "scratch/q3.txt"
+contains = "Q3 revenue: 134"
+
+[output]
+files = ["scratch/q3.txt"]
+
+[[golden]]
+tool = "cat"
+args = { "path" = "archive/old/report_final_v2.txt" }
+
+[[golden]]
+tool = "write_file"
+args = { "path" = "scratch/q3.txt", "content" = "Q3 revenue: 134 (revised)" }

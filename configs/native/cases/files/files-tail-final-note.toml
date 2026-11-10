@@ -1,0 +1,27 @@
+id = "files-tail-final-note"
+category = "files"
+tags = ["workspace", "tail"]
+split = "heldout"
+golden_answer = "The passcode is 7731."
+
+[scope]
+prompt = "What is the maintenance passcode in the last line of logs/big/service-2026-01.log?"
+expected_calls = 1
+
+[tools]
+allowed = ["tail", "head", "cat", "wc"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Read the end of the file."
+tools = ["tail", "cat"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 7731 }
+
+[[golden]]
+tool = "tail"
+args = { "path" = "logs/big/service-2026-01.log", "lines" = 1 }

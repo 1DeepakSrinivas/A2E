@@ -1,0 +1,27 @@
+id = "files-count-errors"
+category = "files"
+tags = ["workspace", "grep"]
+split = "heldout"
+golden_answer = "There are 3 ERROR lines."
+
+[scope]
+prompt = "How many ERROR lines are in logs/app.log?"
+expected_calls = 1
+
+[tools]
+allowed = ["grep", "cat", "wc"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Find the ERROR lines."
+tools = ["grep"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 3 }
+
+[[golden]]
+tool = "grep"
+args = { "pattern" = "ERROR", "path" = "logs/app.log" }

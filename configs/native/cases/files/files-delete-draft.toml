@@ -1,0 +1,38 @@
+id = "files-delete-draft"
+category = "files"
+tags = ["workspace", "write", "distractor"]
+split = "heldout"
+golden_answer = "Deleted the draft."
+
+[scope]
+prompt = "Delete the draft report archive/old/report-final.txt but keep the other report files."
+expected_calls = 1
+
+[tools]
+allowed = ["rm", "ls", "cat"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Remove the draft."
+tools = ["rm"]
+
+[[check]]
+kind = "file"
+path = "archive/old/report-final.txt"
+absent = true
+
+[[check]]
+kind = "file"
+path = "archive/old/report_final.txt"
+present = true
+
+[[check]]
+kind = "file"
+path = "archive/old/report_final_v2.txt"
+present = true
+
+[[golden]]
+tool = "rm"
+args = { "path" = "archive/old/report-final.txt" }

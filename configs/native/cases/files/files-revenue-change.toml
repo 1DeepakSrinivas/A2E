@@ -1,0 +1,35 @@
+id = "files-revenue-change"
+category = "files"
+tags = ["workspace", "diff", "tier2"]
+split = "dev"
+golden_answer = "Revenue rose by 14."
+
+[scope]
+prompt = "By how much did Q3 revenue change between archive/old/report_final.txt and archive/old/report_final_v2.txt?"
+expected_calls = 2
+
+[tools]
+allowed = ["diff", "cat", "calculate"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Compare the two files."
+tools = ["diff", "cat"]
+
+[[stage]]
+instruction = "Subtract the old figure from the new one."
+tools = ["calculate"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 14 }
+
+[[golden]]
+tool = "diff"
+args = { "a" = "archive/old/report_final.txt", "b" = "archive/old/report_final_v2.txt" }
+
+[[golden]]
+tool = "calculate"
+args = { "operation" = "subtract", "a" = 134, "b" = 120 }

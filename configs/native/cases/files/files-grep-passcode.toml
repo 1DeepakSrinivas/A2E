@@ -1,0 +1,31 @@
+id = "files-grep-passcode"
+category = "files"
+tags = ["workspace", "grep", "tier2"]
+split = "dev"
+golden_answer = "service-2026-01.log says the passcode is 7731."
+
+[scope]
+prompt = "Which log file under logs mentions a maintenance passcode, and what is the passcode?"
+expected_calls = 1
+
+[tools]
+allowed = ["grep", "cat", "ls", "find"]
+
+[fixtures]
+sandbox = "workspace"
+
+[[stage]]
+instruction = "Search the logs folder for the passcode."
+tools = ["grep"]
+
+[[check]]
+kind = "answer"
+number = { "value" = 7731 }
+
+[[check]]
+kind = "answer"
+contains = "service-2026-01.log"
+
+[[golden]]
+tool = "grep"
+args = { "pattern" = "passcode", "path" = "logs", "recursive" = true }
