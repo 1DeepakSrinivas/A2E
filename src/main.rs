@@ -298,6 +298,6 @@ fn doctor(c: &Config, probe: bool, stop: Arc<AtomicBool>) -> Result<serde_json::
         models.push(item);
     }
     Ok(
-        json!({"host":c.host_id,"host_file":c.host_file,"roles":c.roles,"machine":machine,"models":models,"llama_server":c.runtime.llama_server,"expected_llama_commit":c.runtime.llama_commit,"pi_energy":"unavailable without a supported measurement source"}),
+        json!({"host":c.host_id,"host_file":c.host_file,"roles":c.roles,"machine":machine,"telemetry":a2e::measure::telemetry(),"models":models,"llama_server":c.runtime.llama_server,"expected_llama_commit":c.runtime.llama_commit,"pi_energy":"unavailable without a supported measurement source"}),
     )
 }

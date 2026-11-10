@@ -13,7 +13,13 @@ if [[ "$(id -u)" == 0 ]]; then
 fi
 
 sudo apt-get update
-sudo apt-get install -y build-essential cmake git curl ca-certificates
+sudo apt-get install -y build-essential cmake git curl ca-certificates libraspberrypi-bin
+
+# vcgencmd reads temperature and throttle flags through the video group
+if ! id -nG | tr ' ' '\n' | grep -qx video; then
+    sudo usermod -aG video "$USER"
+    echo "Added $USER to the video group. Log out and back in before measuring."
+fi
 
 export PATH="$HOME/.cargo/bin:$PATH"
 if ! command -v rustup >/dev/null; then
