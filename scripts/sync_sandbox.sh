@@ -11,4 +11,4 @@ OUT="${A2E_SANDBOX:-sandbox}"
 
 [ -d "$OUT/base" ] || { echo "no $OUT/base; run scripts/init_sandbox.sh first" >&2; exit 1; }
 rsync -a --delete "$OUT/" "$HOST:$REMOTE/sandbox/"
-ssh "$HOST" "cd $REMOTE && target/release/a2e-native sandbox verify"
+ssh "$HOST" "cd $REMOTE && target/release/a2e sandbox verify"

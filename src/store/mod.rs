@@ -48,7 +48,7 @@ impl RunLock {
                     if unsafe { libc::kill(pid, 0) } == 0
                         || std::io::Error::last_os_error().raw_os_error() != Some(libc::ESRCH)
                     {
-                        bail!("another native run holds the runtime lock");
+                        bail!("another run holds the runtime lock");
                     }
                     std::fs::remove_file(&path)?;
                 }

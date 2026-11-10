@@ -1,6 +1,6 @@
 //! Result upload: payload shape against the Worker schema, outbox ordering, retries, resume
 
-use a2e_native::{
+use a2e::{
     case::Case,
     config::{Suite, Variant},
     measure::Sample,
@@ -30,13 +30,10 @@ const STUDY: &str = "0123456789abcdef0123456789abcdef";
 const JOB: &str = "fedcba9876543210fedcba9876543210";
 
 fn repo() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_owned()
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 fn case() -> Case {
-    let path = repo().join("configs/native/suites/smoke.toml");
+    let path = repo().join("configs/suites/smoke.toml");
     Suite::load(&path)
         .unwrap()
         .load_cases(&path)
@@ -81,7 +78,7 @@ fn outcome(samples: usize) -> Outcome {
         output_bytes: 3,
         error: None,
     }];
-    o.checks = vec![a2e_native::eval::CheckResult {
+    o.checks = vec![a2e::eval::CheckResult {
         kind: "file_equals".into(),
         label: "copy".into(),
         passed: true,

@@ -1,8 +1,8 @@
 // main.rs
-// Command-line entry point for native experiments and setup checks
+// Command-line entry point for experiments and setup checks
 // Command dispatch, interrupt handling, and JSON output
 
-use a2e_native::config::{Catalog, Config, Suite};
+use a2e::config::{Catalog, Config, Suite};
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use serde_json::json;
@@ -20,7 +20,7 @@ use std::{
     about = "Measure bounded tool-calling agents on edge hardware"
 )]
 struct Cli {
-    #[arg(long, global = true, default_value = "configs/native/models.toml")]
+    #[arg(long, global = true, default_value = "configs/models.toml")]
     config: PathBuf,
     #[command(subcommand)]
     command: Commands,
@@ -36,15 +36,15 @@ enum Commands {
         probe: bool,
     },
     Plan {
-        #[arg(default_value = "configs/native/suites/smoke.toml")]
+        #[arg(default_value = "configs/suites/smoke.toml")]
         suite: PathBuf,
-        #[arg(long, default_value = "configs/native/tools/standard.toml")]
+        #[arg(long, default_value = "configs/tools/standard.toml")]
         tools: PathBuf,
     },
     Run {
-        #[arg(default_value = "configs/native/suites/smoke.toml")]
+        #[arg(default_value = "configs/suites/smoke.toml")]
         suite: PathBuf,
-        #[arg(long, default_value = "configs/native/tools/standard.toml")]
+        #[arg(long, default_value = "configs/tools/standard.toml")]
         tools: PathBuf,
         #[arg(long)]
         retry_failed: bool,
@@ -69,7 +69,7 @@ enum Commands {
 #[derive(Subcommand)]
 enum Sandbox {
     Init {
-        #[arg(long, default_value_t = a2e_native::sandbox::DEFAULT_SEED)]
+        #[arg(long, default_value_t = a2e::sandbox::DEFAULT_SEED)]
         seed: u64,
         #[arg(long, default_value = "sandbox")]
         out: PathBuf,
@@ -92,15 +92,15 @@ enum Models {
 #[derive(Subcommand)]
 enum Cases {
     Validate {
-        #[arg(default_value = "configs/native/cases")]
+        #[arg(default_value = "configs/cases")]
         path: PathBuf,
-        #[arg(long, default_value = "configs/native/tools/standard.toml")]
+        #[arg(long, default_value = "configs/tools/standard.toml")]
         tools: PathBuf,
         #[arg(long, default_value = "a2e-results/rubrics")]
         rubrics: PathBuf,
     },
     List {
-        #[arg(default_value = "configs/native/cases")]
+        #[arg(default_value = "configs/cases")]
         path: PathBuf,
         #[arg(long)]
         ids: bool,
@@ -109,7 +109,7 @@ enum Cases {
 #[derive(Subcommand)]
 enum Tools {
     Validate {
-        #[arg(default_value = "configs/native/tools/standard.toml")]
+        #[arg(default_value = "configs/tools/standard.toml")]
         tools: PathBuf,
     },
 }
@@ -120,7 +120,7 @@ fn main() {
     }
 }
 fn entry() -> Result<()> {
-    a2e_native::dotenv::load_startup(std::path::Path::new(".env"))?;
+    a2e::dotenv::load_startup(std::path::Path::new(".env"))?;
     let cli = Cli::parse();
     if let Commands::Tools {
         command: Tools::Validate { tools },
@@ -138,9 +138,9 @@ fn entry() -> Result<()> {
     }
     if let Commands::Sandbox { command } = &cli.command {
         let manifest = match command {
-            Sandbox::Init { seed, out, force } => a2e_native::sandbox::init(out, *seed, *force)?,
-            Sandbox::Verify { dir } => a2e_native::sandbox::verify(dir)?,
-            Sandbox::Info { dir } => a2e_native::sandbox::read_manifest(dir)?,
+            Sandbox::Init { seed, out, force } => a2e::sandbox::init(out, *seed, *force)?,
+            Sandbox::Verify { dir } => a2e::sandbox::verify(dir)?,
+            Sandbox::Info { dir } => a2e::sandbox::read_manifest(dir)?,
         };
         println!("{}", serde_json::to_string_pretty(&manifest)?);
         return Ok(());
@@ -156,7 +156,7 @@ fn entry() -> Result<()> {
         Commands::Doctor { probe } => doctor(&c, probe, stop)?,
         Commands::Plan { suite, tools } => {
             let s = Suite::load(&suite)?;
-            a2e_native::runner::plan(&c, &s, &s.load_cases(&suite)?, &Catalog::load(&tools)?)?
+            a2e::runner::plan(&c, &s, &s.load_cases(&suite)?, &Catalog::load(&tools)?)?
         }
         Commands::Run {
             suite,
@@ -164,7 +164,7 @@ fn entry() -> Result<()> {
             retry_failed,
         } => {
             let s = Suite::load(&suite)?;
-            a2e_native::runner::run(
+            a2e::runner::run(
                 &c,
                 &s,
                 &s.load_cases(&suite)?,
@@ -174,9 +174,8 @@ fn entry() -> Result<()> {
             )?
         }
         Commands::Upload { status } => {
-            let mut uploader = a2e_native::upload::Uploader::open(
-                &a2e_native::config::expand_path(&c.runtime.output_dir),
-            )?;
+            let mut uploader =
+                a2e::upload::Uploader::open(&a2e::config::expand_path(&c.runtime.output_dir))?;
             serde_json::to_value(if status {
                 uploader.status()?
             } else {
@@ -218,7 +217,7 @@ fn cases(command: &Cases) -> Result<()> {
                 );
             }
             let registry = c.tools.iter().map(|t| t.name.as_str()).collect();
-            let all = a2e_native::case::load_all(std::slice::from_ref(path))?;
+            let all = a2e::case::load_all(std::slice::from_ref(path))?;
             for case in &all {
                 case.validate(&registry)?;
                 if case.judge.enabled
@@ -233,11 +232,11 @@ fn cases(command: &Cases) -> Result<()> {
                     );
                 }
             }
-            json!({"valid":true,"summary":a2e_native::case::summary(&all)})
+            json!({"valid":true,"summary":a2e::case::summary(&all)})
         }
         Cases::List { path, ids } => {
-            let all = a2e_native::case::load_all(std::slice::from_ref(path))?;
-            let mut out = a2e_native::case::summary(&all);
+            let all = a2e::case::load_all(std::slice::from_ref(path))?;
+            let mut out = a2e::case::summary(&all);
             if *ids {
                 out["cases"] = json!(all
                     .iter()
@@ -252,36 +251,35 @@ fn cases(command: &Cases) -> Result<()> {
 }
 fn doctor(c: &Config, probe: bool, stop: Arc<AtomicBool>) -> Result<serde_json::Value> {
     let machine =
-        a2e_native::measure::machine(&c.runtime).unwrap_or_else(|e| json!({"error":e.to_string()}));
+        a2e::measure::machine(&c.runtime).unwrap_or_else(|e| json!({"error":e.to_string()}));
     let mut models = Vec::new();
     for m in &c.models {
         let path = c.model_path(m);
         let mut item = json!({"id":m.id,"path":path,"source":m.source,"revision":m.revision,"quant":m.quant,"exists":path.exists()});
         if path.exists() {
-            let sha = a2e_native::hash_file(&path)?;
+            let sha = a2e::hash_file(&path)?;
             item["sha256"] = json!(sha);
             item["hash_matches"] = json!(m.sha256.as_ref().map(|s| s == &sha));
         }
         if probe && path.exists() {
-            let root = a2e_native::config::expand_path(&c.runtime.output_dir);
-            let _lock = a2e_native::store::RunLock::acquire(&root)?;
+            let root = a2e::config::expand_path(&c.runtime.output_dir);
+            let _lock = a2e::store::RunLock::acquire(&root)?;
             let dir = root.join("probes").join(&m.id);
             std::fs::create_dir_all(&dir)?;
             let result = (|| -> Result<serde_json::Value> {
                 if machine.get("error").is_some() {
                     anyhow::bail!("device preflight failed");
                 }
-                let mut server = a2e_native::inference::Server::spawn(c, m, 1024, &dir)?;
-                let monitor =
-                    a2e_native::measure::Monitor::start(server.pid(), &c.runtime, stop.clone())?;
+                let mut server = a2e::inference::Server::spawn(c, m, 1024, &dir)?;
+                let monitor = a2e::measure::Monitor::start(server.pid(), &c.runtime, stop.clone())?;
                 let ready = server.ready(c.runtime.startup_seconds, &stop);
                 let resources = monitor.finish();
                 if resources.memory_exceeded {
                     anyhow::bail!("model_load_memory_budget");
                 }
                 let props = ready?;
-                let adapter = a2e_native::adapter::Adapter::new(&m.adapter)?;
-                let prompt=server.client.template(&adapter.template_request(&[json!({"role":"user","content":"Call final_answer with answer set to ready."})],&[a2e_native::adapter::final_tool()]),std::time::Duration::from_secs(30))?;
+                let adapter = a2e::adapter::Adapter::new(&m.adapter)?;
+                let prompt=server.client.template(&adapter.template_request(&[json!({"role":"user","content":"Call final_answer with answer set to ready."})],&[a2e::adapter::final_tool()]),std::time::Duration::from_secs(30))?;
                 let response = server.client.complete(
                     &json!({"prompt":prompt,"n_predict":64,"temperature":0,"stop":adapter.generation_stops()}),
                     std::time::Duration::from_secs(300),

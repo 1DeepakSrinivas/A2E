@@ -46,7 +46,7 @@ impl Default for Runtime {
             llama_server: "deps/llama.cpp/build-a2e/bin/llama-server".into(),
             llama_commit: "6666a7330c5375dc310ddea1f9621a7770430010".into(),
             models_dir: "~/models".into(),
-            output_dir: "results/native".into(),
+            output_dir: "results".into(),
             device: "auto".into(),
             port: 8197,
             threads: 4,
@@ -177,13 +177,13 @@ impl Config {
         let mut c: Self = v.try_into()?;
         c.host_id = host_id;
         c.host_file = host_file;
-        if let Ok(p) = std::env::var("A2E_NATIVE_MODELS_DIR") {
+        if let Ok(p) = std::env::var("A2E_MODELS_DIR") {
             c.runtime.models_dir = p;
         }
-        if let Ok(p) = std::env::var("A2E_NATIVE_LLAMA_SERVER") {
+        if let Ok(p) = std::env::var("A2E_LLAMA_SERVER") {
             c.runtime.llama_server = p;
         }
-        if let Ok(p) = std::env::var("A2E_NATIVE_OUTPUT_DIR") {
+        if let Ok(p) = std::env::var("A2E_OUTPUT_DIR") {
             c.runtime.output_dir = p;
         }
         let mut names = BTreeSet::new();

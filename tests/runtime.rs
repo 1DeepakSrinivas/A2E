@@ -2,7 +2,7 @@
 //! Scripted inference, resource limits, retrieval checks, and run recovery
 
 mod support;
-use a2e_native::{
+use a2e::{
     adapter::{Adapter, Call},
     case::{Case, FinalAnswer},
     config::{Catalog, Config, Mode, Runtime, Suite, Variant},
@@ -13,33 +13,30 @@ use a2e_native::{
 };
 use serde_json::json;
 use std::{
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
 use support::{call, MockServer};
 
 fn repo() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .to_owned()
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
 fn catalog() -> Catalog {
-    Catalog::load(&repo().join("configs/native/tools/standard.toml")).unwrap()
+    Catalog::load(&repo().join("configs/tools/standard.toml")).unwrap()
 }
 fn suite() -> Suite {
-    Suite::load(&repo().join("configs/native/suites/smoke.toml")).unwrap()
+    Suite::load(&repo().join("configs/suites/smoke.toml")).unwrap()
 }
 fn task() -> Case {
     let s = suite();
-    s.load_cases(&repo().join("configs/native/suites/smoke.toml"))
+    s.load_cases(&repo().join("configs/suites/smoke.toml"))
         .unwrap()
         .into_iter()
         .find(|t| t.id == "chain-copy")
         .unwrap()
 }
-fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> a2e_native::runner::Outcome {
+fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> a2e::runner::Outcome {
     let dir = tempfile::tempdir().unwrap();
     let client = Inference::new(server.url.clone()).unwrap();
     let runtime = Runtime {
@@ -272,7 +269,7 @@ fn use_sandbox() {
     static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
     let dir = DIR.get_or_init(|| {
         let dir = tempfile::tempdir().unwrap();
-        a2e_native::sandbox::init(dir.path(), a2e_native::sandbox::DEFAULT_SEED, false).unwrap();
+        a2e::sandbox::init(dir.path(), a2e::sandbox::DEFAULT_SEED, false).unwrap();
         dir
     });
     std::env::set_var("A2E_SANDBOX", dir.path());
@@ -280,13 +277,13 @@ fn use_sandbox() {
 #[test]
 fn every_shipped_suite_validates_and_has_disjoint_splits() {
     use_sandbox();
-    let cfg = Config::load(&repo().join("configs/native/models.toml")).unwrap();
+    let cfg = Config::load(&repo().join("configs/models.toml")).unwrap();
     let m = catalog();
-    for entry in std::fs::read_dir(repo().join("configs/native/suites")).unwrap() {
+    for entry in std::fs::read_dir(repo().join("configs/suites")).unwrap() {
         let path = entry.unwrap().path();
         let s = Suite::load(&path).unwrap();
         let cases = s.load_cases(&path).unwrap();
-        assert!(a2e_native::runner::plan(&cfg, &s, &cases, &m).is_ok());
+        assert!(a2e::runner::plan(&cfg, &s, &cases, &m).is_ok());
         assert!(cases.iter().all(|c| c.split == s.split));
     }
 }
@@ -328,21 +325,21 @@ fn destination_validation_blocks_local_addresses_and_redirect_targets() {
         "file:///etc/passwd",
         "https://example.org:1234/",
     ] {
-        assert!(a2e_native::tools::validate_url(url).is_err(), "{url}");
+        assert!(a2e::tools::validate_url(url).is_err(), "{url}");
     }
-    assert!(a2e_native::tools::validate_url("https://example.org/docs").is_ok());
+    assert!(a2e::tools::validate_url("https://example.org/docs").is_ok());
 }
 #[test]
 fn file_paths_and_html_extraction_keep_tool_data_bounded() {
     let dir = tempfile::tempdir().unwrap();
     for p in ["../escape", "/etc/passwd", "a/../b", ""] {
-        assert!(a2e_native::tools::safe_path(dir.path(), p).is_err());
+        assert!(a2e::tools::safe_path(dir.path(), p).is_err());
     }
-    let text = a2e_native::tools::html_text(
+    let text = a2e::tools::html_text(
         "<html><script>bad()</script><style>bad</style><p>Visible facts</p></html>",
     );
     assert_eq!(text, "Visible facts");
-    assert!(a2e_native::read_bounded(std::io::Cursor::new(vec![0; 1025]), 1024).is_err());
+    assert!(a2e::read_bounded(std::io::Cursor::new(vec![0; 1025]), 1024).is_err());
 }
 
 #[test]
@@ -353,7 +350,7 @@ fn shipped_cases_validate_against_the_standard_catalog() {
         .iter()
         .map(|t| t.name.as_str())
         .collect::<std::collections::BTreeSet<_>>();
-    let cases = a2e_native::case::load_all(&[repo().join("configs/native/cases")]).unwrap();
+    let cases = a2e::case::load_all(&[repo().join("configs/cases")]).unwrap();
     assert!(cases.len() >= 48);
     for c in &cases {
         c.validate(&registry).unwrap();
@@ -361,13 +358,13 @@ fn shipped_cases_validate_against_the_standard_catalog() {
 }
 #[test]
 fn guided_plan_marks_cases_without_a_workflow_not_applicable() {
-    let cfg = Config::load(&repo().join("configs/native/models.toml")).unwrap();
+    let cfg = Config::load(&repo().join("configs/models.toml")).unwrap();
     let mut chain = task();
     chain.stages.clear();
     let single = {
         let mut c = task();
         c.id = "single".into();
-        c.category = a2e_native::case::Category::Simple;
+        c.category = a2e::case::Category::Simple;
         c.stages.clear();
         c
     };
@@ -381,7 +378,7 @@ fn guided_plan_marks_cases_without_a_workflow_not_applicable() {
             ..Default::default()
         },
     ];
-    let plan = a2e_native::runner::plan(&cfg, &s, &[chain, single], &catalog()).unwrap();
+    let plan = a2e::runner::plan(&cfg, &s, &[chain, single], &catalog()).unwrap();
     let groups = plan["groups"].as_array().unwrap();
     let guided = groups
         .iter()
@@ -485,7 +482,7 @@ fn sql_file_seeds_resolve_relative_to_the_case_and_validate() {
     std::fs::write(&path, case("sql_file = \"seed.sql\"")).unwrap();
     let m = catalog();
     let registry = m.tools.iter().map(|t| t.name.as_str()).collect();
-    let cases = a2e_native::case::load_all(std::slice::from_ref(&path)).unwrap();
+    let cases = a2e::case::load_all(std::slice::from_ref(&path)).unwrap();
     cases[0].validate(&registry).unwrap();
     assert!(cases[0]
         .fixtures
@@ -497,24 +494,22 @@ fn sql_file_seeds_resolve_relative_to_the_case_and_validate() {
         .unwrap()
         .contains("INSERT"));
     std::fs::write(&path, case("sql_file = \"missing.sql\"")).unwrap();
-    assert!(a2e_native::case::load_all(std::slice::from_ref(&path)).is_err());
+    assert!(a2e::case::load_all(std::slice::from_ref(&path)).is_err());
     std::fs::write(&path, case("sql = \"NOT SQL\"")).unwrap();
-    let bad = a2e_native::case::load_all(&[path]).unwrap();
+    let bad = a2e::case::load_all(&[path]).unwrap();
     assert!(bad[0].validate(&registry).is_err());
 }
 #[test]
 fn shipped_database_seeds_load() {
     for name in ["inventory", "sensors"] {
         let sql =
-            std::fs::read_to_string(repo().join(format!("configs/native/fixtures/{name}.sql")))
-                .unwrap();
-        a2e_native::tools::check_seed(&sql).unwrap();
+            std::fs::read_to_string(repo().join(format!("configs/fixtures/{name}.sql"))).unwrap();
+        a2e::tools::check_seed(&sql).unwrap();
     }
 }
 #[test]
 fn database_case_runs_through_the_agent_loop() {
-    let sql =
-        std::fs::read_to_string(repo().join("configs/native/fixtures/inventory.sql")).unwrap();
+    let sql = std::fs::read_to_string(repo().join("configs/fixtures/inventory.sql")).unwrap();
     let case = Case::from_toml(&format!(
         r#"
 id = "db-e2e"
@@ -565,7 +560,7 @@ number = {{ value = 1 }}
 #[test]
 fn every_offline_golden_sequence_succeeds_through_the_agent_loop() {
     use_sandbox();
-    let cases = a2e_native::case::load_all(&[repo().join("configs/native/cases")]).unwrap();
+    let cases = a2e::case::load_all(&[repo().join("configs/cases")]).unwrap();
     let s = suite();
     for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
         let mut script = case
