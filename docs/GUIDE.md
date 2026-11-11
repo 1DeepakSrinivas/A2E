@@ -48,7 +48,7 @@ target/release/a2e run
 target/release/a2e upload --status
 ```
 
-Long runs belong in tmux. `scripts/run.sh start <suite>` starts the suite in a
+Long runs belong in tmux. Run `scripts/run.sh` with no arguments for a menu that picks the suites. `scripts/run.sh start <suite>` starts the suite in a
 detached session named `a2e-<suite>` and writes the output to
 `results/logs`. Other arguments, such as `--retry-failed`, are passed to
 `a2e run`. Only one run can hold the runtime lock, so a second start is

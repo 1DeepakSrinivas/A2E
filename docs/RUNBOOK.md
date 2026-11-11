@@ -25,6 +25,8 @@ To send results to the cloud, copy `.env.example` to `.env` and set `WORKER_URL`
 
 A full suite takes hours on the Pi, so run it in tmux. The session keeps running after you close the terminal or lose the SSH connection.
 
+Run `scripts/run.sh` with no arguments for a menu. It lists the suites in `configs/suites`, lets you pick one or several by number (or `a` for all), asks whether to upload to the Worker and whether to retry failed attempts, and then starts the session. Several suites run one after another in a session named `a2e-queue`. The same menu attaches to, shows the log of, or stops a run. The commands below do the same without the menu.
+
 ```bash
 scripts/run.sh start smoke        # start a detached session named a2e-smoke
 scripts/run.sh attach smoke       # watch it; detach with Ctrl-b d
@@ -33,7 +35,7 @@ scripts/run.sh logs smoke         # follow the newest log in results/logs
 scripts/run.sh stop smoke         # send Ctrl-C; the session closes when the runner exits
 ```
 
-`start` checks that the sandbox verifies and that the suite plans, and then starts the run. Only one run can hold the runtime lock, so it refuses to start while another `a2e-` session exists. Extra arguments go to `a2e run`, for example `scripts/run.sh start smoke --retry-failed`.
+`start` checks that the sandbox verifies and that the suite plans, and then starts the run. Only one run can hold the runtime lock, so it refuses to start while another `a2e-` session exists. Extra arguments go to `a2e run`, for example `scripts/run.sh start smoke --retry-failed`. Give several suites as `start smoke,files_dev`; they run in order in the session `a2e-queue`.
 
 The repository `.env` normally holds the real Worker credentials, so a normal start uploads results to the live Worker. Add `--local` to keep a test run off the Worker. Results then stay in `results/outbox`.
 
