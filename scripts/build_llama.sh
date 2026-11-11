@@ -25,6 +25,9 @@ if [[ "$(git -C "$source_dir" rev-parse HEAD)" != "$commit" || ! -f "$source_dir
     git -C "$source_dir" checkout --detach "$commit"
 fi
 
+# The runner looks for the first 8 characters of the pin in the version string.
+git -C "$source_dir" config core.abbrev 8
+
 metal=OFF
 if [[ "$(uname -s)" == Darwin ]]; then
     metal=ON
@@ -33,4 +36,9 @@ cmake -S "$source_dir" -B "$build_dir" \
     -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
     -DGGML_CCACHE=OFF -DGGML_NATIVE=ON -DGGML_METAL="$metal" -DLLAMA_BUILD_TESTS=OFF
 cmake --build "$build_dir" --parallel "$jobs" --target llama-server llama-bench
-"$build_dir/bin/llama-server" --version
+version="$("$build_dir/bin/llama-server" --version 2>&1)"
+printf '%s\n' "$version"
+if [[ "$version" != *"${commit:0:8}"* ]]; then
+    echo "llama-server --version does not contain ${commit:0:8}; the runner would reject it." >&2
+    exit 1
+fi
