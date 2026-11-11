@@ -6,19 +6,24 @@ registry records the exact files, revisions, and published hashes.
 
 ## Setup
 
-On a Pi 3B+ with 64-bit Raspberry Pi OS, run `./setup-pi.sh` as your normal
-user. The script uses sudo for APT packages and builds with one job by default.
-Builds may need temporary swap on a 1 GB device. Disable swap before measuring.
+Run `./setup.sh` as your normal user on a Pi 3B+ with 64-bit Raspberry Pi OS
+or on an Apple Silicon Mac. It runs these steps, each a script that can be run
+alone and repeated:
 
-On an Apple Silicon Mac with Rust 1.96 or newer, CMake, and the Xcode command
-line tools, run the following from the project directory.
+1. `scripts/setup/deps.sh` installs the packages (APT or Homebrew), tmux and
+   Rust 1.96.0. The Pi uses sudo for APT.
+2. `scripts/build_llama.sh` builds the pinned llama.cpp commit and checks that
+   `llama-server --version` contains the first 8 characters of the commit,
+   which the runner requires. It builds with one job on the Pi.
+3. `scripts/setup/build.sh` builds `target/release/a2e`.
+4. `a2e models fetch` downloads the models and checks their hashes.
+5. `scripts/init_sandbox.sh` generates and verifies the file sandbox.
+6. `scripts/setup/checks.sh` validates tools and cases and runs `doctor`
+   (`doctor --probe` on the Mac).
 
-```bash
-bash scripts/build_llama.sh
-cargo build --release --locked
-target/release/a2e models fetch
-target/release/a2e doctor --probe
-```
+Use `--skip-llama` or `--skip-models` to repeat setup without those steps.
+Builds may need temporary swap on a 1 GB device. The Pi baseline refuses to run
+with swap on, so disable it before measuring. See [RUNBOOK.md](RUNBOOK.md).
 
 The checkout and build live under `deps/llama.cpp`. Git ignores the local
 dependencies, models, and results. Run setup on each machine to build for its
@@ -42,6 +47,24 @@ target/release/a2e plan
 target/release/a2e run
 target/release/a2e upload --status
 ```
+
+Long runs belong in tmux. `scripts/run.sh start <suite>` starts the suite in a
+detached session named `a2e-<suite>` and writes the output to
+`results/logs`. Other arguments, such as `--retry-failed`, are passed to
+`a2e run`. Only one run can hold the runtime lock, so a second start is
+refused. `attach`, `status`, `logs` and `stop` take the same suite name.
+Pass `--local` to `start` to keep results in the outbox and off the Worker.
+
+| Command | What it does |
+|---|---|
+| `a2e models fetch` | Download the models and check their hashes |
+| `a2e doctor [--probe]` | Show the machine, the models and the settings; `--probe` also starts each model |
+| `a2e plan [suite]` | List the jobs a suite would run |
+| `a2e run [suite] [--retry-failed]` | Run or resume a suite |
+| `a2e upload [--status]` | Send the outbox to the Worker, or show what is waiting |
+| `a2e cases validate\|list` | Check or count the case files |
+| `a2e tools validate` | Check the tool definitions |
+| `a2e sandbox init\|verify\|info` | Build, check or describe the file sandbox |
 
 Pass a suite file to `plan` or `run`. The shipped suites are listed in the
 suites section below. Set `BRAVE_SEARCH_API_KEY` for the live suite, either in
@@ -236,7 +259,7 @@ a2e sandbox info
 scripts/sync_sandbox.sh pi@host    # copy a tree built elsewhere to a Pi and verify it there
 ```
 
-`setup-pi.sh` runs `scripts/init_sandbox.sh`. The tree is not committed. `run` and `plan` refuse to start when a
+`setup.sh` runs `scripts/init_sandbox.sh`. The tree is not committed. `run` and `plan` refuse to start when a
 suite uses it and `verify` fails. The tree hash is part of the study id, so a different tree starts a new study.
 
 A case opts in with `sandbox = "workspace"` under `[fixtures]`. Each attempt gets its own copy of the tree, and

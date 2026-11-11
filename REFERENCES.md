@@ -12,7 +12,7 @@ Status key:
 
 ## 1. Models
 
-The models and exact files are set in `configs/models.toml`. Each entry records the source repository, the revision and the SHA-256 of the GGUF file. `scripts/download_models.sh` downloads and verifies them.
+The models and exact files are set in `configs/models.toml`. Each entry records the source repository, the revision and the SHA-256 of the GGUF file. `a2e models fetch` downloads and verifies them.
 
 | Model | Quant | Source repository |
 |---|---|---|

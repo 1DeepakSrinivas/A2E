@@ -4,18 +4,24 @@ A2E measures how small language models use tools under time, memory, and call bu
 
 ## Quick start
 
-On the Pi 3B+ with 64-bit Raspberry Pi OS, run this from the project checkout.
+On the Pi 3B+ with 64-bit Raspberry Pi OS, or on an Apple Silicon Mac, run this from the project checkout.
 
 ```bash
-./setup-pi.sh
+./setup.sh
 ```
 
-The script builds the pinned llama.cpp checkout under `deps/llama.cpp`, builds the Rust CLI, and downloads and verifies the three GGUF files under `models`. After setup, disable swap for the Pi baseline and run `target/release/a2e run`.
+The script installs the packages and Rust, builds the pinned llama.cpp checkout under `deps/llama.cpp`, builds the Rust CLI, downloads and verifies the three GGUF files under `models`, generates the file sandbox, and runs the validation and `doctor` checks. On the Pi, turn swap off afterwards, then start the smoke suite in tmux so it keeps running if the connection drops.
 
-See the [guide](docs/GUIDE.md) for Mac setup, writing cases and tools, and sending results to the cloud. Judging, scoring and reports live in the A2E-Results project ([github.com/1DeepakSrinivas/A2E-Results](https://github.com/1DeepakSrinivas/A2E-Results)), which is the submodule `a2e-results`.
+```bash
+scripts/run.sh start smoke
+scripts/run.sh attach smoke
+```
+
+See the [runbook](docs/RUNBOOK.md) for the full procedure and for troubleshooting, and the [guide](docs/GUIDE.md) for writing cases and tools and sending results to the cloud. Judging, scoring and reports live in the A2E-Results project ([github.com/1DeepakSrinivas/A2E-Results](https://github.com/1DeepakSrinivas/A2E-Results)), which is the submodule `a2e-results`.
 
 ## Documents
 
+- [docs/RUNBOOK.md](docs/RUNBOOK.md) explains how to set up a device, run suites in tmux, resume, upload, and fix common problems.
 - [docs/GUIDE.md](docs/GUIDE.md) explains how to install, configure, run, resume, write cases and tools, and send results to the cloud.
 - [docs/REPORT.md](docs/REPORT.md) is the methods report.
 - [docs/PREREGISTRATION.md](docs/PREREGISTRATION.md) states the research question and hypotheses.
