@@ -11,14 +11,12 @@ doctor=(doctor)
 if [[ "${A2E_PLATFORM:-}" == mac ]]; then
     doctor+=(--probe)
 fi
-if ! "$bin" "${doctor[@]}"; then
-    if [[ "${A2E_PLATFORM:-}" == pi ]]; then
-        echo "doctor failed. The Pi baseline needs swap off: sudo dphys-swapfile swapoff && sudo systemctl disable dphys-swapfile" >&2
-    fi
-    exit 1
-fi
+"$bin" "${doctor[@]}"
 
 if [[ "${A2E_PLATFORM:-}" == pi ]]; then
+    if [[ -n "$(swapon --show --noheadings 2>/dev/null)" ]]; then
+        echo "Swap is on. The Pi baseline refuses to run with swap on: sudo dphys-swapfile swapoff && sudo systemctl disable dphys-swapfile"
+    fi
     if command -v vcgencmd >/dev/null; then
         echo "throttled: $(vcgencmd get_throttled)  (0x0 is clean)"
     fi
