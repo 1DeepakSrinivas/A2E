@@ -357,14 +357,13 @@ later.
 [judge]
 enabled = true
 rubric = "retrieval_summary"
-handoff = ["prompt", "required_facts", "evidence", "answer", "transcript"]
+handoff = ["prompt", "required_facts", "evidence", "answer"]
 required_facts = ["The fee is 12 dollars."]
 ```
 
 The `handoff` list chooses what the judge sees. The fields are `prompt`,
-`answer`, `calls`, `evidence`, `files`, `state_diff`, `required_facts`, and
-`transcript`. The transcript lists each turn's raw model text with the tool calls
-and tool results of that turn. Results are cut to 4 KB when recorded. The
-rubric named in the case is a TOML file in `a2e-results/rubrics`.
+`answer`, `calls`, `evidence`, `files`, `state_diff`, and `required_facts`.
+Results are cut to 4 KB when recorded. The rubric named in the case is a TOML
+file in `a2e-results/rubrics`.
 A run with a judged case sends its `answer`, `evidence`, `final_state`, the raw
 model text of every turn, and every tool call with its result.

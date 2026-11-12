@@ -18,6 +18,7 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     net::TcpListener,
     path::{Path, PathBuf},
+    process::Command,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -427,6 +428,47 @@ fn without_credentials_requests_wait_in_the_outbox() {
         .unwrap();
     assert_eq!(up.status().unwrap().pending, 1);
     assert!(up.flush().unwrap().stopped.is_some());
+}
+#[test]
+fn local_mode_keeps_requests_pending_regardless_of_credentials() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut uploader = Uploader::with_client(&dir.path().join("results"), None).unwrap();
+    uploader
+        .submit(run_requests(&case(), &Variant::default(), 1, 2))
+        .unwrap();
+    std::fs::write(
+        dir.path().join(".env"),
+        "A2E_RESULTS_ENV=missing-results.env\n",
+    )
+    .unwrap();
+    for (url, token) in [
+        ("", ""),
+        ("http://localhost:1", ""),
+        ("http://localhost:1", "token"),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_a2e"))
+            .current_dir(dir.path())
+            .args(["--config"])
+            .arg(repo().join("configs/models.toml"))
+            .arg("upload")
+            .env("A2E_LOCAL", "1")
+            .env("WORKER_URL", url)
+            .env("WRITE_TOKEN", token)
+            .env("A2E_OUTPUT_DIR", dir.path().join("results"))
+            .env_remove("A2E_RESULTS_ENV")
+            .env_remove("A2E_HOST_ID")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let status: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(status["pending"], 1);
+        assert_eq!(status["sent"], 0);
+        assert_eq!(status["stopped"], "uploads are disabled in local mode");
+    }
 }
 #[test]
 fn resume_skips_finished_jobs_and_numbers_attempts() {

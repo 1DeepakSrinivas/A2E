@@ -787,6 +787,22 @@ pub fn plan(config: &Config, suite: &Suite, cases: &[Case], catalog: &Catalog) -
         json!({"suite":suite.name,"split":suite.split,"web_mode":suite.web_mode,"budget":suite.budget,"groups":groups}),
     )
 }
+/// One line of the run log for a finished attempt, with failure details and the trace path.
+pub fn attempt_line(meta: &RunMeta, out: &Outcome) -> Value {
+    json!({
+        "run": payload::run_id(meta.study, meta.job, meta.attempt),
+        "case": meta.case.id,
+        "model": meta.model,
+        "context": meta.context,
+        "variant": meta.variant.name,
+        "phase": crate::store::tag(&meta.phase),
+        "status": out.status,
+        "reason": out.reason,
+        "failure_class": out.failure_class,
+        "failed_checks": out.checks.iter().filter(|check| !check.passed).collect::<Vec<_>>(),
+        "trace": meta.trace,
+    })
+}
 /// Serial study execution with one loaded model at a time.
 pub fn run(
     config: &Config,
@@ -979,10 +995,7 @@ pub fn run(
                             Some(&crate::store::tag(&out.status)),
                         )?;
                         completed += 1;
-                        println!(
-                            "{}",
-                            json!({"run":payload::run_id(&study, &key, attempt),"case":case.id,"model":model_id,"context":ctx,"variant":v.name,"phase":crate::store::tag(&phase),"status":out.status,"reason":out.reason})
-                        );
+                        println!("{}", attempt_line(&meta, &out));
                     }
                 }
             }

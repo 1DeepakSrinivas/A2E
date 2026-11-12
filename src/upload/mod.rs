@@ -20,7 +20,7 @@ pub struct Uploader {
     offline: bool,
 }
 impl Uploader {
-    /// Uploads only when `WORKER_URL` and `WRITE_TOKEN` are set; otherwise requests wait in the outbox.
+    /// Uploads with configured credentials unless local mode is enabled.
     pub fn open(root: &Path) -> Result<Self> {
         Self::with_client(root, Client::from_env()?)
     }
@@ -61,10 +61,13 @@ impl Uploader {
         Ok(Flush {
             pending: self.outbox.pending()?.len(),
             rejected: self.outbox.rejected()?,
-            stopped: self
-                .client
-                .is_none()
-                .then(|| "WORKER_URL and WRITE_TOKEN are not set".to_owned()),
+            stopped: self.client.is_none().then(|| {
+                if crate::dotenv::local_only() {
+                    "uploads are disabled in local mode".to_owned()
+                } else {
+                    "WORKER_URL and WRITE_TOKEN are not set".to_owned()
+                }
+            }),
             sent: 0,
         })
     }

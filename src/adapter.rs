@@ -42,7 +42,7 @@ fn gemma_value(v: &Value) -> String {
     }
 }
 /// Version of the rules that turn model text into an action; part of the study id.
-pub const PARSE_RULES: u32 = 2;
+pub const PARSE_RULES: u32 = 3;
 impl Adapter {
     pub fn new(name: &str) -> Result<Self> {
         match name {
@@ -125,21 +125,21 @@ impl Adapter {
             .strip_suffix(close)
             .context("incomplete_tool_call")?
             .trim();
-        if body.contains(open) {
-            bail!("multiple_calls");
-        }
-        let call = match self {
-            Self::Qwen => serde_json::from_str::<Call>(body)?,
+        let (call, trailing) = match self {
+            Self::Qwen => {
+                let mut calls = serde_json::Deserializer::from_str(body).into_iter::<Call>();
+                let call = calls.next().context("empty tool call")??;
+                (call, &body[calls.byte_offset()..])
+            }
             Self::FunctionGemma => {
-                let mut p = Literal::new(body);
+                let mut p = Literal::new(body, false);
                 p.expect("call:")?;
                 let name = p.identifier()?;
                 let arguments = p.value(0)?;
-                p.end()?;
-                Call { name, arguments }
+                (Call { name, arguments }, p.s)
             }
             Self::Liquid => {
-                let mut p = Literal::new(body);
+                let mut p = Literal::new(body, true);
                 p.expect("[")?;
                 let name = p.identifier()?;
                 p.expect("(")?;
@@ -159,13 +159,25 @@ impl Adapter {
                     }
                 }
                 p.expect("]")?;
-                p.end()?;
-                Call {
-                    name,
-                    arguments: Value::Object(arguments),
-                }
+                (
+                    Call {
+                        name,
+                        arguments: Value::Object(arguments),
+                    },
+                    p.s,
+                )
             }
         };
+        let trailing = trailing.trim();
+        if trailing
+            .strip_prefix(close)
+            .is_some_and(|rest| rest.trim_start().starts_with(open))
+        {
+            bail!("multiple_calls");
+        }
+        if !trailing.is_empty() {
+            bail!("trailing expression or parallel calls");
+        }
         if !call.arguments.is_object() {
             bail!("arguments must be an object");
         }
@@ -291,11 +303,12 @@ pub fn final_tool() -> ToolSpec {
 // Literal parser without expression evaluation
 struct Literal<'a> {
     s: &'a str,
+    python_strings: bool,
 }
 
 impl<'a> Literal<'a> {
-    fn new(s: &'a str) -> Self {
-        Self { s }
+    fn new(s: &'a str, python_strings: bool) -> Self {
+        Self { s, python_strings }
     }
     fn eat(&mut self, t: &str) -> bool {
         self.s = self.s.trim_start();
@@ -309,12 +322,6 @@ impl<'a> Literal<'a> {
     fn expect(&mut self, t: &str) -> Result<()> {
         if !self.eat(t) {
             bail!("expected {t}");
-        }
-        Ok(())
-    }
-    fn end(&self) -> Result<()> {
-        if !self.s.trim().is_empty() {
-            bail!("trailing expression or parallel calls");
         }
         Ok(())
     }
@@ -364,14 +371,26 @@ impl<'a> Literal<'a> {
                         't' => out.push('\t'),
                         'b' => out.push('\u{0008}'),
                         'f' => out.push('\u{000c}'),
-                        '\\' | '\'' | '"' | '/' => out.push(e),
+                        '\\' | '\'' | '"' => out.push(e),
+                        '/' if !self.python_strings => out.push(e),
                         'u' => {
                             if self.s.len() < 4 {
                                 bail!("short unicode escape");
                             }
-                            let v = u32::from_str_radix(&self.s[..4], 16)?;
+                            let digits = self.s.get(..4).context("invalid unicode escape")?;
+                            let v = u32::from_str_radix(digits, 16)?;
                             self.s = &self.s[4..];
                             out.push(char::from_u32(v).context("invalid unicode scalar")?);
+                        }
+                        // Python preserves unrecognized escapes, including regex classes.
+                        _ if self.python_strings
+                            && !matches!(
+                                e,
+                                'a' | 'v' | 'x' | 'U' | 'N' | '0'..='7' | '\n' | '\r'
+                            ) =>
+                        {
+                            out.push('\\');
+                            out.push(e);
                         }
                         _ => bail!("invalid string escape"),
                     }
@@ -495,6 +514,24 @@ mod tests {
     }
 
     #[test]
+    fn opening_markers_inside_arguments_are_literal() {
+        for (adapter, raw, value) in [
+            (Adapter::Qwen, r#"<tool_call>{"name":"f","arguments":{"text":"<tool_call>"}}</tool_call>"#, "<tool_call>"),
+            (Adapter::FunctionGemma, "<start_function_call>call:f{text:<escape><start_function_call><escape>}<end_function_call>", "<start_function_call>"),
+            (Adapter::Liquid, "<|tool_call_start|>[f(text='<|tool_call_start|>')]<|tool_call_end|>", "<|tool_call_start|>"),
+        ] {
+            assert_eq!(
+                adapter.parse(raw).unwrap(),
+                Action::Call(Call { name: "f".into(), arguments: json!({ "text": value }) }),
+            );
+            assert_eq!(
+                adapter.parse(&format!("{raw}\n{raw}")).unwrap_err().to_string(),
+                "multiple_calls",
+            );
+        }
+    }
+
+    #[test]
     fn rewrites_a_json_string_call_rendered_by_the_gemma_template() {
         let rendered = "<start_of_turn>model\n<start_function_call>call:set_setting{                    {\"name\":\"heater\",\"value\":55}}<end_function_call><start_function_response>response:set_setting{value:<escape>{\"setting\":55}<escape>}<end_function_response>";
         let fixed = Adapter::FunctionGemma.normalize_prompt(rendered.into());
@@ -525,6 +562,36 @@ mod tests {
             .parse("<start_function_call>call:f{x:<escape>unclosed}<end_function_call>")
             .is_err());
         assert!(Adapter::Qwen.parse("<think>unfinished").is_err());
+    }
+
+    #[test]
+    fn liquid_preserves_python_regex_escapes() {
+        for pattern in [r"\d{4}-\d{3}", r"\w+\s+\S+", r"\/", r"\D\W"] {
+            for quote in ['\'', '"'] {
+                let raw = format!("<|tool_call_start|>[regex_extract(pattern={quote}{pattern}{quote}, text='orders')]<|tool_call_end|>");
+                assert_eq!(
+                    Adapter::Liquid.parse(&raw).unwrap(),
+                    Action::Call(Call {
+                        name: "regex_extract".into(),
+                        arguments: json!({"pattern":pattern,"text":"orders"}),
+                    })
+                );
+            }
+        }
+        assert!(Adapter::Qwen
+            .parse(r#"<tool_call>{"name":"f","arguments":{"x":"\d"}}</tool_call>"#)
+            .is_err());
+        assert!(Adapter::FunctionGemma
+            .parse(r#"<start_function_call>call:f{x:"\d"}<end_function_call>"#)
+            .is_err());
+    }
+
+    #[test]
+    fn malformed_unicode_escape_returns_an_error_without_panicking() {
+        for value in [r"\u123", r"\u12🦀", r"\uZZZZ", r"\uD800"] {
+            let raw = format!("<|tool_call_start|>[f(x='{value}')]<|tool_call_end|>");
+            assert!(Adapter::Liquid.parse(&raw).is_err());
+        }
     }
 
     #[test]

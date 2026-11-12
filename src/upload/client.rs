@@ -42,8 +42,11 @@ impl Client {
                 .context("cannot build the HTTP client")?,
         })
     }
-    /// `None` when neither variable is set; an error when only one is.
+    /// Local runs and runs without credentials have no upload client.
     pub fn from_env() -> Result<Option<Self>> {
+        if crate::dotenv::local_only() {
+            return Ok(None);
+        }
         let get = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
         match (get("WORKER_URL"), get("WRITE_TOKEN")) {
             (None, None) => Ok(None),

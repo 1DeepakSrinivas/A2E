@@ -64,7 +64,6 @@ pub enum Handoff {
     Files,
     StateDiff,
     RequiredFacts,
-    Transcript,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -107,7 +106,6 @@ impl Default for JudgeSpec {
                 Handoff::RequiredFacts,
                 Handoff::Evidence,
                 Handoff::Answer,
-                Handoff::Transcript,
             ],
             required_facts: Vec::new(),
         }
