@@ -981,7 +981,7 @@ pub fn run(
                         completed += 1;
                         println!(
                             "{}",
-                            json!({"run":payload::run_id(&study, &key, attempt),"case":case.id,"model":model_id,"context":ctx,"variant":v.name,"phase":crate::store::tag(&phase),"status":out.status,"reason":out.reason})
+                            json!({"run":payload::run_id(&study, &key, attempt),"case":case.id,"model":model_id,"context":ctx,"variant":v.name,"phase":crate::store::tag(&phase),"status":out.status,"reason":out.reason,"failure_class":out.failure_class,"failed_checks":out.checks.iter().filter(|check| !check.passed).collect::<Vec<_>>(),"trace":meta.trace})
                         );
                     }
                 }
