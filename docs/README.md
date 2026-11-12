@@ -1,5 +1,7 @@
 # Documents
 
+New here? Start with the [project README](../README.md), which has the four steps to set up and run, then use the runbook when something needs more detail.
+
 1. [RUNBOOK.md](RUNBOOK.md) explains how to set up a device, run suites in tmux, resume, upload, and fix common problems.
 2. [GUIDE.md](GUIDE.md) explains the configuration, how to write cases and tools, and how results reach the cloud.
 3. [REPORT.md](REPORT.md) is the methods report.
