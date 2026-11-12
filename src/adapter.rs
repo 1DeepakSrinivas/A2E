@@ -125,18 +125,18 @@ impl Adapter {
             .strip_suffix(close)
             .context("incomplete_tool_call")?
             .trim();
-        if body.contains(open) {
-            bail!("multiple_calls");
-        }
-        let call = match self {
-            Self::Qwen => serde_json::from_str::<Call>(body)?,
+        let (call, trailing) = match self {
+            Self::Qwen => {
+                let mut calls = serde_json::Deserializer::from_str(body).into_iter::<Call>();
+                let call = calls.next().context("empty tool call")??;
+                (call, &body[calls.byte_offset()..])
+            }
             Self::FunctionGemma => {
                 let mut p = Literal::new(body);
                 p.expect("call:")?;
                 let name = p.identifier()?;
                 let arguments = p.value(0)?;
-                p.end()?;
-                Call { name, arguments }
+                (Call { name, arguments }, p.s)
             }
             Self::Liquid => {
                 let mut p = Literal::new(body);
@@ -159,13 +159,25 @@ impl Adapter {
                     }
                 }
                 p.expect("]")?;
-                p.end()?;
-                Call {
-                    name,
-                    arguments: Value::Object(arguments),
-                }
+                (
+                    Call {
+                        name,
+                        arguments: Value::Object(arguments),
+                    },
+                    p.s,
+                )
             }
         };
+        let trailing = trailing.trim();
+        if trailing
+            .strip_prefix(close)
+            .is_some_and(|rest| rest.trim_start().starts_with(open))
+        {
+            bail!("multiple_calls");
+        }
+        if !trailing.is_empty() {
+            bail!("trailing expression or parallel calls");
+        }
         if !call.arguments.is_object() {
             bail!("arguments must be an object");
         }
@@ -309,12 +321,6 @@ impl<'a> Literal<'a> {
     fn expect(&mut self, t: &str) -> Result<()> {
         if !self.eat(t) {
             bail!("expected {t}");
-        }
-        Ok(())
-    }
-    fn end(&self) -> Result<()> {
-        if !self.s.trim().is_empty() {
-            bail!("trailing expression or parallel calls");
         }
         Ok(())
     }
@@ -492,6 +498,24 @@ mod tests {
         let open = r#"text <tool_call>{"name":"f","arguments":{}}"#;
         let error = Adapter::Qwen.parse_flagged(open).unwrap_err();
         assert_eq!(error.to_string(), "incomplete_tool_call");
+    }
+
+    #[test]
+    fn opening_markers_inside_arguments_are_literal() {
+        for (adapter, raw, value) in [
+            (Adapter::Qwen, r#"<tool_call>{"name":"f","arguments":{"text":"<tool_call>"}}</tool_call>"#, "<tool_call>"),
+            (Adapter::FunctionGemma, "<start_function_call>call:f{text:<escape><start_function_call><escape>}<end_function_call>", "<start_function_call>"),
+            (Adapter::Liquid, "<|tool_call_start|>[f(text='<|tool_call_start|>')]<|tool_call_end|>", "<|tool_call_start|>"),
+        ] {
+            assert_eq!(
+                adapter.parse(raw).unwrap(),
+                Action::Call(Call { name: "f".into(), arguments: json!({ "text": value }) }),
+            );
+            assert_eq!(
+                adapter.parse(&format!("{raw}\n{raw}")).unwrap_err().to_string(),
+                "multiple_calls",
+            );
+        }
     }
 
     #[test]

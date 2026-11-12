@@ -12,6 +12,24 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Find the pinned Results revision
+        id: results
+        env:
+          RESULTS_TOKEN: ${{ secrets.A2E_RESULTS_CHECKOUT_TOKEN }}
+        run: |
+          if [[ -n "$RESULTS_TOKEN" ]]; then
+            echo "revision=$(git rev-parse HEAD:a2e-results)" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Set A2E_RESULTS_CHECKOUT_TOKEN to run the Results schema contract test in CI."
+          fi
+      - uses: actions/checkout@v4
+        if: steps.results.outputs.revision != ''
+        with:
+          repository: 1DeepakSrinivas/A2E-Results
+          ref: ${{ steps.results.outputs.revision }}
+          path: a2e-results
+          token: ${{ secrets.A2E_RESULTS_CHECKOUT_TOKEN }}
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_VERSION }}
@@ -33,7 +51,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: bash -n setup.sh scripts/*.sh scripts/setup/*.sh
+      - run: |
+          for script in setup.sh scripts/*.sh scripts/setup/*.sh; do
+            bash -n "$script"
+          done
       - run: shellcheck --severity=warning setup.sh scripts/*.sh scripts/setup/*.sh
   pi-build:
     runs-on: ubuntu-latest

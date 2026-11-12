@@ -5,7 +5,7 @@
 #   scripts/run.sh attach|status|logs|stop [name]
 # One suite runs in the session a2e-<suite>. Several suites run one after another in a2e-queue,
 # because only one run can hold the runtime lock. Output is also written to results/logs.
-# --local sets WORKER_URL=http://localhost:1, so results stay in results/outbox.
+# --local disables uploads, so results stay in results/outbox.
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 
@@ -39,47 +39,82 @@ yes_no() {
 
 # launch <local 0|1> <suite list, space separated> [a2e run options]
 launch() {
-    local local_only="$1" suites="$2" session name s cmd="" log
+    local local_only="$1" suites="$2" session name s log arg option=""
+    local names=() plan_args=() tmux_args=()
     shift 2
     need_tmux
     [[ -x "$bin" ]] || die "$bin is missing; run ./setup.sh."
-    for s in $suites; do
+    read -r -a names <<< "$suites"
+    [[ ${#names[@]} -gt 0 ]] || die "No suites chosen."
+    for s in "${names[@]}"; do
         [[ "$s" =~ ^[a-z0-9_]+$ ]] || die "Suite names use lowercase letters, digits and underscores."
         [[ -f "configs/suites/$s.toml" ]] || die "No suite file configs/suites/$s.toml."
     done
-    set -- $suites
-    if [[ $# -eq 1 ]]; then name="$1"; else name=queue; fi
+    if [[ ${#names[@]} -eq 1 ]]; then name="${names[0]}"; else name=queue; fi
     session="a2e-$name"
     [[ -z "$(sessions)" ]] || die "Another a2e session is running ($(sessions | tr '\n' ' ')); only one run can hold the runtime lock."
 
+    for arg in "$@"; do
+        if [[ -n "$option" ]]; then
+            plan_args+=("$option" "$arg")
+            option=""
+        else
+            case "$arg" in
+                --config|--tools) option="$arg" ;;
+                --config=*|--tools=*) plan_args+=("$arg") ;;
+            esac
+        fi
+        # tmux treats a trailing semicolon as a command separator.
+        case "$arg" in
+            *';') tmux_args+=("${arg%;}\\;") ;;
+            *) tmux_args+=("$arg") ;;
+        esac
+    done
+    [[ -z "$option" ]] || die "$option requires a path."
+    if [[ "$local_only" == 1 ]]; then
+        local -x A2E_LOCAL=1
+    fi
     "$bin" sandbox verify >/dev/null 2>&1 ||
         die "The sandbox is missing or does not match its manifest; run scripts/init_sandbox.sh."
-    for s in $suites; do "$bin" plan "configs/suites/$s.toml" >/dev/null; done
+    for s in "${names[@]}"; do
+        "$bin" plan "configs/suites/$s.toml" ${plan_args[@]+"${plan_args[@]}"} >/dev/null
+    done
 
-    local prefix=""
     if [[ "$local_only" == 1 ]]; then
-        prefix="env WORKER_URL=http://localhost:1"
         echo "Local only: results stay in results/outbox."
     else
         echo "Results are uploaded to the Worker named by WORKER_URL or .env. Use --local to keep them off the Worker."
     fi
-    for s in $suites; do cmd+="$prefix $bin run configs/suites/$s.toml ${RUN_ARGS:-}; "; done
-
     mkdir -p results/logs
     log="results/logs/$name-$(date +%Y%m%d-%H%M%S).log"
-    tmux new-session -d -s "$session" "bash -c '{ $cmd} 2>&1 | tee $log'"
+    tmux new-session -d -s "$session" -- bash scripts/run.sh _run "$log" "$local_only" "$suites" ${tmux_args[@]+"${tmux_args[@]}"}
     echo "Started $session ($suites). Log: $log"
     echo "Attach: scripts/run.sh attach $name   (detach with Ctrl-b d)"
 }
 
 start_cmd() {
     local suites="${1//,/ }" local_only=0 arg
+    local run_args=()
     shift
-    RUN_ARGS=""
     for arg in "$@"; do
-        if [[ "$arg" == --local ]]; then local_only=1; else RUN_ARGS+="$arg "; fi
+        if [[ "$arg" == --local ]]; then local_only=1; else run_args+=("$arg"); fi
     done
-    launch "$local_only" "$suites"
+    launch "$local_only" "$suites" ${run_args[@]+"${run_args[@]}"}
+}
+
+run_suites() {
+    local log="$1" local_only="$2" suites="$3" s status=0
+    local names=()
+    shift 3
+    if [[ "$local_only" == 1 ]]; then export A2E_LOCAL=1; fi
+    read -r -a names <<< "$suites"
+    {
+        trap 'exit 130' INT
+        for s in "${names[@]}"; do
+            "$bin" run "configs/suites/$s.toml" "$@" || status=$?
+        done
+        exit "$status"
+    } 2>&1 | tee "$log"
 }
 
 attach_cmd() { need_tmux; running "$1" || die "No session a2e-$1."; tmux attach -t "a2e-$1"; }
@@ -103,6 +138,7 @@ stop_cmd() {
 interactive() {
     [[ -t 0 && -t 1 ]] || usage
     local action name picked suites i=1 s reply local_only=0
+    local choices=() run_args=()
     echo "A2E runs"
     action="$(printf '%s\n' "Start suites" "Attach to a run" "Status" "Show log" "Stop a run" "Quit" | choose "Choose:")"
     case "$action" in
@@ -114,7 +150,8 @@ interactive() {
             if [[ "$reply" == a ]]; then
                 suites="$(suite_list | tr '\n' ' ')"
             else
-                for picked in $reply; do
+                read -r -a choices <<< "$reply"
+                for picked in ${choices[@]+"${choices[@]}"}; do
                     [[ "$picked" =~ ^[0-9]+$ ]] || die "Not a number: $picked"
                     s="$(suite_list | sed -n "${picked}p")"
                     [[ -n "$s" ]] || die "No suite number $picked."
@@ -122,12 +159,11 @@ interactive() {
                 done
             fi
             [[ -n "$suites" ]] || die "No suites chosen."
-            RUN_ARGS=""
             if yes_no "Send results to the Worker? (No keeps them in results/outbox)"; then local_only=0; else local_only=1; fi
-            if yes_no "Retry attempts that failed before?"; then RUN_ARGS="--retry-failed"; fi
-            echo "Run: $suites| $([[ $local_only == 1 ]] && echo local only || echo upload to Worker) | ${RUN_ARGS:-no retry}"
+            if yes_no "Retry attempts that failed before?"; then run_args=(--retry-failed); fi
+            echo "Run: $suites| $([[ $local_only == 1 ]] && echo local only || echo upload to Worker) | ${run_args[0]:-no retry}"
             yes_no "Start?" || die "Cancelled."
-            launch "$local_only" "$suites"
+            launch "$local_only" "$suites" ${run_args[@]+"${run_args[@]}"}
             ;;
         "Attach to a run") need_tmux; name="$(sessions | choose "Run:")" || die "No run is active."; attach_cmd "$name" ;;
         "Status")
@@ -148,6 +184,7 @@ action="$1"
 shift
 case "$action" in
     start) [[ $# -ge 1 ]] || usage; start_cmd "$@" ;;
+    _run) run_suites "$@" ;;
     attach|status|logs|stop)
         [[ $# -ge 1 ]] || usage
         [[ "$1" =~ ^[a-z0-9_]+$ ]] || die "Names use lowercase letters, digits and underscores."

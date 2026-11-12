@@ -59,10 +59,14 @@ pub fn load_only(path: &Path, keys: &[&str]) -> Result<()> {
 /// Variables the runner takes from the file named by `A2E_RESULTS_ENV`.
 const RESULTS_KEYS: [&str; 2] = ["WORKER_URL", "WRITE_TOKEN"];
 
-/// Loads `path`, then the file named by `A2E_RESULTS_ENV` (the a2e-results `.env`) for `RESULTS_KEYS` only.
+pub(crate) fn local_only() -> bool {
+    std::env::var_os("A2E_LOCAL").is_some_and(|value| value == "1")
+}
+
+/// Loads `path` and, outside local mode, the shared Worker credentials.
 pub fn load_startup(path: &Path) -> Result<()> {
     load(path)?;
-    if let Some(shared) = std::env::var_os("A2E_RESULTS_ENV") {
+    if let Some(shared) = std::env::var_os("A2E_RESULTS_ENV").filter(|_| !local_only()) {
         load_only(Path::new(&shared), &RESULTS_KEYS)?;
     }
     Ok(())

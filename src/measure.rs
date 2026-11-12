@@ -188,6 +188,7 @@ pub fn throttle_clean(v: &str) -> bool {
     v.is_empty() || v == "0x0" || v == "nominal"
 }
 const POWERMETRICS: &str = "/usr/bin/powermetrics";
+const POWERMETRICS_ARGS: [&str; 4] = ["--samplers", "cpu_power,gpu_power,thermal", "-i", "500"];
 pub const TELEMETRY_SETUP: &str = "bash scripts/setup_mac_telemetry.sh";
 fn is_root() -> bool {
     // SAFETY: No memory preconditions
@@ -202,7 +203,8 @@ pub fn power_access() -> Result<()> {
         return Ok(());
     }
     let allowed = Command::new("sudo")
-        .args(["-n", "-l", POWERMETRICS])
+        .args(["-n", "-l", "--", POWERMETRICS])
+        .args(POWERMETRICS_ARGS)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -247,11 +249,11 @@ impl Power {
             Command::new(POWERMETRICS)
         } else {
             let mut c = Command::new("sudo");
-            c.args(["-n", POWERMETRICS]);
+            c.args(["-n", "--", POWERMETRICS]);
             c
         };
         let mut child = command
-            .args(["--samplers", "cpu_power,gpu_power,thermal", "-i", "500"])
+            .args(POWERMETRICS_ARGS)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
