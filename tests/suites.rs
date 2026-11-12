@@ -91,3 +91,20 @@ fn golden_sequences_pass_in_every_suite_variant() {
         }
     }
 }
+
+#[test]
+fn pi_100_suite_is_a_small_slice_of_the_filesystem_suite() {
+    let (s, cases) = load("test_pi_100");
+    let (_, fs) = load("test_filesystem");
+    let fs_ids = fs.iter().map(|c| c.id.as_str()).collect::<BTreeSet<_>>();
+    assert_eq!(cases.len(), 16);
+    assert!(cases.iter().all(|c| fs_ids.contains(c.id.as_str())));
+    assert!(cases.iter().any(|c| c.fixtures.sandbox.is_some()));
+    assert!(cases.len() * s.models.len() * s.variants.len() * s.repeats <= 100);
+    assert_eq!(s.warmup, 0);
+    for case in &cases {
+        let server = MockServer::new(golden_script(case), 100, Duration::ZERO);
+        let out = execute(&server, case, &s.variants[0], &s);
+        assert_eq!(out.status, Status::Success, "{}: {:?}", case.id, out.reason);
+    }
+}

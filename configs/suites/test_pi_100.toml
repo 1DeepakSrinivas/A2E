@@ -1,0 +1,34 @@
+name = "test_pi_100"
+models = ["functiongemma-270m", "qwen3-0.6b", "lfm2.5-1.2b-instruct-qad"]
+contexts = [2048]
+cases = [
+  "../cases/simple/simple-list-dir.toml",
+  "../cases/simple/simple-read-file.toml",
+  "../cases/multiple/multiple-grep.toml",
+  "../cases/multiple/multiple-read-vs-search.toml",
+  "../cases/chain/chain-copy.toml",
+  "../cases/chain/chain-move-archive.toml",
+  "../cases/files/files-config-port.toml",
+  "../cases/files/files-count-lines.toml",
+  "../cases/files/files-grep-passcode.toml",
+  "../cases/files/files-copy-config.toml",
+  "../cases/files/files-write-figure.toml",
+  "../cases/recovery/recovery-name-taken.toml",
+  "../cases/recovery/recovery-read-retry.toml",
+  "../cases/robustness/robustness-filename-spaces.toml",
+  "../cases/robustness/robustness-inject-file.toml",
+  "../cases/missing_param/missing-read-path.toml",
+]
+split = "dev"
+web_mode = "fixture"
+warmup = 0
+repeats = 1
+seed = 0
+
+[[variants]]
+name = "autonomous"
+mode = "autonomous"
+
+[[variants]]
+name = "guided"
+mode = "guided"
