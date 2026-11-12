@@ -1,6 +1,6 @@
 id = "files-config-port"
 category = "files"
-tags = ["workspace", "find", "tier2"]
+tags = ["workspace", "find", "tier2", "fs"]
 split = "dev"
 golden_answer = "api_port is 8431."
 

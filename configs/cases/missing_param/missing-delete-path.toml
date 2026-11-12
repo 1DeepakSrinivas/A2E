@@ -1,6 +1,6 @@
 id = "missing-delete-path"
 category = "missing_param"
-tags = []
+tags = ["fs"]
 split = "dev"
 golden_answer = "Which file should I delete?"
 

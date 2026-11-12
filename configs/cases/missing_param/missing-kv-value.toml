@@ -1,6 +1,6 @@
 id = "missing-kv-value"
 category = "missing_param"
-tags = []
+tags = ["data"]
 split = "heldout"
 golden_answer = "What value should I store under colour?"
 

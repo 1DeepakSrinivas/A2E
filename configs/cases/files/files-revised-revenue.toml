@@ -1,6 +1,6 @@
 id = "files-revised-revenue"
 category = "files"
-tags = ["workspace", "grep", "distractor"]
+tags = ["workspace", "grep", "distractor", "fs"]
 split = "dev"
 golden_answer = "report_final_v2.txt gives 134."
 

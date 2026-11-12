@@ -1,6 +1,6 @@
 id = "files-read-only-config"
 category = "files"
-tags = ["workspace", "trap", "recovery"]
+tags = ["workspace", "trap", "recovery", "fs"]
 split = "heldout"
 golden_answer = "I could not change it because the file is read-only."
 

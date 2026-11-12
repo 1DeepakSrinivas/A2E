@@ -1,6 +1,6 @@
 id = "files-delete-draft"
 category = "files"
-tags = ["workspace", "write", "distractor"]
+tags = ["workspace", "write", "distractor", "fs"]
 split = "heldout"
 golden_answer = "Deleted the draft."
 

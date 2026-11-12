@@ -1,6 +1,6 @@
 id = "multiple-unit"
 category = "multiple"
-tags = ["tier2", "units"]
+tags = ["tier2", "units", "compute"]
 split = "heldout"
 golden_answer = "3 kg is 6.6139 lb."
 

@@ -1,6 +1,6 @@
 id = "files-mkdir-move"
 category = "files"
-tags = ["workspace", "write"]
+tags = ["workspace", "write", "fs"]
 split = "heldout"
 golden_answer = "Moved."
 

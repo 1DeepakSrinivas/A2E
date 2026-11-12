@@ -1,6 +1,6 @@
 id = "files-touch-flag"
 category = "files"
-tags = ["workspace", "write"]
+tags = ["workspace", "write", "fs"]
 split = "dev"
 golden_answer = "Created."
 

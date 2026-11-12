@@ -1,6 +1,6 @@
 id = "simple-db-lookup"
 category = "simple"
-tags = ["db"]
+tags = ["db", "data"]
 split = "dev"
 golden_answer = "There are 5 bolts in stock."
 

@@ -1,6 +1,6 @@
 id = "multiple-read-vs-search"
 category = "multiple"
-tags = ["tier2", "smoke"]
+tags = ["tier2", "smoke", "fs"]
 split = "dev"
 golden_answer = "The report says 42 units were sold."
 

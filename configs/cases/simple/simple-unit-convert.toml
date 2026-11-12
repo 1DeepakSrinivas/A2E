@@ -1,6 +1,6 @@
 id = "simple-unit-convert"
 category = "simple"
-tags = ["units"]
+tags = ["units", "compute"]
 split = "heldout"
 golden_answer = "5 km is 3.1069 mi."
 

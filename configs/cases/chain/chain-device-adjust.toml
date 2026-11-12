@@ -1,6 +1,6 @@
 id = "chain-device-adjust"
 category = "chain"
-tags = ["tier2", "smoke", "devices"]
+tags = ["tier2", "smoke", "devices", "data"]
 split = "dev"
 golden_answer = "The cooler is now at 80."
 

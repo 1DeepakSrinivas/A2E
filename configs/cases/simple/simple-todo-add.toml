@@ -1,6 +1,6 @@
 id = "simple-todo-add"
 category = "simple"
-tags = ["store"]
+tags = ["store", "data"]
 split = "heldout"
 golden_answer = "Added the todo."
 

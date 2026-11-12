@@ -1,6 +1,6 @@
 id = "multiple-note-search"
 category = "multiple"
-tags = ["tier2", "store"]
+tags = ["tier2", "store", "data"]
 split = "dev"
 golden_answer = "The note says the dentist appointment is on Thursday."
 

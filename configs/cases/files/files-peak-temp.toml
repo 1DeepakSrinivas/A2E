@@ -1,6 +1,6 @@
 id = "files-peak-temp"
 category = "files"
-tags = ["workspace", "json"]
+tags = ["workspace", "json", "fs"]
 split = "heldout"
 golden_answer = "The peak is 78.2."
 

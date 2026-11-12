@@ -1,6 +1,6 @@
 id = "multiple-db-count"
 category = "multiple"
-tags = ["tier2", "db"]
+tags = ["tier2", "db", "data"]
 split = "heldout"
 golden_answer = "There are 4 supplies products."
 

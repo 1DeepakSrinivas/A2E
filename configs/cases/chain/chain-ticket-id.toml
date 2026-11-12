@@ -1,6 +1,6 @@
 id = "chain-ticket-id"
 category = "chain"
-tags = ["tier2", "text", "files"]
+tags = ["tier2", "text", "files", "compute"]
 split = "dev"
 golden_answer = "The ticket is INC-4821."
 

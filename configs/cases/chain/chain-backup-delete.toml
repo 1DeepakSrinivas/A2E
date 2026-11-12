@@ -1,6 +1,6 @@
 id = "chain-backup-delete"
 category = "chain"
-tags = ["tier2", "files"]
+tags = ["tier2", "files", "fs"]
 split = "heldout"
 golden_answer = "Backed up and deleted."
 

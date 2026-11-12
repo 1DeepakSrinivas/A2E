@@ -1,6 +1,6 @@
 id = "files-hidden-locker"
 category = "files"
-tags = ["workspace", "hidden"]
+tags = ["workspace", "hidden", "fs"]
 split = "heldout"
 golden_answer = "The locker code is 5827."
 

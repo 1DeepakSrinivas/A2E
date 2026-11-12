@@ -1,6 +1,6 @@
 id = "multiple-search"
 category = "multiple"
-tags = ["tier2"]
+tags = ["tier2", "fs"]
 split = "heldout"
 golden_answer = "The file b.txt mentions the invoice."
 

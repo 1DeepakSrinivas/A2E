@@ -1,6 +1,6 @@
 id = "missing-move-destination"
 category = "missing_param"
-tags = []
+tags = ["fs"]
 split = "dev"
 golden_answer = "Where should I move report.txt?"
 

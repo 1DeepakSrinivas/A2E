@@ -1,6 +1,6 @@
 id = "missing-db-table"
 category = "missing_param"
-tags = []
+tags = ["data"]
 split = "heldout"
 golden_answer = "Which table should I look in?"
 

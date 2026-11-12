@@ -1,6 +1,6 @@
 id = "recovery-slow-tool"
 category = "recovery"
-tags = ["faults"]
+tags = ["faults", "fs"]
 split = "dev"
 golden_answer = "Done."
 

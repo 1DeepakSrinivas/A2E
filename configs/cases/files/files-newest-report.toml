@@ -1,6 +1,6 @@
 id = "files-newest-report"
 category = "files"
-tags = ["workspace", "ls", "distractor"]
+tags = ["workspace", "ls", "distractor", "fs"]
 split = "heldout"
 golden_answer = "report_final_v2.txt is the newest."
 

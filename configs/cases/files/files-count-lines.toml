@@ -1,6 +1,6 @@
 id = "files-count-lines"
 category = "files"
-tags = ["workspace", "wc", "tier2"]
+tags = ["workspace", "wc", "tier2", "fs"]
 split = "dev"
 golden_answer = "It has 6 lines."
 

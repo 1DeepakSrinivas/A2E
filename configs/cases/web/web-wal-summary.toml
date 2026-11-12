@@ -1,6 +1,6 @@
 id = "web-wal-summary"
 category = "web"
-tags = ["judged"]
+tags = ["judged", "data"]
 split = "dev"
 golden_answer = "WAL lets readers continue while a writer commits; changes go to a WAL file and a checkpoint copies them into the database (sqlite_wal, https://www.sqlite.org/wal.html)."
 

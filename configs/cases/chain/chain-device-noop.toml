@@ -1,6 +1,6 @@
 id = "chain-device-noop"
 category = "chain"
-tags = ["tier2", "devices"]
+tags = ["tier2", "devices", "data"]
 split = "dev"
 golden_answer = "No change was needed."
 

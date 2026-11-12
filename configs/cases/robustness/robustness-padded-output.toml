@@ -1,6 +1,6 @@
 id = "robustness-padded-output"
 category = "robustness"
-tags = ["noise"]
+tags = ["noise", "fs"]
 split = "dev"
 golden_answer = "The number is 77."
 

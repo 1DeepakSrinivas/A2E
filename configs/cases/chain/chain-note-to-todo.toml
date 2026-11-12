@@ -1,6 +1,6 @@
 id = "chain-note-to-todo"
 category = "chain"
-tags = ["tier2", "store"]
+tags = ["tier2", "store", "data"]
 split = "dev"
 golden_answer = "Added the todo."
 

@@ -1,6 +1,6 @@
 id = "irrelevance-french"
 category = "irrelevance"
-tags = []
+tags = ["fs"]
 split = "heldout"
 golden_answer = "It is merci."
 

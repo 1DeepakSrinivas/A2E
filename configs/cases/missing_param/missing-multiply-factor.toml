@@ -1,6 +1,6 @@
 id = "missing-multiply-factor"
 category = "missing_param"
-tags = []
+tags = ["compute"]
 split = "heldout"
 golden_answer = "Which number should I multiply 8 by?"
 

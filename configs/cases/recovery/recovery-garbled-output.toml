@@ -1,6 +1,6 @@
 id = "recovery-garbled-output"
 category = "recovery"
-tags = ["faults"]
+tags = ["faults", "fs"]
 split = "heldout"
 golden_answer = "The price is 12."
 

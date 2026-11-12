@@ -1,6 +1,6 @@
 id = "multiple-db-query-sum"
 category = "multiple"
-tags = ["tier2", "db"]
+tags = ["tier2", "db", "data"]
 split = "dev"
 golden_answer = "The total stock is 11."
 

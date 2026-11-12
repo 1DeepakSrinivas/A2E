@@ -1,6 +1,6 @@
 id = "multiple-grep"
 category = "multiple"
-tags = ["tier2"]
+tags = ["tier2", "fs"]
 split = "dev"
 golden_answer = "ERROR appears on line 3."
 

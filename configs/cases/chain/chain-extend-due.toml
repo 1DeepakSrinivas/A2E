@@ -1,6 +1,6 @@
 id = "chain-extend-due"
 category = "chain"
-tags = ["tier2", "time", "files"]
+tags = ["tier2", "time", "files", "compute"]
 split = "dev"
 golden_answer = "The new due date is 2026-03-07."
 

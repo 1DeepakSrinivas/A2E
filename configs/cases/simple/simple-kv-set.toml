@@ -1,6 +1,6 @@
 id = "simple-kv-set"
 category = "simple"
-tags = ["store"]
+tags = ["store", "data"]
 split = "dev"
 golden_answer = "Stored."
 

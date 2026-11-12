@@ -1,6 +1,6 @@
 id = "simple-write-file"
 category = "simple"
-tags = ["files"]
+tags = ["files", "fs"]
 split = "heldout"
 golden_answer = "Saved to agenda.txt."
 

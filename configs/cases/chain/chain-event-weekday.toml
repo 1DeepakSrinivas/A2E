@@ -1,6 +1,6 @@
 id = "chain-event-weekday"
 category = "chain"
-tags = ["tier2", "time", "files"]
+tags = ["tier2", "time", "files", "compute"]
 split = "heldout"
 golden_answer = "It is a Saturday."
 

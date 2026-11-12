@@ -1,6 +1,6 @@
 id = "simple-read-file"
 category = "simple"
-tags = ["smoke", "files"]
+tags = ["smoke", "files", "fs"]
 split = "dev"
 golden_answer = "It says to call the dentist on Monday."
 

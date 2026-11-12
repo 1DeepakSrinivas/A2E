@@ -1,6 +1,6 @@
 id = "missing-note-text"
 category = "missing_param"
-tags = []
+tags = ["data"]
 split = "heldout"
 golden_answer = "What should the note say?"
 

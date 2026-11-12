@@ -1,6 +1,6 @@
 id = "recovery-find-the-file"
 category = "recovery"
-tags = ["wrong-guess"]
+tags = ["wrong-guess", "fs"]
 split = "dev"
 golden_answer = "The total is 4200."
 

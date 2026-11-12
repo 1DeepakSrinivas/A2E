@@ -1,6 +1,6 @@
 id = "recovery-device-name"
 category = "recovery"
-tags = ["wrong-guess", "devices"]
+tags = ["wrong-guess", "devices", "data"]
 split = "heldout"
 golden_answer = "Set fan_1 to 40."
 

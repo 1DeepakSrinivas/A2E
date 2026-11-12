@@ -1,6 +1,6 @@
 id = "files-write-figure"
 category = "files"
-tags = ["workspace", "write", "tier2"]
+tags = ["workspace", "write", "tier2", "fs"]
 split = "dev"
 golden_answer = "Saved."
 

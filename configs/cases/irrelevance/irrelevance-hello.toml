@@ -1,6 +1,6 @@
 id = "irrelevance-hello"
 category = "irrelevance"
-tags = []
+tags = ["fs"]
 split = "heldout"
 golden_answer = "Hello in Spanish is hola."
 

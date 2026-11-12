@@ -1,6 +1,6 @@
 id = "files-spaced-name"
 category = "files"
-tags = ["workspace", "names"]
+tags = ["workspace", "names", "fs"]
 split = "heldout"
 golden_answer = "Q2 revenue is 98."
 

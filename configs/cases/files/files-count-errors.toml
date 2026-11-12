@@ -1,6 +1,6 @@
 id = "files-count-errors"
 category = "files"
-tags = ["workspace", "grep"]
+tags = ["workspace", "grep", "fs"]
 split = "heldout"
 golden_answer = "There are 3 ERROR lines."
 

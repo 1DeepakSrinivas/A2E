@@ -1,6 +1,6 @@
 id = "recovery-divide-by-zero"
 category = "recovery"
-tags = ["wrong-guess"]
+tags = ["wrong-guess", "fs"]
 split = "heldout"
 golden_answer = "It cannot be done because the number is zero."
 

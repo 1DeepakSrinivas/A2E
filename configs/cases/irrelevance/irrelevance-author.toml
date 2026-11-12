@@ -1,6 +1,6 @@
 id = "irrelevance-author"
 category = "irrelevance"
-tags = []
+tags = ["fs"]
 split = "heldout"
 golden_answer = "William Shakespeare wrote it."
 

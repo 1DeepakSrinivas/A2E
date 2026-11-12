@@ -1,6 +1,6 @@
 id = "web-save-cpu"
 category = "web"
-tags = []
+tags = ["data"]
 split = "dev"
 golden_answer = "The CPU runs at 1.4 GHz."
 

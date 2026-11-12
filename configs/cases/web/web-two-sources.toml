@@ -1,6 +1,6 @@
 id = "web-two-sources"
 category = "web"
-tags = []
+tags = ["data"]
 split = "dev"
 golden_answer = "It has 1 GB of RAM (pi_specs) and needs a 5V 2.5A supply (pi_power)."
 
