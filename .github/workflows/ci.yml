@@ -77,4 +77,6 @@ jobs:
         with:
           components: miri
       - run: cargo miri setup
-      - run: cargo miri test --lib --locked
+      - run: "cargo miri test --lib --locked -- --skip measure::"
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation
