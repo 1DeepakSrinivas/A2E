@@ -23,6 +23,26 @@ pub enum Action {
     Call(Call),
     Final(String),
 }
+/// FunctionGemma literal: strings in `<escape>` markers, other values as JSON-like text.
+fn gemma_value(v: &Value) -> String {
+    match v {
+        Value::String(s) => format!("<escape>{s}<escape>"),
+        Value::Array(a) => format!(
+            "[{}]",
+            a.iter().map(gemma_value).collect::<Vec<_>>().join(",")
+        ),
+        Value::Object(o) => format!(
+            "{{{}}}",
+            o.iter()
+                .map(|(k, v)| format!("{k}:{}", gemma_value(v)))
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        other => other.to_string(),
+    }
+}
+/// Version of the rules that turn model text into an action; part of the study id.
+pub const PARSE_RULES: u32 = 2;
 impl Adapter {
     pub fn new(name: &str) -> Result<Self> {
         match name {
@@ -52,15 +72,28 @@ impl Adapter {
         stops
     }
     pub fn parse_generation(self, text: &str, stopping_word: Option<&str>) -> Result<Action> {
+        self.parse_generation_flagged(text, stopping_word)
+            .map(|(action, _)| action)
+    }
+    /// Action plus whether text came before the tool call.
+    pub fn parse_generation_flagged(
+        self,
+        text: &str,
+        stopping_word: Option<&str>,
+    ) -> Result<(Action, bool)> {
         // Matched delimiter omitted from llama.cpp output
         if stopping_word == Some(self.call_end()) && !text.ends_with(self.call_end()) {
-            self.parse(&format!("{text}{}", self.call_end()))
+            self.parse_flagged(&format!("{text}{}", self.call_end()))
         } else {
-            self.parse(text)
+            self.parse_flagged(text)
         }
     }
     /// Single action from a native model response.
     pub fn parse(self, text: &str) -> Result<Action> {
+        self.parse_flagged(text).map(|(action, _)| action)
+    }
+    /// Text before exactly one well-formed call is accepted for every format and flagged.
+    pub fn parse_flagged(self, text: &str) -> Result<(Action, bool)> {
         let mut t = text.trim();
         if t.starts_with("<think>") {
             t = t
@@ -84,14 +117,17 @@ impl Adapter {
             if t.contains(close) || t.starts_with('{') || t.starts_with('[') {
                 bail!("malformed_tool_call");
             }
-            return Ok(Action::Final(t.into()));
+            return Ok((Action::Final(t.into()), false));
         }
-        let body = t
-            .strip_prefix(open)
-            .context("text before tool call")?
+        let at = t.find(open).context("malformed_tool_call")?;
+        let leading_text = !t[..at].trim().is_empty();
+        let body = t[at + open.len()..]
             .strip_suffix(close)
-            .context("incomplete tool call")?
+            .context("incomplete_tool_call")?
             .trim();
+        if body.contains(open) {
+            bail!("multiple_calls");
+        }
         let call = match self {
             Self::Qwen => serde_json::from_str::<Call>(body)?,
             Self::FunctionGemma => {
@@ -137,18 +173,60 @@ impl Adapter {
             if call.arguments.as_object().is_none_or(|a| a.len() != 1) {
                 bail!("invalid final_answer arguments");
             }
-            return Ok(Action::Final(
-                call.arguments["answer"]
-                    .as_str()
-                    .context("final_answer requires answer string")?
-                    .into(),
+            return Ok((
+                Action::Final(
+                    call.arguments["answer"]
+                        .as_str()
+                        .context("final_answer requires answer string")?
+                        .into(),
+                ),
+                leading_text,
             ));
         }
-        Ok(Action::Call(call))
+        Ok((Action::Call(call), leading_text))
     }
     /// Tool result in the server's accepted message shape.
     pub fn tool_message(self, name: &str, output: &Value) -> Value {
         json!({"role":"tool","name":name,"content":output.to_string()})
+    }
+    /// Rewrites tool calls from earlier turns that the server template renders as a JSON string.
+    pub fn normalize_prompt(self, prompt: String) -> String {
+        if self != Self::FunctionGemma {
+            return prompt;
+        }
+        const OPEN: &str = "<start_function_call>call:";
+        const CLOSE: &str = "<end_function_call>";
+        let mut out = String::with_capacity(prompt.len());
+        let mut rest = prompt.as_str();
+        while let Some(at) = rest.find(OPEN) {
+            let head = at + OPEN.len();
+            out.push_str(&rest[..head]);
+            rest = &rest[head..];
+            let fixed = (|| {
+                let (name, body) = rest.split_once('{')?;
+                let body = body.trim_start();
+                if !body.starts_with('{') {
+                    return None;
+                }
+                let mut values = serde_json::Deserializer::from_str(body).into_iter::<Value>();
+                let value = values.next()?.ok()?;
+                let after = body[values.byte_offset()..].strip_prefix('}')?;
+                after.starts_with(CLOSE).then_some(())?;
+                let args = value.as_object()?;
+                let fields = args
+                    .iter()
+                    .map(|(k, v)| format!("{k}:{}", gemma_value(v)))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                Some((format!("{name}{{{fields}}}"), after))
+            })();
+            if let Some((call, after)) = fixed {
+                out.push_str(&call);
+                rest = after;
+            }
+        }
+        out.push_str(rest);
+        out
     }
     pub fn assistant(call: &Call) -> Value {
         json!({"role":"assistant","content":"","tool_calls":[{"type":"function","function":call}]})
@@ -385,6 +463,51 @@ mod tests {
             (Adapter::FunctionGemma,"<start_function_call>call:write_file{path:<escape>a.txt<escape>,content:<escape>x,{y}<escape>}<end_function_call>"),
             (Adapter::Liquid,"<|tool_call_start|>[write_file(path='a.txt', content='x,{y}')]<|tool_call_end|>"),
         ] {assert_eq!(adapter.parse(raw).unwrap(),expected);}
+    }
+
+    #[test]
+    fn accepts_and_flags_text_before_one_call_in_every_format() {
+        let expected = || {
+            Action::Call(Call {
+                name: "read_file".into(),
+                arguments: json!({"path":"a.txt"}),
+            })
+        };
+        for (adapter,raw) in [
+            (Adapter::Qwen,r#"Reading it now.<tool_call>{"name":"read_file","arguments":{"path":"a.txt"}}</tool_call>"#),
+            (Adapter::FunctionGemma,"Reading it now.<start_function_call>call:read_file{path:<escape>a.txt<escape>}<end_function_call>"),
+            (Adapter::Liquid,"Reading it now.<|tool_call_start|>[read_file(path='a.txt')]<|tool_call_end|>"),
+        ] {
+            assert_eq!(adapter.parse_flagged(raw).unwrap(), (expected(), true), "{raw}");
+        }
+    }
+
+    #[test]
+    fn plain_calls_are_not_flagged_and_two_calls_fail_with_a_reason() {
+        let one = r#"<tool_call>{"name":"f","arguments":{}}</tool_call>"#;
+        assert!(!Adapter::Qwen.parse_flagged(one).unwrap().1);
+        let two = format!("{one}{one}");
+        let error = Adapter::Qwen.parse_flagged(&two).unwrap_err();
+        assert_eq!(error.to_string(), "multiple_calls");
+        let open = r#"text <tool_call>{"name":"f","arguments":{}}"#;
+        let error = Adapter::Qwen.parse_flagged(open).unwrap_err();
+        assert_eq!(error.to_string(), "incomplete_tool_call");
+    }
+
+    #[test]
+    fn rewrites_a_json_string_call_rendered_by_the_gemma_template() {
+        let rendered = "<start_of_turn>model\n<start_function_call>call:set_setting{                    {\"name\":\"heater\",\"value\":55}}<end_function_call><start_function_response>response:set_setting{value:<escape>{\"setting\":55}<escape>}<end_function_response>";
+        let fixed = Adapter::FunctionGemma.normalize_prompt(rendered.into());
+        assert!(fixed
+            .contains("call:set_setting{name:<escape>heater<escape>,value:55}<end_function_call>"));
+        assert!(fixed.ends_with("<end_function_response>"));
+        let parsed = Adapter::FunctionGemma
+            .parse("<start_function_call>call:set_setting{name:<escape>heater<escape>,value:55}<end_function_call>")
+            .unwrap();
+        assert!(matches!(parsed, Action::Call(_)));
+        let good = "<start_function_call>call:f{a:1}<end_function_call>";
+        assert_eq!(Adapter::FunctionGemma.normalize_prompt(good.into()), good);
+        assert_eq!(Adapter::Qwen.normalize_prompt(rendered.into()), rendered);
     }
 
     #[test]

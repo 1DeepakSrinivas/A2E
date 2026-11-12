@@ -1,24 +1,38 @@
 # A2E guide
 
+This guide covers settings, commands, cases, tools and results. To set up a
+device and start a run, begin with the [README](../README.md) and the
+[runbook](RUNBOOK.md).
+
+Contents: [Setup](#setup), [Run and read results](#run-and-read-results),
+[Sending results to the cloud](#sending-results-to-the-cloud), [Cases](#cases),
+[Workspace sandbox](#workspace-sandbox), [Suites](#suites),
+[Add a tool](#add-a-tool), [Results, judging and reports](#results-judging-and-reports).
+
 The Rust CLI runs FunctionGemma 270M Q4_K_M, Qwen3-0.6B Q4_K_M, and
 LFM2.5-1.2B-Instruct QAD Q4_0 on a Pi 3B+ or Apple Silicon Mac. The model
 registry records the exact files, revisions, and published hashes.
 
 ## Setup
 
-On a Pi 3B+ with 64-bit Raspberry Pi OS, run `./setup-pi.sh` as your normal
-user. The script uses sudo for APT packages and builds with one job by default.
-Builds may need temporary swap on a 1 GB device. Disable swap before measuring.
+Run `./setup.sh` as your normal user on a Pi 3B+ with 64-bit Raspberry Pi OS
+or on an Apple Silicon Mac. It runs these steps, each a script that can be run
+alone and repeated:
 
-On an Apple Silicon Mac with Rust 1.96 or newer, CMake, and the Xcode command
-line tools, run the following from the project directory.
+1. `scripts/setup/deps.sh` installs the packages (APT or Homebrew), tmux and
+   Rust 1.96.0. The Pi uses sudo for APT.
+2. `scripts/build_llama.sh` builds the pinned llama.cpp commit and checks that
+   `llama-server --version` contains the first 8 characters of the commit,
+   which the runner requires. It builds with one job on the Pi.
+3. `scripts/setup/build.sh` builds `target/release/a2e`.
+4. `a2e models fetch` downloads the models and checks their hashes.
+5. `scripts/init_sandbox.sh` generates and verifies the file sandbox.
+6. `scripts/setup/checks.sh` validates tools and cases and runs `doctor`
+   (`doctor --probe` on the Mac).
 
-```bash
-bash scripts/build_llama.sh
-cargo build --release --locked
-target/release/a2e models fetch
-target/release/a2e doctor --probe
-```
+Use `--skip-llama` or `--skip-models` to repeat setup without those steps.
+Builds may need temporary swap on a 1 GB device. The Pi baseline refuses to run
+with swap on, so disable it before measuring. See [RUNBOOK.md](RUNBOOK.md).
 
 The checkout and build live under `deps/llama.cpp`. Git ignores the local
 dependencies, models, and results. Run setup on each machine to build for its
@@ -32,7 +46,8 @@ user and hostname, or the one named by `A2E_HOST_ID`. The file can hold any
 setting from the models file plus a `[roles]` table with the booleans
 `controller` and `benchmark_target`, which both default to false. Settings
 apply in this order, and the later one wins: the models file, the host file,
-`local.toml`, then environment variables. `doctor` prints the host, the loaded
+`local.toml`, then environment variables. The variables are `A2E_NATIVE_MODELS_DIR`,
+`A2E_NATIVE_LLAMA_SERVER` and `A2E_NATIVE_OUTPUT_DIR`. `doctor` prints the host, the loaded
 host file and the roles.
 
 ## Run and read results
@@ -42,6 +57,24 @@ target/release/a2e plan
 target/release/a2e run
 target/release/a2e upload --status
 ```
+
+Long runs belong in tmux. Run `scripts/run.sh` with no arguments for a menu that picks the suites. `scripts/run.sh start <suite>` starts the suite in a
+detached session named `a2e-<suite>` and writes the output to
+`results/logs`. Other arguments, such as `--retry-failed`, are passed to
+`a2e run`. Only one run can hold the runtime lock, so a second start is
+refused. `attach`, `status`, `logs` and `stop` take the same suite name.
+Pass `--local` to `start` to keep results in the outbox and off the Worker.
+
+| Command | What it does |
+|---|---|
+| `a2e models fetch` | Download the models and check their hashes |
+| `a2e doctor [--probe]` | Show the machine, the models and the settings; `--probe` also starts each model |
+| `a2e plan [suite]` | List the jobs a suite would run |
+| `a2e run [suite] [--retry-failed]` | Run or resume a suite |
+| `a2e upload [--status]` | Send the outbox to the Worker, or show what is waiting |
+| `a2e cases validate\|list` | Check or count the case files |
+| `a2e tools validate` | Check the tool definitions |
+| `a2e sandbox init\|verify\|info` | Build, check or describe the file sandbox |
 
 Pass a suite file to `plan` or `run`. The shipped suites are listed in the
 suites section below. Set `BRAVE_SEARCH_API_KEY` for the live suite, either in
@@ -62,7 +95,8 @@ submodule `a2e-results` in the repository root. Its `docs/API.md` describes the
 Worker API. After each attempt the runner posts the study, the model load and the
 finished attempt to the Worker. Set `WORKER_URL` and `WRITE_TOKEN` in the shell
 or in `.env` (see `.env.example`). To avoid copying them, set `A2E_RESULTS_ENV` in
-`.env` to the a2e-results `.env` file (e.g. `../a2e-results/.env`). The runner
+`.env` to the a2e-results `.env` file (`a2e-results/.env`, a path relative to the
+working directory). The runner
 reads only those two variables from that file, and it stops with an error if the
 file is missing.
 
@@ -77,17 +111,27 @@ requests stay in the outbox and the run continues. Send them later with
 
 Latency includes failed attempts. The runtime measures model loading
 separately and records inference and harness RSS. Tools run inside the harness
-process, so harness RSS includes them. Peak RSS comes from the samples. CPU
-time is the total CPU time of the inference and harness processes.
+process, so harness RSS includes them. Peak RSS comes from the samples, and
+every load and attempt takes a sample at its start and at its end. CPU time is
+the total CPU time of the inference and harness processes.
 
-Mac power comes from privileged `powermetrics` samples and covers the reported
-CPU, GPU, and ANE scope. The Pi 3B+ has no power sensor, so its power is
-modeled. Every 500 ms the runner reads whole-system CPU usage and puts it into
-the published Joular `rbp3b+1.3` polynomial, and it adds up the watts over time
-to get joules. The `power_scope` field of each result says `modeled` for these
-values, and they are an estimate, not a measurement. Set `power = "none"` to
-turn the model off. `power = "required"` accepts only measured power, so it
-fails on the Pi.
+The Pi reports temperature and throttle flags. `setup.sh` adds your user to
+the `video` group so `vcgencmd` works without root, and you must log in again
+afterwards.
+
+Mac power and thermal pressure come from privileged `powermetrics` samples and
+cover the reported CPU, GPU, and ANE scope. Run `bash scripts/setup_mac_telemetry.sh`
+once to allow `sudo -n powermetrics` for your user only, or start the runner with
+`sudo`. Remove the rule with `sudo rm /etc/sudoers.d/a2e-powermetrics`. `a2e
+doctor` prints a `telemetry` entry that shows what is available.
+
+The Pi 3B+ has no power sensor, so its power is modeled. Every 500 ms the runner
+reads whole-system CPU usage and puts it into the published Joular `rbp3b+1.3`
+polynomial, and it adds up the watts over time to get joules. The `power_scope`
+field of each result says `modeled` for these values, and they are an estimate,
+not a measurement. Set `power = "none"` to turn power off. With `power = "auto"`
+a run without power continues and prints one warning. With `power = "required"`
+only measured power is accepted, so the run stops on the Pi.
 
 Greedy decoding is used for every attempt. Repeats measure how latency, memory,
 and temperature vary. They do not measure variation in success.
@@ -236,7 +280,7 @@ a2e sandbox info
 scripts/sync_sandbox.sh pi@host    # copy a tree built elsewhere to a Pi and verify it there
 ```
 
-`setup-pi.sh` runs `scripts/init_sandbox.sh`. The tree is not committed. `run` and `plan` refuse to start when a
+`setup.sh` runs `scripts/init_sandbox.sh`. The tree is not committed. `run` and `plan` refuse to start when a
 suite uses it and `verify` fails. The tree hash is part of the study id, so a different tree starts a new study.
 
 A case opts in with `sandbox = "workspace"` under `[fixtures]`. Each attempt gets its own copy of the tree, and
@@ -263,6 +307,8 @@ file. The study id is a hash of the suite, the cases, the tool definitions, the
 machine settings, and the binary, so changing any of them starts a new study.
 
 - `smoke` runs the cases tagged `smoke` from the dev split, once.
+- `files_dev` runs the file cases from the dev split once, and `files_heldout`
+  runs them from the held-out split with one warmup and three repeats.
 - `core` runs all held-out cases in autonomous and guided mode, with one warmup
   and three repeats.
 - `harness` compares the autonomous variant with guided, filter, recent
@@ -311,12 +357,14 @@ later.
 [judge]
 enabled = true
 rubric = "retrieval_summary"
-handoff = ["prompt", "required_facts", "evidence", "answer"]
+handoff = ["prompt", "required_facts", "evidence", "answer", "transcript"]
 required_facts = ["The fee is 12 dollars."]
 ```
 
 The `handoff` list chooses what the judge sees. The fields are `prompt`,
-`answer`, `calls`, `evidence`, `files`, `state_diff`, and `required_facts`. The
+`answer`, `calls`, `evidence`, `files`, `state_diff`, `required_facts`, and
+`transcript`. The transcript lists each turn's raw model text with the tool calls
+and tool results of that turn. Results are cut to 4 KB when recorded. The
 rubric named in the case is a TOML file in `a2e-results/rubrics`.
-A run with a judged case sends its `answer`, `evidence`, `final_state` and tool
-calls, which is all the judge needs.
+A run with a judged case sends its `answer`, `evidence`, `final_state`, the raw
+model text of every turn, and every tool call with its result.

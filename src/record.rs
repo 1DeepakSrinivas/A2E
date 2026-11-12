@@ -32,6 +32,7 @@ pub struct Turn {
     pub generated_tokens: Option<u64>,
     pub parse_ms: f64,
     pub parse_status: ParseStatus,
+    pub leading_text: bool,
     pub parse_error: Option<String>,
     pub raw_text: Option<String>,
 }
@@ -54,5 +55,7 @@ pub struct ToolEntry {
     pub validate_ms: f64,
     pub ms: f64,
     pub output_bytes: usize,
+    pub output: Option<String>,
+    pub output_truncated: bool,
     pub error: Option<String>,
 }

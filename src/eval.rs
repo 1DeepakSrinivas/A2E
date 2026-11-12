@@ -19,6 +19,8 @@ pub enum FailureClass {
     WrongOrder,
     ExtraCall,
     NoFinalAnswer,
+    NoToolUse,
+    ToolErrorAbandoned,
     BadAnswer,
     StateMismatch,
     ParseFailure,
@@ -36,7 +38,10 @@ pub struct CheckResult {
     pub class: Option<FailureClass>,
 }
 pub struct Observation<'a> {
+    /// Calls whose tool ran successfully.
     pub calls: &'a [Call],
+    /// Every parsed call, including schema errors and tool errors.
+    pub attempted: &'a [Call],
     pub state: &'a Value,
     pub answer: &'a str,
 }
@@ -91,7 +96,7 @@ fn result(kind: &str, label: String, passed: bool, class: FailureClass) -> Check
         class: (!passed).then_some(class),
     }
 }
-fn call_check(c: &Check, calls: &[Call]) -> CheckResult {
+fn call_check(c: &Check, calls: &[Call], attempted: &[Call]) -> CheckResult {
     let Check::Call {
         tool,
         args,
@@ -103,7 +108,7 @@ fn call_check(c: &Check, calls: &[Call]) -> CheckResult {
     else {
         unreachable!("call_check receives call checks")
     };
-    let named = calls.iter().filter(|c| &c.name == tool).count();
+    let named = attempted.iter().filter(|c| &c.name == tool).count();
     let hits = calls
         .iter()
         .filter(|c| &c.name == tool)
@@ -117,12 +122,29 @@ fn call_check(c: &Check, calls: &[Call]) -> CheckResult {
         FailureClass::ExtraCall
     } else if named > 0 {
         FailureClass::WrongArgs
-    } else if calls.is_empty() {
+    } else if attempted.is_empty() {
         FailureClass::MissingCall
     } else {
         FailureClass::WrongTool
     };
     result("call", format!("call {tool}"), passed, class)
+}
+/// Share of milestone checks passed; any failed minefield (`no_call`, `calls_at_most`) zeroes it.
+pub fn milestone_score(checks: &[CheckResult]) -> Option<f64> {
+    if checks.is_empty() {
+        return None;
+    }
+    let is_mine = |c: &CheckResult| matches!(c.kind.as_str(), "no_call" | "calls_at_most");
+    if checks.iter().any(|c| is_mine(c) && !c.passed) {
+        return Some(0.);
+    }
+    let (passed, total) = checks
+        .iter()
+        .filter(|c| !is_mine(c))
+        .fold((0., 0.), |(p, t), c| {
+            (p + f64::from(u8::from(c.passed)), t + 1.)
+        });
+    Some(if total == 0. { 1. } else { passed / total })
 }
 /// Every configured check plus an existence check for each required output file.
 pub fn evaluate(case: &Case, obs: &Observation) -> Vec<CheckResult> {
@@ -130,11 +152,11 @@ pub fn evaluate(case: &Case, obs: &Observation) -> Vec<CheckResult> {
     let mut out = Vec::with_capacity(case.checks.len() + case.output.files.len());
     for c in &case.checks {
         out.push(match c {
-            Check::Call { .. } => call_check(c, obs.calls),
+            Check::Call { .. } => call_check(c, obs.calls, obs.attempted),
             Check::NoCall { tool } => result(
                 "no_call",
                 format!("no_call {tool}"),
-                !obs.calls.iter().any(|c| &c.name == tool),
+                !obs.attempted.iter().any(|c| &c.name == tool),
                 FailureClass::ExtraCall,
             ),
             Check::CallOrder { tools } => {
@@ -154,7 +176,7 @@ pub fn evaluate(case: &Case, obs: &Observation) -> Vec<CheckResult> {
             Check::CallsAtMost { max } => result(
                 "calls_at_most",
                 format!("calls_at_most {max}"),
-                obs.calls.len() <= *max,
+                obs.attempted.len() <= *max,
                 FailureClass::ExtraCall,
             ),
             Check::File {
@@ -276,6 +298,7 @@ mod tests {
             &case(checks),
             &Observation {
                 calls,
+                attempted: calls,
                 state: &state,
                 answer,
             },
@@ -332,6 +355,44 @@ mod tests {
             run(max, &twice, json!({}), "")[0].class,
             Some(FailureClass::ExtraCall)
         );
+    }
+    #[test]
+    fn failed_calls_count_as_attempts_for_minefields_and_argument_classes() {
+        let none = case("[[check]]\nkind = \"no_call\"\ntool = \"calculate\"");
+        let attempted = [call("calculate", json!({}))];
+        let obs = Observation {
+            calls: &[],
+            attempted: &attempted,
+            state: &json!({}),
+            answer: "",
+        };
+        assert!(!evaluate(&none, &obs)[0].passed);
+        let want = case("[[check]]\nkind = \"call\"\ntool = \"calculate\"");
+        assert_eq!(
+            evaluate(&want, &obs)[0].class,
+            Some(FailureClass::WrongArgs)
+        );
+        let max = case("[[check]]\nkind = \"calls_at_most\"\nmax = 0");
+        assert!(!evaluate(&max, &obs)[0].passed);
+    }
+    #[test]
+    fn milestone_score_is_the_passed_share_and_minefields_zero_it() {
+        let check = |kind: &str, passed| CheckResult {
+            kind: kind.into(),
+            label: kind.into(),
+            passed,
+            class: None,
+        };
+        assert_eq!(milestone_score(&[]), None);
+        let partial = [
+            check("file", true),
+            check("answer", false),
+            check("no_call", true),
+        ];
+        assert_eq!(milestone_score(&partial), Some(0.5));
+        let hit = [check("file", true), check("no_call", false)];
+        assert_eq!(milestone_score(&hit), Some(0.));
+        assert_eq!(milestone_score(&[check("calls_at_most", true)]), Some(1.));
     }
     #[test]
     fn call_order_is_a_subsequence_check() {

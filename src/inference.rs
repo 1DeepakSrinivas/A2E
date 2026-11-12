@@ -139,7 +139,7 @@ impl Server {
             String::from_utf8_lossy(&version.stdout),
             String::from_utf8_lossy(&version.stderr)
         );
-        if !version.contains(&c.runtime.llama_commit[..8]) {
+        if !version.contains(&c.runtime.llama_commit[..7]) {
             bail!("llama_commit_mismatch: expected {}", c.runtime.llama_commit);
         }
         let client = Inference::new(format!("http://127.0.0.1:{}", c.runtime.port))?;

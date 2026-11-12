@@ -4,9 +4,9 @@
 
 use crate::{
     adapter::{final_tool, Action, Adapter, Call},
-    case::{Case, FinalAnswer},
+    case::{Case, Category, FinalAnswer},
     config::{Catalog, Config, ContextWindow, Mode, Stage, Suite, ToolSpec, Variant, WebMode},
-    eval::{evaluate, CheckResult, FailureClass, Observation},
+    eval::{evaluate, milestone_score, CheckResult, FailureClass, Observation},
     inference::{Completion, Inference, Server},
     measure::{Monitor, Resources},
     record::{ParseStatus, ToolEntry, Turn},
@@ -48,6 +48,9 @@ pub struct Outcome {
     pub failure_class: Option<FailureClass>,
     pub answer: Option<String>,
     pub checks: Vec<CheckResult>,
+    pub milestone_score: Option<f64>,
+    pub attempted_calls: u64,
+    pub abstained: Option<bool>,
     pub retrieval_success: Option<bool>,
     pub evidence: Vec<Value>,
     pub model_calls: u64,
@@ -85,6 +88,9 @@ impl Default for Outcome {
             failure_class: None,
             answer: None,
             checks: Vec::new(),
+            milestone_score: None,
+            attempted_calls: 0,
+            abstained: None,
             retrieval_success: None,
             evidence: Vec::new(),
             model_calls: 0,
@@ -152,6 +158,15 @@ fn remaining(deadline: Instant, max: u64) -> Result<Duration> {
         bail!("task_timeout");
     }
     Ok(d.min(Duration::from_secs(max)))
+}
+/// Bytes of a tool result kept on the attempt record for the judge.
+const TOOL_OUTPUT_BYTES: usize = 4096;
+fn truncate(text: &str, max: usize) -> &str {
+    let mut end = text.len().min(max);
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
 }
 /// Tools visible for the current workflow stage; distractors only in autonomous mode.
 pub fn select_tools(
@@ -238,6 +253,7 @@ struct Attempt<'a> {
     stage: usize,
     stage_successes: usize,
     calls: Vec<Call>,
+    attempted: Vec<Call>,
     last_call: Option<String>,
     repeats: u32,
     turn: Turn,
@@ -276,6 +292,7 @@ impl Attempt<'_> {
             &self.x.adapter.template_request(&messages, specs),
             remaining(self.deadline, suite.budget.call_seconds)?,
         )?;
+        let prompt = self.x.adapter.normalize_prompt(prompt);
         self.turn.template_ms = t.elapsed().as_secs_f64() * 1000.;
         let t = Instant::now();
         let prompt_len = self.x.client.tokens(
@@ -326,7 +343,14 @@ impl Attempt<'_> {
         } else {
             self.x
                 .adapter
-                .parse_generation(&completion.text, completion.raw["stopping_word"].as_str())
+                .parse_generation_flagged(
+                    &completion.text,
+                    completion.raw["stopping_word"].as_str(),
+                )
+                .map(|(action, leading_text)| {
+                    self.turn.leading_text = leading_text;
+                    action
+                })
         };
         self.turn.parse_ms = t.elapsed().as_secs_f64() * 1000.;
         action
@@ -361,6 +385,7 @@ impl Attempt<'_> {
             Action::Call(call) => call,
         };
         self.turn.parse_status = ParseStatus::Call;
+        self.attempted.push(call.clone());
         let (suite, variant) = (self.x.suite, self.x.variant);
         let t = Instant::now();
         let validation = if let Some(spec) = specs.iter().find(|s| s.name == call.name) {
@@ -380,6 +405,8 @@ impl Attempt<'_> {
             validate_ms: t.elapsed().as_secs_f64() * 1000.,
             ms: 0.,
             output_bytes: 0,
+            output: None,
+            output_truncated: false,
             error: None,
         };
         let signature = crate::canonical_hash(&call)?;
@@ -432,6 +459,9 @@ impl Attempt<'_> {
             }
         };
         let executed = entry.ok;
+        let text = output.to_string();
+        entry.output_truncated = text.len() > TOOL_OUTPUT_BYTES;
+        entry.output = Some(truncate(&text, TOOL_OUTPUT_BYTES).to_string());
         // Retrying a failed call is recovery, not a loop
         if !executed {
             self.last_call = None;
@@ -520,10 +550,18 @@ impl Attempt<'_> {
         let state = self.tools.snapshot()?;
         let observation = Observation {
             calls: &self.calls,
+            attempted: &self.attempted,
             state: &state,
             answer: self.out.answer.as_deref().unwrap_or(""),
         };
         self.out.checks = evaluate(case, &observation);
+        self.out.milestone_score = milestone_score(&self.out.checks);
+        self.out.attempted_calls = self.attempted.len() as u64;
+        self.out.abstained = matches!(
+            case.category,
+            Category::Irrelevance | Category::MissingParam
+        )
+        .then_some(self.attempted.is_empty());
         self.trace
             .event(&json!({"event":"evaluation","state":state,"checks":self.out.checks}))?;
         let retrieval = self
@@ -573,6 +611,10 @@ fn failure_class(out: &Outcome, case: &Case) -> Option<FailureClass> {
         Status::InfrastructureFailure | Status::Interrupted
     ) {
         Some(FailureClass::Infrastructure)
+    } else if out.tool_log.is_empty() && case.scope.expected_calls.unwrap_or(0) > 0 {
+        Some(FailureClass::NoToolUse)
+    } else if out.tool_log.last().is_some_and(|t| t.valid && !t.ok) {
+        Some(FailureClass::ToolErrorAbandoned)
     } else {
         out.checks
             .iter()
@@ -641,6 +683,7 @@ pub fn task_run(x: TaskExecution<'_>) -> Result<Outcome> {
         stage: 0,
         stage_successes: 0,
         calls: Vec::new(),
+        attempted: Vec::new(),
         last_call: None,
         repeats: 0,
         turn: Turn::default(),
@@ -775,7 +818,7 @@ pub fn run(
         };
         artifacts.insert(id, json!({"model":m,"sha256":hash}));
     }
-    let mut definition = json!({"suite":suite,"cases":cases,"tools":catalog,"runtime":config.runtime,"artifacts":artifacts,"device":machine["device"],"kernel":machine["kernel"],"arch":machine["arch"],"total_memory_bytes":machine["total_memory_bytes"],"runtime_version":env!("CARGO_PKG_VERSION"),"binary_sha256":crate::hash_file(&std::env::current_exe()?)?});
+    let mut definition = json!({"suite":suite,"cases":cases,"tools":catalog,"runtime":config.runtime,"artifacts":artifacts,"device":machine["device"],"kernel":machine["kernel"],"arch":machine["arch"],"total_memory_bytes":machine["total_memory_bytes"],"runtime_version":env!("CARGO_PKG_VERSION"),"parse_rules":crate::adapter::PARSE_RULES,"binary_sha256":crate::hash_file(&std::env::current_exe()?)?});
     if let Some(m) = &sandbox {
         definition["sandbox"] = json!({"version":m.version,"seed":m.seed,"sha256":m.sha256});
     }

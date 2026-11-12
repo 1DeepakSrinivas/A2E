@@ -47,7 +47,7 @@ fn sample(t: f64) -> Sample {
         t_ms: t,
         harness_bytes: 1,
         inference_bytes: 2,
-        available_bytes: 3,
+        available_bytes: Some(3),
         cpu_ms: Some(4),
         temperature_c: Some(50.),
         throttled: None,
@@ -76,6 +76,8 @@ fn outcome(samples: usize) -> Outcome {
         validate_ms: 0.1,
         ms: 0.2,
         output_bytes: 3,
+        output: Some("{\"content\":\"hi\"}".into()),
+        output_truncated: false,
         error: None,
     }];
     o.checks = vec![a2e::eval::CheckResult {
@@ -102,6 +104,20 @@ fn run_requests(c: &Case, v: &Variant, attempt: u32, samples: usize) -> Vec<Requ
         trace: Path::new("trace.jsonl"),
     };
     payload::run(&meta, &outcome(samples)).unwrap()
+}
+
+#[test]
+fn run_payload_carries_the_scoring_fields() {
+    let reqs = run_requests(&case(), &Variant::default(), 1, 1);
+    let run = &reqs[0].body["run"];
+    for key in [
+        "milestone_score",
+        "attempted_calls",
+        "abstained",
+        "expected_calls",
+    ] {
+        assert!(run.get(key).is_some(), "{key}");
+    }
 }
 
 // Worker
@@ -205,13 +221,21 @@ impl Drop for MockWorker {
 
 // Contract
 fn schema_columns(sql: &str) -> BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)> {
-    let mut tables = BTreeMap::new();
+    let mut tables: BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)> = BTreeMap::new();
     let mut current: Option<(String, BTreeSet<String>, BTreeSet<String>)> = None;
     for line in sql.lines() {
         let t = line.trim();
         if let Some(rest) = t.strip_prefix("CREATE TABLE ") {
             let name = rest.split('(').next().unwrap().to_owned();
             current = Some((name, BTreeSet::new(), BTreeSet::new()));
+            continue;
+        }
+        if let Some(rest) = t.strip_prefix("ALTER TABLE ") {
+            let mut words = rest.split_whitespace();
+            let (table, column) = (words.next().unwrap_or(""), words.nth(2).unwrap_or(""));
+            if let Some((all, _)) = tables.get_mut(table) {
+                all.insert(column.to_owned());
+            }
             continue;
         }
         let Some((_, all, required)) = current.as_mut() else {
@@ -262,11 +286,18 @@ fn check_row(
 
 #[test]
 fn payload_fields_match_the_worker_schema() {
-    let schema = repo().join("a2e-results/migrations/0001_schema.sql");
-    let Ok(sql) = std::fs::read_to_string(&schema) else {
+    let dir = repo().join("a2e-results/migrations");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
         eprintln!("skipped: submodule a2e-results is not checked out");
         return;
     };
+    let mut files: Vec<_> = entries.flatten().map(|e| e.path()).collect();
+    files.sort();
+    let sql: String = files
+        .iter()
+        .filter_map(|f| std::fs::read_to_string(f).ok())
+        .collect::<Vec<_>>()
+        .join("\n");
     let tables = schema_columns(&sql);
     let reqs = run_requests(&case(), &Variant::default(), 1, 3);
     let body = &reqs[0].body;
@@ -274,6 +305,7 @@ fn payload_fields_match_the_worker_schema() {
     check_row(&tables, "turns", &body["turns"][0], &["run_id"]);
     check_row(&tables, "tool_calls", &body["tool_calls"][0], &["run_id"]);
     check_row(&tables, "checks", &body["checks"][0], &["run_id"]);
+    assert_eq!(body["tool_calls"][0]["output"], "{\"content\":\"hi\"}");
     check_row(
         &tables,
         "samples",
