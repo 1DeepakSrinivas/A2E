@@ -118,6 +118,7 @@ fn alternative_valid_action_sequence_passes() {
     ];
     let observation = Observation {
         calls: &calls,
+        attempted: &calls,
         state: &state,
         answer: "done",
     };
@@ -453,6 +454,29 @@ fn failed_attempts_report_a_failure_class_and_check_results() {
     assert_eq!(out.reason.as_deref(), Some("outcome_check_failed"));
     assert_eq!(out.failure_class, Some(FailureClass::StateMismatch));
     assert!(out.checks.iter().any(|c| !c.passed));
+}
+#[test]
+fn answering_without_the_required_tools_is_no_tool_use() {
+    let server = MockServer::new(
+        vec![call("final_answer", json!({"answer":"done"}))],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &task(), &Variant::default(), &suite());
+    assert_eq!(out.failure_class, Some(FailureClass::NoToolUse));
+}
+#[test]
+fn stopping_after_a_tool_error_is_tool_error_abandoned() {
+    let server = MockServer::new(
+        vec![
+            call("read_file", json!({"path":"missing.txt"})),
+            call("final_answer", json!({"answer":"could not read it"})),
+        ],
+        100,
+        Duration::ZERO,
+    );
+    let out = execute(&server, &task(), &Variant::default(), &suite());
+    assert_eq!(out.failure_class, Some(FailureClass::ToolErrorAbandoned));
 }
 #[test]
 fn catalog_and_builtin_registry_list_the_same_tools() {

@@ -126,7 +126,8 @@ pub fn run(m: &RunMeta, out: &Outcome) -> Result<Vec<Request>> {
         "repeat_index":m.repeat,"case_id":m.case.id,"category":tag(&m.case.category),"split":tag(&m.case.split),
         "load_id":m.load_id,"trace":m.trace.to_string_lossy(),
         "status":tag(&out.status),"reason":out.reason,"failure_class":out.failure_class.as_ref().map(tag),
-        "answer":out.answer,"evidence":out.evidence,"final_state":out.final_state,"retrieval_success":out.retrieval_success});
+        "milestone_score":out.milestone_score,"attempted_calls":out.attempted_calls,"abstained":out.abstained,
+        "expected_calls":m.case.scope.expected_calls,"answer":out.answer,"evidence":out.evidence,"final_state":out.final_state,"retrieval_success":out.retrieval_success});
     let counts = json!({"model_calls":out.model_calls,"tool_invocations":out.tool_invocations,
         "valid_tool_calls":out.valid_tool_calls,"argument_errors":out.argument_errors,"repairs":out.repairs,
         "prompt_tokens":out.prompt_tokens,"generated_tokens":out.generated_tokens,"cached_tokens":out.cached_tokens});
