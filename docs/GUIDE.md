@@ -115,7 +115,7 @@ process, so harness RSS includes them. Peak RSS comes from the samples, and
 every load and attempt takes a sample at its start and at its end. CPU time is
 the total CPU time of the inference and harness processes.
 
-The Pi reports temperature and throttle flags. `setup-pi.sh` adds your user to
+The Pi reports temperature and throttle flags. `setup.sh` adds your user to
 the `video` group so `vcgencmd` works without root, and you must log in again
 afterwards.
 

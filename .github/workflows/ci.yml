@@ -2,6 +2,8 @@ name: CI
 on:
   push:
   pull_request:
+env:
+  RUST_VERSION: 1.96.0
 jobs:
   test:
     strategy:
@@ -10,18 +12,36 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUST_VERSION }}
           components: clippy, rustfmt
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - run: cargo build --release --locked
+      - run: target/release/a2e tools validate
+      - run: target/release/a2e cases validate
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n setup.sh scripts/*.sh scripts/setup/*.sh
+      - run: shellcheck setup.sh scripts/*.sh scripts/setup/*.sh
   pi-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.RUST_VERSION }}
           targets: aarch64-unknown-linux-gnu
       - run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
       - run: cargo build --release --locked --target aarch64-unknown-linux-gnu
