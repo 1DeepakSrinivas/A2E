@@ -4,9 +4,9 @@
 
 use crate::{
     adapter::{final_tool, Action, Adapter, Call},
-    case::{Case, FinalAnswer},
+    case::{Case, Category, FinalAnswer},
     config::{Catalog, Config, ContextWindow, Mode, Stage, Suite, ToolSpec, Variant, WebMode},
-    eval::{evaluate, CheckResult, FailureClass, Observation},
+    eval::{evaluate, milestone_score, CheckResult, FailureClass, Observation},
     inference::{Completion, Inference, Server},
     measure::{Monitor, Resources},
     record::{ParseStatus, ToolEntry, Turn},
@@ -48,6 +48,9 @@ pub struct Outcome {
     pub failure_class: Option<FailureClass>,
     pub answer: Option<String>,
     pub checks: Vec<CheckResult>,
+    pub milestone_score: Option<f64>,
+    pub attempted_calls: u64,
+    pub abstained: Option<bool>,
     pub retrieval_success: Option<bool>,
     pub evidence: Vec<Value>,
     pub model_calls: u64,
@@ -85,6 +88,9 @@ impl Default for Outcome {
             failure_class: None,
             answer: None,
             checks: Vec::new(),
+            milestone_score: None,
+            attempted_calls: 0,
+            abstained: None,
             retrieval_success: None,
             evidence: Vec::new(),
             model_calls: 0,
@@ -247,6 +253,7 @@ struct Attempt<'a> {
     stage: usize,
     stage_successes: usize,
     calls: Vec<Call>,
+    attempted: Vec<Call>,
     last_call: Option<String>,
     repeats: u32,
     turn: Turn,
@@ -378,6 +385,7 @@ impl Attempt<'_> {
             Action::Call(call) => call,
         };
         self.turn.parse_status = ParseStatus::Call;
+        self.attempted.push(call.clone());
         let (suite, variant) = (self.x.suite, self.x.variant);
         let t = Instant::now();
         let validation = if let Some(spec) = specs.iter().find(|s| s.name == call.name) {
@@ -542,10 +550,18 @@ impl Attempt<'_> {
         let state = self.tools.snapshot()?;
         let observation = Observation {
             calls: &self.calls,
+            attempted: &self.attempted,
             state: &state,
             answer: self.out.answer.as_deref().unwrap_or(""),
         };
         self.out.checks = evaluate(case, &observation);
+        self.out.milestone_score = milestone_score(&self.out.checks);
+        self.out.attempted_calls = self.attempted.len() as u64;
+        self.out.abstained = matches!(
+            case.category,
+            Category::Irrelevance | Category::MissingParam
+        )
+        .then_some(self.attempted.is_empty());
         self.trace
             .event(&json!({"event":"evaluation","state":state,"checks":self.out.checks}))?;
         let retrieval = self
@@ -595,6 +611,10 @@ fn failure_class(out: &Outcome, case: &Case) -> Option<FailureClass> {
         Status::InfrastructureFailure | Status::Interrupted
     ) {
         Some(FailureClass::Infrastructure)
+    } else if out.tool_log.is_empty() && case.scope.expected_calls.unwrap_or(0) > 0 {
+        Some(FailureClass::NoToolUse)
+    } else if out.tool_log.last().is_some_and(|t| t.valid && !t.ok) {
+        Some(FailureClass::ToolErrorAbandoned)
     } else {
         out.checks
             .iter()
@@ -663,6 +683,7 @@ pub fn task_run(x: TaskExecution<'_>) -> Result<Outcome> {
         stage: 0,
         stage_successes: 0,
         calls: Vec::new(),
+        attempted: Vec::new(),
         last_call: None,
         repeats: 0,
         turn: Turn::default(),

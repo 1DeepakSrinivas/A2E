@@ -52,6 +52,7 @@ fn replay(case: &Case, calls: &[(String, Value)], answer: &str) -> Vec<CheckResu
         case,
         &Observation {
             calls: &observed,
+            attempted: &observed,
             state: &state,
             answer,
         },
@@ -175,6 +176,7 @@ fn forbidden_calls_fail_irrelevance_and_missing_parameter_cases() {
             case,
             &Observation {
                 calls: &observed,
+                attempted: &observed,
                 state: &json!({"files":{}}),
                 answer,
             },

@@ -106,6 +106,20 @@ fn run_requests(c: &Case, v: &Variant, attempt: u32, samples: usize) -> Vec<Requ
     payload::run(&meta, &outcome(samples)).unwrap()
 }
 
+#[test]
+fn run_payload_carries_the_scoring_fields() {
+    let reqs = run_requests(&case(), &Variant::default(), 1, 1);
+    let run = &reqs[0].body["run"];
+    for key in [
+        "milestone_score",
+        "attempted_calls",
+        "abstained",
+        "expected_calls",
+    ] {
+        assert!(run.get(key).is_some(), "{key}");
+    }
+}
+
 // Worker
 struct MockWorker {
     url: String,
