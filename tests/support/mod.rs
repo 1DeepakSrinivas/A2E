@@ -1,10 +1,18 @@
 //! Local mock llama.cpp server for runtime tests
 //! Scripted completions, request capture, and tool-call fixtures
 
+use a2e::{
+    adapter::Adapter,
+    case::Case,
+    config::{Catalog, Runtime, Suite, Variant},
+    inference::Inference,
+    runner::{task_run, Outcome, TaskExecution},
+};
 use serde_json::{json, Value};
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc, Mutex,
@@ -15,6 +23,7 @@ use std::{
 
 pub struct MockServer {
     pub url: String,
+    #[allow(dead_code)]
     pub seen: Arc<Mutex<Vec<Value>>>,
     stop: Arc<AtomicBool>,
     handle: Option<thread::JoinHandle<()>>,
@@ -111,4 +120,73 @@ pub fn call(name: &str, args: Value) -> String {
         "<tool_call>{}</tool_call>",
         json!({"name":name,"arguments":args})
     )
+}
+
+#[allow(dead_code)]
+pub fn repo() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+#[allow(dead_code)]
+pub fn catalog() -> Catalog {
+    Catalog::load(&repo().join("configs/tools/standard.toml")).unwrap()
+}
+/// Generates the workspace tree once and points `A2E_SANDBOX` at it.
+#[allow(dead_code)]
+pub fn use_sandbox() {
+    static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
+    let dir = DIR.get_or_init(|| {
+        let dir = tempfile::tempdir().unwrap();
+        a2e::sandbox::init(dir.path(), a2e::sandbox::DEFAULT_SEED, false).unwrap();
+        dir
+    });
+    std::env::set_var("A2E_SANDBOX", dir.path());
+}
+/// Runs one attempt of a case against the mock server.
+#[allow(dead_code)]
+pub fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> Outcome {
+    let dir = tempfile::tempdir().unwrap();
+    let client = Inference::new(server.url.clone()).unwrap();
+    let runtime = Runtime {
+        memory_limit_mb: 1_000_000,
+        reserve_mb: 0,
+        power: "none".into(),
+        ..Runtime::default()
+    };
+    task_run(TaskExecution {
+        client: &client,
+        adapter: Adapter::Qwen,
+        case: t,
+        suite: s,
+        variant: v,
+        catalog: &catalog(),
+        ctx: 1024,
+        dir: dir.path(),
+        cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        server_pid: std::process::id(),
+        runtime: &runtime,
+    })
+    .unwrap()
+}
+/// Scripted model output that replays a case's golden calls and answer.
+#[allow(dead_code)]
+pub fn golden_script(case: &Case) -> Vec<String> {
+    let mut script = case
+        .golden
+        .iter()
+        .map(|g| {
+            call(
+                &g.tool,
+                if g.args.is_null() {
+                    json!({})
+                } else {
+                    g.args.clone()
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    script.push(call(
+        "final_answer",
+        json!({"answer":case.golden_answer.clone().unwrap_or_default()}),
+    ));
+    script
 }
