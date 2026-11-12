@@ -52,6 +52,9 @@ Results are saved under `results`. Judging, scoring and reports live in the A2E-
 | `files_heldout` | The file cases, held-out split, 1 warmup and 3 repeats. | Long |
 | `core` | All held-out cases in autonomous and guided mode, 1 warmup and 3 repeats. | Hours |
 | `harness` | Autonomous mode against guided, filter, recent context, constrained decoding and repair. | Hours |
+| `test_filesystem` | Dev-split sandbox and file cases (search, create, move, delete) in autonomous and guided mode, plus filter, recent context, constrained decoding and repair. | Hours |
+| `test_compute` | Dev-split arithmetic, units, time and text cases in autonomous and guided mode. | Short |
+| `test_data_web` | Dev-split database, key-value, device and fixture web cases in autonomous and guided mode. | Short |
 | `web_live` | Live web search cases. Needs `BRAVE_SEARCH_API_KEY` in `.env`. | Short |
 
 ## Which document to read
