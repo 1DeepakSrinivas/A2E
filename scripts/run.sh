@@ -135,7 +135,7 @@ interactive() {
             if [[ -n "$name" ]]; then status_cmd "$name"; else echo "No run is active."; "$bin" upload --status; fi
             ;;
         "Show log")
-            name="$(ls results/logs/*.log 2>/dev/null | xargs -n1 basename | sed 's/-[0-9]*-[0-9]*\.log$//' | sort -u | choose "Log:")" || die "No logs yet."
+            name="$(for f in results/logs/*.log; do [[ -e "$f" ]] && basename "$f"; done | sed 's/-[0-9]*-[0-9]*\.log$//' | sort -u | choose "Log:")" || die "No logs yet."
             logs_cmd "$name"
             ;;
         "Stop a run") need_tmux; name="$(sessions | choose "Run:")" || die "No run is active."; stop_cmd "$name" ;;
