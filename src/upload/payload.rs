@@ -150,7 +150,7 @@ pub fn run(m: &RunMeta, out: &Outcome) -> Result<Vec<Request>> {
             json!({"idx":t.idx,"visible_tools":t.visible_tools,"template_ms":t.template_ms,"tokenize_ms":t.tokenize_ms,
                 "http_ms":t.http_ms,"prefill_ms":t.prefill_ms,"decode_ms":t.decode_ms,"prompt_tokens":t.prompt_tokens,
                 "cached_tokens":t.cached_tokens,"generated_tokens":t.generated_tokens,"parse_ms":t.parse_ms,
-                "parse_status":tag(&t.parse_status),"parse_error":t.parse_error,"raw_text":t.raw_text})
+                "parse_status":tag(&t.parse_status),"leading_text":t.leading_text,"parse_error":t.parse_error,"raw_text":t.raw_text})
         })
         .collect();
     let calls: Vec<Value> = out
@@ -159,7 +159,7 @@ pub fn run(m: &RunMeta, out: &Outcome) -> Result<Vec<Request>> {
         .enumerate()
         .map(|(i, c)| {
             json!({"idx":i,"turn":c.turn,"tool":c.tool,"arguments":c.arguments,"valid":c.valid,"ok":c.ok,
-                "validate_ms":c.validate_ms,"ms":c.ms,"output_bytes":c.output_bytes,"error":c.error})
+                "validate_ms":c.validate_ms,"ms":c.ms,"output_bytes":c.output_bytes,"output":c.output,"output_truncated":c.output_truncated,"error":c.error})
         })
         .collect();
     let checks: Vec<Value> = out

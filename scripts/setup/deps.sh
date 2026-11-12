@@ -8,7 +8,11 @@ export PATH="$HOME/.cargo/bin:$PATH"
 case "${A2E_PLATFORM:-}" in
     pi)
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake git curl ca-certificates tmux
+        sudo apt-get install -y build-essential cmake git curl ca-certificates tmux libraspberrypi-bin
+        if ! id -nG | tr ' ' '\n' | grep -qx video; then
+            sudo usermod -aG video "$USER"
+            echo "Added $USER to the video group. Log out and back in before measuring."
+        fi
         ;;
     mac)
         if ! xcode-select -p >/dev/null 2>&1; then

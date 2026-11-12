@@ -25,7 +25,7 @@ pub struct Sample {
     pub t_ms: f64,
     pub harness_bytes: u64,
     pub inference_bytes: u64,
-    pub available_bytes: u64,
+    pub available_bytes: Option<u64>,
     pub cpu_ms: Option<u64>,
     pub temperature_c: Option<f64>,
     pub throttled: Option<String>,
@@ -153,7 +153,22 @@ fn pi_thermal() -> (Option<f64>, Option<String>) {
     let temp = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp")
         .ok()
         .and_then(|v| v.trim().parse::<f64>().ok())
-        .map(|v| v / 1000.);
+        .map(|v| v / 1000.)
+        .or_else(|| {
+            Command::new("vcgencmd")
+                .arg("measure_temp")
+                .output()
+                .ok()
+                .filter(|o| o.status.success())
+                .and_then(|o| {
+                    String::from_utf8_lossy(&o.stdout)
+                        .trim()
+                        .strip_prefix("temp=")?
+                        .trim_end_matches("'C")
+                        .parse()
+                        .ok()
+                })
+        });
     let throttle = if temp.is_some() {
         Command::new("vcgencmd")
             .arg("get_throttled")
@@ -166,15 +181,77 @@ fn pi_thermal() -> (Option<f64>, Option<String>) {
     };
     (temp, throttle)
 }
+/// True for a reading with no throttling: `throttled=0x0` on the Pi, `Nominal` pressure on the Mac.
+pub fn throttle_clean(v: &str) -> bool {
+    let v = v.trim().to_ascii_lowercase();
+    let v = v.strip_prefix("throttled=").unwrap_or(&v);
+    v.is_empty() || v == "0x0" || v == "nominal"
+}
+const POWERMETRICS: &str = "/usr/bin/powermetrics";
+pub const TELEMETRY_SETUP: &str = "bash scripts/setup_mac_telemetry.sh";
+fn is_root() -> bool {
+    // SAFETY: No memory preconditions
+    unsafe { libc::geteuid() == 0 }
+}
+/// Checks that powermetrics can run now, directly as root or through a passwordless sudo rule.
+pub fn power_access() -> Result<()> {
+    if std::env::consts::OS != "macos" {
+        bail!("power sampling is only supported on macOS");
+    }
+    if is_root() {
+        return Ok(());
+    }
+    let allowed = Command::new("sudo")
+        .args(["-n", "-l", POWERMETRICS])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success());
+    if !allowed {
+        bail!(
+            "powermetrics needs root; run `{TELEMETRY_SETUP}` once, or start the runner with sudo"
+        );
+    }
+    Ok(())
+}
+/// What this device can report during a run; shown by `doctor`.
+pub fn telemetry() -> Value {
+    let (temp, throttle) = pi_thermal();
+    let power = if std::env::consts::OS == "macos" {
+        match power_access() {
+            Ok(()) => json!("ok"),
+            Err(e) => json!(format!("unavailable: {e}")),
+        }
+    } else {
+        json!("unavailable")
+    };
+    json!({
+        "temperature": if temp.is_some() { "ok" } else { "unavailable" },
+        "throttle_flags": if throttle.is_some() || (std::env::consts::OS == "macos" && power_access().is_ok()) { "ok" } else { "unavailable" },
+        "power": power,
+    })
+}
 struct Power {
+    root: bool,
     child: std::process::Child,
     latest: Arc<Mutex<Option<(Instant, f64)>>>,
+    pressure: Arc<Mutex<Option<String>>>,
     reader: Option<thread::JoinHandle<()>>,
 }
 impl Power {
     fn start() -> Result<Self> {
-        let mut child = Command::new("powermetrics")
-            .args(["--samplers", "cpu_power,gpu_power", "-i", "500"])
+        power_access()?;
+        let root = is_root();
+        let mut command = if root {
+            Command::new(POWERMETRICS)
+        } else {
+            let mut c = Command::new("sudo");
+            c.args(["-n", POWERMETRICS]);
+            c
+        };
+        let mut child = command
+            .args(["--samplers", "cpu_power,gpu_power,thermal", "-i", "500"])
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -183,12 +260,18 @@ impl Power {
         let stdout = child.stdout.take().expect("stdout was configured as piped");
         let latest = Arc::new(Mutex::new(None));
         let shared = latest.clone();
+        let pressure = Arc::new(Mutex::new(None));
+        let level = pressure.clone();
         let reader = thread::spawn(move || {
             let mut b = BufReader::new(stdout);
             let mut watts = 0.;
             let mut seen = false;
             while let Ok(Some(line)) = crate::process::line(&mut b, 8192) {
                 let s = String::from_utf8_lossy(&line);
+                if let Some(level) = s.strip_prefix("Current pressure level:") {
+                    *pressure.lock().unwrap_or_else(|e| e.into_inner()) =
+                        Some(level.trim().to_string());
+                }
                 if s.starts_with("*** Sampled") {
                     if seen {
                         *shared.lock().unwrap_or_else(|e| e.into_inner()) =
@@ -214,15 +297,30 @@ impl Power {
             }
         });
         Ok(Self {
+            root,
             child,
             latest,
+            pressure: level,
             reader: Some(reader),
         })
     }
 }
 impl Drop for Power {
     fn drop(&mut self) {
-        crate::process::kill_group(&mut self.child);
+        if self.root {
+            crate::process::kill_group(&mut self.child);
+        } else {
+            // sudo relays SIGTERM to the root child; SIGKILL would orphan it
+            // SAFETY: Numeric PID of the managed sudo child
+            unsafe {
+                libc::kill(self.child.id() as i32, libc::SIGTERM);
+            }
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while Instant::now() < deadline && !matches!(self.child.try_wait(), Ok(Some(_))) {
+                thread::sleep(Duration::from_millis(50));
+            }
+            crate::process::kill_group(&mut self.child);
+        }
         if let Some(h) = self.reader.take() {
             let _ = h.join();
         }
@@ -237,10 +335,16 @@ pub struct Monitor {
 impl Monitor {
     /// Background sampling for one loading or task interval.
     pub fn start(pid: u32, r: &Runtime, cancel: Arc<AtomicBool>) -> Result<Self> {
-        // SAFETY: No memory preconditions
-        let is_root = unsafe { libc::geteuid() } == 0;
-        let power = if r.power != "none" && std::env::consts::OS == "macos" && is_root {
-            Power::start().ok()
+        let power = if r.power != "none" && std::env::consts::OS == "macos" {
+            match Power::start() {
+                Ok(p) => Some(p),
+                Err(e) if r.power == "required" => bail!("power_required: {e}"),
+                Err(e) => {
+                    static WARNED: std::sync::Once = std::sync::Once::new();
+                    WARNED.call_once(|| eprintln!("warning: power and thermal unavailable: {e}"));
+                    None
+                }
+            }
         } else {
             None
         };
@@ -276,7 +380,8 @@ impl Monitor {
             let mut initial_cpu = None;
             let mut initial_faults = None;
             let mut cpu_primed = false;
-            while !done.load(Ordering::Relaxed) {
+            loop {
+                let last = done.load(Ordering::Relaxed);
                 system.refresh_memory();
                 system.refresh_processes(ProcessesToUpdate::Some(&pids), true);
                 // CPU usage needs two refreshes, so the first sample has no modeled power
@@ -304,7 +409,12 @@ impl Monitor {
                 let cpu_elapsed = cpu.zip(initial).map(|(a, b)| a.saturating_sub(b));
                 let faults = fault_counts(pid);
                 let first = *initial_faults.get_or_insert(faults);
-                let (temp, throttled) = pi_thermal();
+                let (temp, pi_throttled) = pi_thermal();
+                let throttled = pi_throttled.or_else(|| {
+                    power
+                        .as_ref()
+                        .and_then(|p| p.pressure.lock().unwrap_or_else(|e| e.into_inner()).clone())
+                });
                 let elapsed = start.elapsed().as_secs_f64();
                 let watts = power
                     .as_ref()
@@ -319,19 +429,18 @@ impl Monitor {
                     }
                 }
                 previous_power = watts.map(|w| (elapsed, w));
+                let available = Some(system.available_memory()).filter(|a| *a > 0);
                 let exceeded = h + m > r.memory_limit_mb * 1024 * 1024
-                    || system.available_memory() < r.reserve_mb * 1024 * 1024;
+                    || available.is_some_and(|a| a < r.reserve_mb * 1024 * 1024);
                 {
                     let mut s = stats.lock().unwrap_or_else(|e| e.into_inner());
                     s.harness_peak_bytes = s.harness_peak_bytes.max(h);
                     s.inference_peak_bytes = s.inference_peak_bytes.max(m);
                     s.combined_peak_bytes = s.combined_peak_bytes.max(h + m);
-                    s.available_min_bytes = Some(
-                        s.available_min_bytes
-                            .map_or(system.available_memory(), |a| {
-                                a.min(system.available_memory())
-                            }),
-                    );
+                    s.available_min_bytes = match (s.available_min_bytes, available) {
+                        (Some(a), Some(b)) => Some(a.min(b)),
+                        (a, b) => a.or(b),
+                    };
                     s.cpu_time_ms = cpu_elapsed;
                     s.minor_faults = faults.zip(first).map(|(a, b)| a.0.saturating_sub(b.0));
                     s.major_faults = faults.zip(first).map(|(a, b)| a.1.saturating_sub(b.1));
@@ -345,7 +454,7 @@ impl Monitor {
                             t_ms: elapsed * 1000.,
                             harness_bytes: h,
                             inference_bytes: m,
-                            available_bytes: system.available_memory(),
+                            available_bytes: available,
                             cpu_ms: cpu_elapsed,
                             temperature_c: temp,
                             throttled: throttled.clone(),
@@ -354,7 +463,7 @@ impl Monitor {
                             major_faults: major,
                         });
                     }
-                    if throttled.is_some() {
+                    if throttled.is_some() && s.throttled.as_deref().is_none_or(throttle_clean) {
                         s.throttled = throttled;
                     }
                     s.energy_j = (energy_intervals > 0).then_some(energy);
@@ -367,6 +476,9 @@ impl Monitor {
                     unsafe {
                         libc::kill(-(pid as i32), libc::SIGKILL);
                     }
+                    break;
+                }
+                if last {
                     break;
                 }
                 thread::park_timeout(Duration::from_millis(r.sample_ms));
@@ -399,7 +511,7 @@ impl Drop for Monitor {
 }
 #[cfg(test)]
 mod tests {
-    use super::pi_model_watts;
+    use super::*;
 
     #[test]
     fn pi_model_matches_the_published_endpoints() {
@@ -407,5 +519,34 @@ mod tests {
         assert!((pi_model_watts(1.) - 5.274).abs() < 1e-3);
         assert_eq!(pi_model_watts(-1.), pi_model_watts(0.));
         assert_eq!(pi_model_watts(2.), pi_model_watts(1.));
+    }
+
+    #[test]
+    fn a_short_interval_still_gets_a_start_and_an_end_sample() {
+        let runtime = Runtime {
+            power: "none".into(),
+            sample_ms: 5_000,
+            ..Runtime::default()
+        };
+        let mut child = Command::new("sleep").arg("5").spawn().unwrap();
+        let monitor =
+            Monitor::start(child.id(), &runtime, Arc::new(AtomicBool::new(false))).unwrap();
+        thread::sleep(Duration::from_millis(50));
+        let resources = monitor.finish();
+        let _ = child.kill();
+        let _ = child.wait();
+        assert!(resources.sample_count >= 2);
+        assert!(resources.combined_peak_bytes > 0);
+        assert_eq!(resources.series.len() as u64, resources.sample_count);
+    }
+
+    #[test]
+    fn clean_throttle_readings_cover_both_platforms() {
+        for clean in ["throttled=0x0", "0x0", "Nominal", ""] {
+            assert!(throttle_clean(clean), "{clean}");
+        }
+        for hot in ["throttled=0x50005", "Heavy"] {
+            assert!(!throttle_clean(hot), "{hot}");
+        }
     }
 }
