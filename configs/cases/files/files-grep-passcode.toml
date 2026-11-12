@@ -1,6 +1,6 @@
 id = "files-grep-passcode"
 category = "files"
-tags = ["workspace", "grep", "tier2"]
+tags = ["workspace", "grep", "tier2", "fs"]
 split = "dev"
 golden_answer = "service-2026-01.log says the passcode is 7731."
 

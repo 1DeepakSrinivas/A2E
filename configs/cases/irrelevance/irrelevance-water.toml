@@ -1,6 +1,6 @@
 id = "irrelevance-water"
 category = "irrelevance"
-tags = []
+tags = ["compute"]
 split = "heldout"
 golden_answer = "The formula is H2O."
 

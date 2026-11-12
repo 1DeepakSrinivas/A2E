@@ -1,6 +1,6 @@
 id = "simple-calc-mul"
 category = "simple"
-tags = ["arithmetic"]
+tags = ["arithmetic", "compute"]
 split = "heldout"
 golden_answer = "The product is 888."
 

@@ -1,6 +1,6 @@
 id = "simple-list-dir"
 category = "simple"
-tags = ["files"]
+tags = ["files", "fs"]
 split = "dev"
 golden_answer = "The docs folder contains guide.txt."
 

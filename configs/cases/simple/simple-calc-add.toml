@@ -1,6 +1,6 @@
 id = "simple-calc-add"
 category = "simple"
-tags = ["smoke", "arithmetic"]
+tags = ["smoke", "arithmetic", "compute"]
 split = "dev"
 golden_answer = "482 plus 319 is 801."
 

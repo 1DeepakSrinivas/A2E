@@ -1,6 +1,6 @@
 id = "multiple-date-diff"
 category = "multiple"
-tags = ["tier2", "time"]
+tags = ["tier2", "time", "compute"]
 split = "heldout"
 golden_answer = "There are 42 days."
 

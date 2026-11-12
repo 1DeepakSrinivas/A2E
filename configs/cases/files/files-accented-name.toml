@@ -1,6 +1,6 @@
 id = "files-accented-name"
 category = "files"
-tags = ["workspace", "names", "tier2"]
+tags = ["workspace", "names", "tier2", "fs"]
 split = "dev"
 golden_answer = "An espresso costs 3.20."
 

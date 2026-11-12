@@ -1,6 +1,6 @@
 id = "web-power"
 category = "web"
-tags = []
+tags = ["data"]
 split = "heldout"
 golden_answer = "It needs 5V 2.5A (source pi_power)."
 

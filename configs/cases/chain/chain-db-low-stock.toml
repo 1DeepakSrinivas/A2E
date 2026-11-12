@@ -1,6 +1,6 @@
 id = "chain-db-low-stock"
 category = "chain"
-tags = ["tier2", "db", "files"]
+tags = ["tier2", "db", "files", "data"]
 split = "heldout"
 golden_answer = "Wrote the low stock list."
 

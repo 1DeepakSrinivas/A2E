@@ -1,6 +1,6 @@
 id = "missing-setting-value"
 category = "missing_param"
-tags = ["smoke"]
+tags = ["smoke", "data"]
 split = "dev"
 golden_answer = "What setting value should I use for the heater?"
 

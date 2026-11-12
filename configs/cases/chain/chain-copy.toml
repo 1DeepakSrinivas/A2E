@@ -1,6 +1,6 @@
 id = "chain-copy"
 category = "chain"
-tags = ["tier2", "smoke", "files"]
+tags = ["tier2", "smoke", "files", "fs"]
 split = "dev"
 golden_answer = "Copied."
 

@@ -1,6 +1,6 @@
 id = "files-deep-timeout"
 category = "files"
-tags = ["workspace", "grep", "deep"]
+tags = ["workspace", "grep", "deep", "fs"]
 split = "heldout"
 golden_answer = "The session timeout is 45 minutes."
 

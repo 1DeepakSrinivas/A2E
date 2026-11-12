@@ -1,6 +1,6 @@
 id = "multiple-json"
 category = "multiple"
-tags = ["tier2", "text"]
+tags = ["tier2", "text", "compute"]
 split = "heldout"
 golden_answer = "The port is 8080."
 

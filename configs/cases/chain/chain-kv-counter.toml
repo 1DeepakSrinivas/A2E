@@ -1,6 +1,6 @@
 id = "chain-kv-counter"
 category = "chain"
-tags = ["tier2", "store", "arithmetic"]
+tags = ["tier2", "store", "arithmetic", "data"]
 split = "dev"
 golden_answer = "The counter is now 5."
 

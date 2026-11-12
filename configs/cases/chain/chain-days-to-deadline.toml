@@ -1,6 +1,6 @@
 id = "chain-days-to-deadline"
 category = "chain"
-tags = ["tier2", "time"]
+tags = ["tier2", "time", "compute"]
 split = "heldout"
 golden_answer = "There are 9 days left."
 

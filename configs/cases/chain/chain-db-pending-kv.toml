@@ -1,6 +1,6 @@
 id = "chain-db-pending-kv"
 category = "chain"
-tags = ["tier2", "db", "store"]
+tags = ["tier2", "db", "store", "data"]
 split = "heldout"
 golden_answer = "There are 3 pending orders."
 

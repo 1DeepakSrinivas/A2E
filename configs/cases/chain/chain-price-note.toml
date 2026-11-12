@@ -1,6 +1,6 @@
 id = "chain-price-note"
 category = "chain"
-tags = ["tier2", "db", "store"]
+tags = ["tier2", "db", "store", "data"]
 split = "dev"
 golden_answer = "Saved a note: tape costs 2.75."
 

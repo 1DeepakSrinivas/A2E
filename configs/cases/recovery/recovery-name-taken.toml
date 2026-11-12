@@ -1,6 +1,6 @@
 id = "recovery-name-taken"
 category = "recovery"
-tags = ["wrong-guess", "files"]
+tags = ["wrong-guess", "files", "fs"]
 split = "dev"
 golden_answer = "Moved the draft to final_v2.txt."
 

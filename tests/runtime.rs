@@ -3,28 +3,17 @@
 
 mod support;
 use a2e::{
-    adapter::{Adapter, Call},
+    adapter::Call,
     case::{Case, FinalAnswer},
-    config::{Catalog, Config, Mode, Runtime, Suite, Variant},
+    config::{Config, Mode, Suite, Variant},
     eval::{evaluate, FailureClass, Observation},
-    inference::Inference,
-    runner::{select_tools, task_run, Status, TaskExecution},
+    runner::{select_tools, Status},
     tools::Builtins,
 };
 use serde_json::json;
-use std::{
-    path::PathBuf,
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
-};
-use support::{call, MockServer};
+use std::time::Duration;
+use support::{call, catalog, execute, golden_script, repo, use_sandbox, MockServer};
 
-fn repo() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-fn catalog() -> Catalog {
-    Catalog::load(&repo().join("configs/tools/standard.toml")).unwrap()
-}
 fn suite() -> Suite {
     Suite::load(&repo().join("configs/suites/smoke.toml")).unwrap()
 }
@@ -36,31 +25,6 @@ fn task() -> Case {
         .find(|t| t.id == "chain-copy")
         .unwrap()
 }
-fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> a2e::runner::Outcome {
-    let dir = tempfile::tempdir().unwrap();
-    let client = Inference::new(server.url.clone()).unwrap();
-    let runtime = Runtime {
-        memory_limit_mb: 1_000_000,
-        reserve_mb: 0,
-        power: "none".into(),
-        ..Runtime::default()
-    };
-    task_run(TaskExecution {
-        client: &client,
-        adapter: Adapter::Qwen,
-        case: t,
-        suite: s,
-        variant: v,
-        catalog: &catalog(),
-        ctx: 1024,
-        dir: dir.path(),
-        cancel: Arc::new(AtomicBool::new(false)),
-        server_pid: std::process::id(),
-        runtime: &runtime,
-    })
-    .unwrap()
-}
-
 #[test]
 fn dependency_chain_checks_final_state_in_both_modes() {
     for mode in [Mode::Autonomous, Mode::Guided] {
@@ -264,16 +228,6 @@ fn harness_overhead_stays_a_small_share_of_wall_time() {
         out.harness_other_ms,
         out.wall_ms
     );
-}
-/// Generates the workspace tree once and points `A2E_SANDBOX` at it.
-fn use_sandbox() {
-    static DIR: std::sync::OnceLock<tempfile::TempDir> = std::sync::OnceLock::new();
-    let dir = DIR.get_or_init(|| {
-        let dir = tempfile::tempdir().unwrap();
-        a2e::sandbox::init(dir.path(), a2e::sandbox::DEFAULT_SEED, false).unwrap();
-        dir
-    });
-    std::env::set_var("A2E_SANDBOX", dir.path());
 }
 #[test]
 fn every_shipped_suite_validates_and_has_disjoint_splits() {
@@ -587,24 +541,7 @@ fn every_offline_golden_sequence_succeeds_through_the_agent_loop() {
     let cases = a2e::case::load_all(&[repo().join("configs/cases")]).unwrap();
     let s = suite();
     for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
-        let mut script = case
-            .golden
-            .iter()
-            .map(|g| {
-                call(
-                    &g.tool,
-                    if g.args.is_null() {
-                        json!({})
-                    } else {
-                        g.args.clone()
-                    },
-                )
-            })
-            .collect::<Vec<_>>();
-        script.push(call(
-            "final_answer",
-            json!({"answer":case.golden_answer.clone().unwrap_or_default()}),
-        ));
+        let script = golden_script(case);
         let server = MockServer::new(script, 100, Duration::ZERO);
         let out = execute(&server, case, &Variant::default(), &s);
         let want = if case.judge.enabled {

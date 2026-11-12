@@ -1,6 +1,6 @@
 id = "chain-db-order-total"
 category = "chain"
-tags = ["tier2", "db", "arithmetic"]
+tags = ["tier2", "db", "arithmetic", "data"]
 split = "dev"
 golden_answer = "The total is 99.8."
 

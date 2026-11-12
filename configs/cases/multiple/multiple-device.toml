@@ -1,6 +1,6 @@
 id = "multiple-device"
 category = "multiple"
-tags = ["tier2", "devices"]
+tags = ["tier2", "devices", "data"]
 split = "dev"
 golden_answer = "The cooler temperature is 35."
 

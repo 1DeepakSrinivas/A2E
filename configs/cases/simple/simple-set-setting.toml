@@ -1,6 +1,6 @@
 id = "simple-set-setting"
 category = "simple"
-tags = ["smoke", "devices"]
+tags = ["smoke", "devices", "data"]
 split = "dev"
 golden_answer = "The heater is now set to 55."
 

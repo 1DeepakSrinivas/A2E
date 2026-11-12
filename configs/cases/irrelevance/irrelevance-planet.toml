@@ -1,6 +1,6 @@
 id = "irrelevance-planet"
 category = "irrelevance"
-tags = []
+tags = ["data"]
 split = "dev"
 golden_answer = "Jupiter is the largest planet."
 

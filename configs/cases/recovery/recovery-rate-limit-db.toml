@@ -1,6 +1,6 @@
 id = "recovery-rate-limit-db"
 category = "recovery"
-tags = ["faults", "db"]
+tags = ["faults", "db", "data"]
 split = "dev"
 golden_answer = "There are 10 products."
 

@@ -1,6 +1,6 @@
 id = "missing-read-path"
 category = "missing_param"
-tags = []
+tags = ["fs"]
 split = "dev"
 golden_answer = "Which file should I read?"
 

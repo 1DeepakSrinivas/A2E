@@ -1,6 +1,6 @@
 id = "multiple-db-lookup-price"
 category = "multiple"
-tags = ["tier2", "db"]
+tags = ["tier2", "db", "data"]
 split = "heldout"
 golden_answer = "The hammer costs 15.5."
 

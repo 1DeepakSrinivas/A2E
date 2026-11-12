@@ -1,6 +1,6 @@
 id = "recovery-lookup-retry"
 category = "recovery"
-tags = ["faults", "db"]
+tags = ["faults", "db", "data"]
 split = "dev"
 golden_answer = "There are 3 pending orders."
 

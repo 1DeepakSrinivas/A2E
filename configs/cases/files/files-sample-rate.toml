@@ -1,6 +1,6 @@
 id = "files-sample-rate"
 category = "files"
-tags = ["workspace", "grep", "deep"]
+tags = ["workspace", "grep", "deep", "fs"]
 split = "heldout"
 golden_answer = "The sample rate is 250 Hz."
 

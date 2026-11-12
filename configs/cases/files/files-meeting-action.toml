@@ -1,6 +1,6 @@
 id = "files-meeting-action"
 category = "files"
-tags = ["workspace", "ls"]
+tags = ["workspace", "ls", "fs"]
 split = "heldout"
 golden_answer = "The invoice goes to Dana."
 

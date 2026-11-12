@@ -1,6 +1,6 @@
 id = "recovery-two-failures"
 category = "recovery"
-tags = ["faults"]
+tags = ["faults", "fs"]
 split = "heldout"
 golden_answer = "Copied 7."
 

@@ -1,6 +1,6 @@
 id = "files-large-csv-row"
 category = "files"
-tags = ["workspace", "limits", "recovery"]
+tags = ["workspace", "limits", "recovery", "fs"]
 split = "heldout"
 golden_answer = "The value is 4963."
 

@@ -1,6 +1,6 @@
 id = "chain-miles-to-km"
 category = "chain"
-tags = ["tier2", "units", "files"]
+tags = ["tier2", "units", "files", "compute"]
 split = "heldout"
 golden_answer = "It is 19.312128 km."
 

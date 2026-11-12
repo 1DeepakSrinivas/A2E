@@ -1,6 +1,6 @@
 id = "chain-average"
 category = "chain"
-tags = ["tier2", "arithmetic"]
+tags = ["tier2", "arithmetic", "compute"]
 split = "dev"
 golden_answer = "The average is 20."
 

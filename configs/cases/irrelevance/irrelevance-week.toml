@@ -1,6 +1,6 @@
 id = "irrelevance-week"
 category = "irrelevance"
-tags = []
+tags = ["compute"]
 split = "dev"
 golden_answer = "There are 7 days in a week."
 

@@ -1,6 +1,6 @@
 id = "chain-move-archive"
 category = "chain"
-tags = ["tier2", "files"]
+tags = ["tier2", "files", "fs"]
 split = "dev"
 golden_answer = "Moved the file."
 

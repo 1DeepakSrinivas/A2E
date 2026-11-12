@@ -1,6 +1,6 @@
 id = "simple-date-add"
 category = "simple"
-tags = ["time"]
+tags = ["time", "compute"]
 split = "heldout"
 golden_answer = "It is 2026-03-06."
 

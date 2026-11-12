@@ -1,6 +1,6 @@
 id = "web-llama-server"
 category = "web"
-tags = ["judged"]
+tags = ["judged", "data"]
 split = "heldout"
 golden_answer = "llama-server is an HTTP server that runs GGUF models and offers a completion API (llama_server, https://github.com/ggml-org/llama.cpp/tree/master/tools/server)."
 

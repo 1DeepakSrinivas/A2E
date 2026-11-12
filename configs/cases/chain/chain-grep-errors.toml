@@ -1,6 +1,6 @@
 id = "chain-grep-errors"
 category = "chain"
-tags = ["tier2", "files", "text"]
+tags = ["tier2", "files", "text", "fs"]
 split = "heldout"
 golden_answer = "Saved the errors."
 

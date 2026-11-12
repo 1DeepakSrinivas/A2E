@@ -1,6 +1,6 @@
 id = "web-ram"
 category = "web"
-tags = ["smoke"]
+tags = ["smoke", "data"]
 split = "dev"
 golden_answer = "It has 1 GB (source pi_specs, https://www.raspberrypi.com/products/raspberry-pi-3-model-b-plus/)."
 

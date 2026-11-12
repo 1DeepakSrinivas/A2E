@@ -1,6 +1,6 @@
 id = "irrelevance-brazil"
 category = "irrelevance"
-tags = []
+tags = ["data"]
 split = "heldout"
 golden_answer = "Portuguese is spoken in Brazil."
 

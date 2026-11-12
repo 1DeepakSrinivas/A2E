@@ -1,6 +1,6 @@
 id = "robustness-long-file"
 category = "robustness"
-tags = ["noise", "files"]
+tags = ["noise", "files", "fs"]
 split = "heldout"
 golden_answer = "The passcode is 4417."
 

@@ -1,6 +1,6 @@
 id = "simple-device-status"
 category = "simple"
-tags = ["devices"]
+tags = ["devices", "data"]
 split = "heldout"
 golden_answer = "The cooler is at 35 degrees."
 

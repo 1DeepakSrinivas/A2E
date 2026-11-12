@@ -1,6 +1,6 @@
 id = "web-gguf-summary"
 category = "web"
-tags = ["judged"]
+tags = ["judged", "data"]
 split = "heldout"
 golden_answer = "GGUF is a single-file format that stores model weights and metadata (gguf, https://github.com/ggml-org/ggml/blob/master/docs/gguf.md)."
 

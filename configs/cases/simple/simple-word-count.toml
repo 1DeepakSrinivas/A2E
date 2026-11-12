@@ -1,6 +1,6 @@
 id = "simple-word-count"
 category = "simple"
-tags = ["text"]
+tags = ["text", "compute"]
 split = "heldout"
 golden_answer = "The text has 5 words."
 

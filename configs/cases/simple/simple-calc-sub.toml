@@ -1,6 +1,6 @@
 id = "simple-calc-sub"
 category = "simple"
-tags = ["arithmetic"]
+tags = ["arithmetic", "compute"]
 split = "heldout"
 golden_answer = "The result is 643."
 

@@ -1,6 +1,6 @@
 id = "chain-difference"
 category = "chain"
-tags = ["tier2", "files", "arithmetic"]
+tags = ["tier2", "files", "arithmetic", "fs"]
 split = "heldout"
 golden_answer = "Wrote 11."
 

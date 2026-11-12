@@ -1,6 +1,6 @@
 id = "missing-convert-unit"
 category = "missing_param"
-tags = []
+tags = ["compute"]
 split = "heldout"
 golden_answer = "Which unit should I convert 12 from?"
 

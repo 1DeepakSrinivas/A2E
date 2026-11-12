@@ -1,6 +1,6 @@
 id = "robustness-number-words"
 category = "robustness"
-tags = ["types"]
+tags = ["types", "compute"]
 split = "heldout"
 golden_answer = "The sum is 50."
 

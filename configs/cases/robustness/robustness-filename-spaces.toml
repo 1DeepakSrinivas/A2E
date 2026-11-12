@@ -1,6 +1,6 @@
 id = "robustness-filename-spaces"
 category = "robustness"
-tags = ["types", "files"]
+tags = ["types", "files", "fs"]
 split = "dev"
 golden_answer = "It says to plant tomatoes."
 

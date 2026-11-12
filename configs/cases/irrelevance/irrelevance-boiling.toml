@@ -1,6 +1,6 @@
 id = "irrelevance-boiling"
 category = "irrelevance"
-tags = []
+tags = ["compute"]
 split = "dev"
 golden_answer = "Water boils at 100 degrees Celsius."
 

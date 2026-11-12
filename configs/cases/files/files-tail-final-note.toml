@@ -1,6 +1,6 @@
 id = "files-tail-final-note"
 category = "files"
-tags = ["workspace", "tail"]
+tags = ["workspace", "tail", "fs"]
 split = "heldout"
 golden_answer = "The passcode is 7731."
 

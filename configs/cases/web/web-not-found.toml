@@ -1,6 +1,6 @@
 id = "web-not-found"
 category = "web"
-tags = []
+tags = ["data"]
 split = "heldout"
 golden_answer = "The search found nothing about the Zorblax 9000."
 

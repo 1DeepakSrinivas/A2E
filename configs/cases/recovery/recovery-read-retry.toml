@@ -1,6 +1,6 @@
 id = "recovery-read-retry"
 category = "recovery"
-tags = ["smoke", "faults"]
+tags = ["smoke", "faults", "fs"]
 split = "dev"
 golden_answer = "Copied 42."
 

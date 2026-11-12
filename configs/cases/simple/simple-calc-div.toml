@@ -1,6 +1,6 @@
 id = "simple-calc-div"
 category = "simple"
-tags = ["arithmetic"]
+tags = ["arithmetic", "compute"]
 split = "dev"
 golden_answer = "The result is 63."
 

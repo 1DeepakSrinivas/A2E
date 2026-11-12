@@ -1,6 +1,6 @@
 id = "irrelevance-sky"
 category = "irrelevance"
-tags = []
+tags = ["data"]
 split = "dev"
 golden_answer = "The sky is blue."
 

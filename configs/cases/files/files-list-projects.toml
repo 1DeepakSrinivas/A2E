@@ -1,6 +1,6 @@
 id = "files-list-projects"
 category = "files"
-tags = ["workspace", "ls", "tier2"]
+tags = ["workspace", "ls", "tier2", "fs"]
 split = "dev"
 golden_answer = "The projects are webapp, sensor-fw and notes-cli."
 

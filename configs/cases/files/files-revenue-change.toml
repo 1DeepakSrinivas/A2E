@@ -1,6 +1,6 @@
 id = "files-revenue-change"
 category = "files"
-tags = ["workspace", "diff", "tier2"]
+tags = ["workspace", "diff", "tier2", "fs"]
 split = "dev"
 golden_answer = "Revenue rose by 14."
 

@@ -1,6 +1,6 @@
 id = "chain-sensor-max"
 category = "chain"
-tags = ["tier2", "db", "store"]
+tags = ["tier2", "db", "store", "data"]
 split = "dev"
 golden_answer = "The highest reading is 35.2."
 

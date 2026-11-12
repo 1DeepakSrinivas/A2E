@@ -1,6 +1,6 @@
 id = "multiple-regex"
 category = "multiple"
-tags = ["tier2", "text"]
+tags = ["tier2", "text", "compute"]
 split = "dev"
 golden_answer = "The order numbers are 1042 and 2087."
 
