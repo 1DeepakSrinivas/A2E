@@ -132,14 +132,14 @@ impl Adapter {
                 (call, &body[calls.byte_offset()..])
             }
             Self::FunctionGemma => {
-                let mut p = Literal::new(body, self == Self::Liquid);
+                let mut p = Literal::new(body, false);
                 p.expect("call:")?;
                 let name = p.identifier()?;
                 let arguments = p.value(0)?;
                 (Call { name, arguments }, p.s)
             }
             Self::Liquid => {
-                let mut p = Literal::new(body, self == Self::Liquid);
+                let mut p = Literal::new(body, true);
                 p.expect("[")?;
                 let name = p.identifier()?;
                 p.expect("(")?;

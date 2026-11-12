@@ -619,3 +619,37 @@ fn every_offline_golden_sequence_succeeds_through_the_agent_loop() {
         );
     }
 }
+#[test]
+fn attempt_line_reports_the_failure_class_failed_checks_and_trace() {
+    use_sandbox();
+    let s = suite();
+    let case = task();
+    let server = MockServer::new(
+        vec![call("final_answer", json!({"answer":"x"}))],
+        100,
+        Duration::ZERO,
+    );
+    let v = Variant::default();
+    let out = execute(&server, &case, &v, &s);
+    assert_ne!(out.status, Status::Success);
+    let trace = std::path::Path::new("run/trace.jsonl");
+    let meta = a2e::upload::payload::RunMeta {
+        study: "s1",
+        job: "job",
+        attempt: 1,
+        phase: a2e::store::Phase::Measured,
+        model: "m",
+        context: 1024,
+        variant: &v,
+        repeat: 0,
+        case: &case,
+        load_id: None,
+        trace,
+    };
+    let line = a2e::runner::attempt_line(&meta, &out);
+    assert_eq!(line["case"], case.id);
+    assert_eq!(line["trace"], "run/trace.jsonl");
+    assert!(line["failure_class"].is_string());
+    let failed = line["failed_checks"].as_array().unwrap();
+    assert!(!failed.is_empty() && failed.iter().all(|c| c["passed"] == false));
+}
