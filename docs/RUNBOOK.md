@@ -2,6 +2,14 @@
 
 This runbook covers setting up a device, running suites in tmux, resuming and uploading, and fixing the problems seen in practice. The guide in [GUIDE.md](GUIDE.md) explains the settings, cases and tools.
 
+The short path is three commands: `./setup.sh`, then `scripts/run.sh` to pick suites, then `scripts/run.sh attach <suite>` to watch. The sections below explain each step and what to do when one fails.
+
+1. [Set up a device](#1-set-up-a-device)
+2. [Run a suite in tmux](#2-run-a-suite-in-tmux)
+3. [Resume, retry and upload](#3-resume-retry-and-upload)
+4. [Build elsewhere and copy to a Pi](#4-build-elsewhere-and-copy-to-a-pi)
+5. [Troubleshooting](#5-troubleshooting)
+
 ## 1. Set up a device
 
 Run this from the project checkout as your normal user, on a Raspberry Pi 3B+ with 64-bit Raspberry Pi OS or on an Apple Silicon Mac.

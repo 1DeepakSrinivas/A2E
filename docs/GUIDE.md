@@ -1,5 +1,14 @@
 # A2E guide
 
+This guide covers settings, commands, cases, tools and results. To set up a
+device and start a run, begin with the [README](../README.md) and the
+[runbook](RUNBOOK.md).
+
+Contents: [Setup](#setup), [Run and read results](#run-and-read-results),
+[Sending results to the cloud](#sending-results-to-the-cloud), [Cases](#cases),
+[Workspace sandbox](#workspace-sandbox), [Suites](#suites),
+[Add a tool](#add-a-tool), [Results, judging and reports](#results-judging-and-reports).
+
 The Rust CLI runs FunctionGemma 270M Q4_K_M, Qwen3-0.6B Q4_K_M, and
 LFM2.5-1.2B-Instruct QAD Q4_0 on a Pi 3B+ or Apple Silicon Mac. The model
 registry records the exact files, revisions, and published hashes.
@@ -286,6 +295,8 @@ file. The study id is a hash of the suite, the cases, the tool definitions, the
 machine settings, and the binary, so changing any of them starts a new study.
 
 - `smoke` runs the cases tagged `smoke` from the dev split, once.
+- `files_dev` runs the file cases from the dev split once, and `files_heldout`
+  runs them from the held-out split with one warmup and three repeats.
 - `core` runs all held-out cases in autonomous and guided mode, with one warmup
   and three repeats.
 - `harness` compares the autonomous variant with guided, filter, recent
