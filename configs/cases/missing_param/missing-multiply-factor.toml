@@ -18,4 +18,4 @@ tool = "calculate"
 
 [[check]]
 kind = "answer"
-regex = "(?i)\\b(which|what)\\b.*\\bnumber\\b|\\bsecond (number|value)\\b"
+asks = ["number", "factor", "value", "multiplier"]

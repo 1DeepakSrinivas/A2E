@@ -21,4 +21,4 @@ tool = "db_lookup"
 
 [[check]]
 kind = "answer"
-regex = "(?i)\\b(which|what)\\b.*\\b(table|rows)\\b|\\btable\\b"
+asks = ["table", "row", "column", "criteria", "filter"]

@@ -173,6 +173,8 @@ pub enum Check {
         regex: Option<String>,
         exact: Option<String>,
         number: Option<Number>,
+        /// Topics a clarifying question may name; see `eval::asks_for`.
+        asks: Option<Vec<String>>,
     },
     FetchedUrl {
         url: String,
@@ -230,14 +232,22 @@ impl Check {
                 regex,
                 exact,
                 number,
+                asks,
             } => {
                 let set = usize::from(contains.is_some())
                     + usize::from(not_contains.is_some())
                     + usize::from(regex.is_some())
                     + usize::from(exact.is_some())
-                    + usize::from(number.is_some());
+                    + usize::from(number.is_some())
+                    + usize::from(asks.is_some());
                 if set != 1 {
                     bail!("answer check needs exactly one matcher");
+                }
+                if asks
+                    .as_ref()
+                    .is_some_and(|a| a.is_empty() || a.iter().any(|t| t.trim().is_empty()))
+                {
+                    bail!("asks needs at least one non-empty topic");
                 }
                 pattern(regex)?;
             }

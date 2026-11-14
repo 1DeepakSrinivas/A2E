@@ -20,4 +20,4 @@ tool = "set_setting"
 
 [[check]]
 kind = "answer"
-regex = "(?i)\\b(value|setting|level|number)\\b"
+asks = ["value", "setting", "level", "number", "temperature"]

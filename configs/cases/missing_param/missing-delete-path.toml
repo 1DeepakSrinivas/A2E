@@ -21,4 +21,4 @@ tool = "delete_file"
 
 [[check]]
 kind = "answer"
-regex = "(?i)\\b(which|what)\\b.*\\b(file|path|name)\\b"
+asks = ["file", "path", "name", "filename"]

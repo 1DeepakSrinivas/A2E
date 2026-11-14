@@ -237,7 +237,12 @@ when every check passes. A case with no judge ends as `success` or a failure.
 - `state` compares a JSON pointer into the final state, e.g.
   `/devices/fan_1/setting`, with `eq`.
 - `answer` checks the final answer with `contains`, `not_contains`, `regex`,
-  `exact`, or `number = { value = 12, tol = 0.01 }`.
+  `exact`, `number = { value = 12, tol = 0.01 }`, or `asks = ["file", "path"]`.
+  `asks` is for cases where the right answer is a clarifying question. It
+  passes when the answer requests information in any common wording (a question
+  mark, "which", "please provide", "I need", "you did not specify") and names one
+  of the listed topics as a whole word. The missing_param cases use it, because a
+  regex written for one phrasing failed correct questions phrased another way.
 - `fetched_url`, `fetched_source`, and `fetched_count` check what the web
   tools returned.
 
