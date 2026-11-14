@@ -22,6 +22,9 @@ use std::{
 struct Cli {
     #[arg(long, global = true, default_value = "configs/models.toml")]
     config: PathBuf,
+    /// Keep results on this device; nothing is sent to the Worker (same as A2E_LOCAL=1)
+    #[arg(long, global = true)]
+    local: bool,
     #[command(subcommand)]
     command: Commands,
 }
@@ -120,8 +123,12 @@ fn main() {
     }
 }
 fn entry() -> Result<()> {
-    a2e::dotenv::load_startup(std::path::Path::new(".env"))?;
     let cli = Cli::parse();
+    if cli.local {
+        // Set before any thread starts and before the credentials file is read
+        std::env::set_var("A2E_LOCAL", "1");
+    }
+    a2e::dotenv::load_startup(std::path::Path::new(".env"))?;
     if let Commands::Tools {
         command: Tools::Validate { tools },
     } = &cli.command
@@ -164,6 +171,7 @@ fn entry() -> Result<()> {
             retry_failed,
         } => {
             let s = Suite::load(&suite)?;
+            eprintln!("results: {}", a2e::upload::destination());
             a2e::runner::run(
                 &c,
                 &s,
@@ -298,6 +306,6 @@ fn doctor(c: &Config, probe: bool, stop: Arc<AtomicBool>) -> Result<serde_json::
         models.push(item);
     }
     Ok(
-        json!({"host":c.host_id,"host_file":c.host_file,"roles":c.roles,"machine":machine,"telemetry":a2e::measure::telemetry(),"models":models,"llama_server":c.runtime.llama_server,"expected_llama_commit":c.runtime.llama_commit,"pi_energy":"unavailable without a supported measurement source"}),
+        json!({"host":c.host_id,"host_file":c.host_file,"roles":c.roles,"machine":machine,"telemetry":a2e::measure::telemetry(),"warnings":a2e::measure::preflight_warnings(&c.runtime),"models":models,"llama_server":c.runtime.llama_server,"expected_llama_commit":c.runtime.llama_commit,"pi_energy":"unavailable without a supported measurement source"}),
     )
 }

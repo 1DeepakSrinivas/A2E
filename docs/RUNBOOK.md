@@ -51,6 +51,7 @@ The repository `.env` normally holds the real Worker credentials, so a normal st
 
 - Running the same command again skips attempts that are already recorded.
 - `--retry-failed` repeats unsuccessful attempts, including attempts that failed because of the setup.
+- `a2e --local run <suite>` keeps the results on the device and sends nothing to the Worker, the same as `A2E_LOCAL=1`. Use it for trial runs, because the repository `.env` normally points at the production Worker. Every run prints where its results go before it starts.
 - `a2e upload --status` shows what is waiting, and `a2e upload` sends it. A request the Worker refuses for good moves to `results/outbox/rejected`.
 - Records from a failed setup, for example a wrong llama.cpp build, stay in the outbox as results. Check `a2e upload --status` before you upload them.
 
@@ -68,6 +69,16 @@ Use this route only when the Pi cannot build, for example because it runs out of
 **Pi baseline refuses to run.** The message says swap must be disabled. Turn swap off as in section 1.
 
 **`Undervoltage detected!` in `dmesg`, or `vcgencmd get_throttled` is not `0x0`.** The power supply is too weak, and the CPU is throttled, so the timings are not usable. Use a supply rated for the Pi 3B+ and a short cable. A USB drive on the same supply adds load.
+
+`a2e doctor` lists this under `warnings`, and `a2e run` prints the same warning before it starts. The flags `0x50005` mean under-voltage and throttling both now and since boot. Reboot after fixing the supply, because the "since boot" bits only clear then.
+
+**Most attempts end in `operation timed out`, with many major page faults.** The model does not fit in memory. llama.cpp maps the weights from the file, so when the weights, the context cache and the rest of the system need more than the physical memory, the kernel drops and re-reads weight pages on every token. On the 1 GB Pi 3B+ this happens with `lfm2.5-1.2b-instruct-qad` (weights larger than the free memory) and is marginal with `qwen3-0.6b` at context 2048. The runner warns before loading when the weights plus `reserve_mb` exceed the available memory. Close other programs, boot to the console instead of the desktop, or leave the model out of the suite on that device.
+
+**`model_stalled: skipped after 3 attempts with no completed model call`.** Three attempts in a row for one model and context ended before any model call returned, so the runner skipped the rest of that group instead of waiting out every timeout. The skipped attempts are recorded as excluded, not as model failures. Fix the cause, then rerun with `--retry-failed`. Set `stall_attempts = 0` under `[budget]` in the suite to turn this off.
+
+**`cache_reset_failed`.** The server defers a cache erase while its slot is busy, which happened after a call timed out. The runner now waits up to 60 seconds for the slot and restarts the server when it stays busy, so this should only appear when the restart itself fails.
+
+**`memory_limit_mb` is larger than the device memory.** The memory guard compares the two processes with this limit, so a limit above the physical memory can never trip. `a2e doctor` warns about it. The default is 768.
 
 **exFAT drive.** exFAT has no execute bit, so run `chmod +x` on the binaries after copying. A Mac adds `._*` files, and a case file with that name breaks parsing with a UTF-8 error. Remove them with `find . -name '._*' -delete` or `dot_clean`. The device name can change between mounts (for example `sda1` and `sdb1`), so run `lsblk -f` before mounting. Mount with `sudo mount -o uid=$(id -u),gid=$(id -g) /dev/sdb1 /mnt/usb`.
 

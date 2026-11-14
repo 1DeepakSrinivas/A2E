@@ -157,6 +157,20 @@ fn timeout_keeps_failed_call_cost_and_missing_timings() {
     assert_eq!(out.model_calls, 1);
     assert!(out.http_ms >= 900.);
     assert_eq!(out.generated_tokens, None);
+    // This is what the stall counter in `run` counts
+    assert!(a2e::runner::no_call_returned(&out));
+}
+#[test]
+fn completed_calls_do_not_count_as_a_stall_and_prompt_tokens_are_not_doubled() {
+    let t = task();
+    let server = MockServer::new(golden_script(&t), 100, Duration::ZERO);
+    let out = execute(&server, &t, &Variant::default(), &suite());
+    assert_eq!(out.status, Status::Success, "{:?}", out.reason);
+    assert!(!a2e::runner::no_call_returned(&out));
+    assert_eq!(out.prompt_tokens, Some(100 * out.model_calls));
+    assert_eq!(out.cached_tokens, Some(0));
+    let client = a2e::inference::Inference::new(server.url.clone()).unwrap();
+    assert!(client.settle(Duration::from_secs(2)));
 }
 #[test]
 fn slow_tool_past_the_budget_stops_the_attempt() {

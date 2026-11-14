@@ -739,6 +739,107 @@ struct Loaded {
     template: String,
     props: Value,
 }
+/// Longest wait for a cancelled call to leave its slot before the server is restarted.
+const SETTLE: Duration = Duration::from_secs(60);
+struct LoadRequest<'a> {
+    config: &'a Config,
+    model: &'a crate::config::Model,
+    ctx: usize,
+    group: &'a Path,
+    study: &'a str,
+    cancel: &'a Arc<AtomicBool>,
+}
+/// Starts the inference server and records the load, failed or not, under a new load ID.
+fn launch(
+    x: &LoadRequest,
+    resume: &mut Resume,
+    uploader: &mut Uploader,
+) -> Result<(Result<(Server, Loaded)>, String)> {
+    warn_if_tight(x.config, x.model);
+    let launched = (|| -> Result<(Server, Loaded)> {
+        let mut server = Server::spawn(x.config, x.model, x.ctx, x.group)?;
+        let monitor = Monitor::start(server.pid(), &x.config.runtime, x.cancel.clone())?;
+        let ready = server.ready(x.config.runtime.startup_seconds, x.cancel);
+        let resources = monitor.finish();
+        if resources.memory_exceeded {
+            bail!("model_load_memory_budget");
+        }
+        let mut props = ready?;
+        let template = props["chat_template"]
+            .as_str()
+            .context("missing model template")?
+            .to_owned();
+        std::fs::write(x.group.join("chat_template.jinja"), &template)?;
+        if let Some(p) = props.as_object_mut() {
+            p.remove("chat_template");
+        }
+        let load_ms = server.started.elapsed().as_secs_f64() * 1000.;
+        Ok((
+            server,
+            Loaded {
+                load_ms,
+                resources,
+                template,
+                props,
+            },
+        ))
+    })();
+    let load_id = resume.next_load_id(x.study)?;
+    let no_resources = Resources::default();
+    let error = launched.as_ref().err().map(ToString::to_string);
+    let record = match &launched {
+        Ok((server, l)) => LoadRecord {
+            id: &load_id,
+            study: x.study,
+            model: &x.model.id,
+            context: x.ctx,
+            load_ms: l.load_ms,
+            resources: &l.resources,
+            template: Some(&l.template),
+            server_version: Some(&server.version),
+            props: Some(&l.props),
+            error: None,
+        },
+        Err(_) => LoadRecord {
+            id: &load_id,
+            study: x.study,
+            model: &x.model.id,
+            context: x.ctx,
+            load_ms: 0.,
+            resources: &no_resources,
+            template: None,
+            server_version: None,
+            props: None,
+            error: error.as_deref(),
+        },
+    };
+    uploader.submit(payload::load(&record))?;
+    Ok((launched, load_id))
+}
+/// Warns when the model file cannot stay in the page cache next to the reserve.
+/// A mapped model that does not fit is paged from storage on every token.
+fn warn_if_tight(config: &Config, model: &crate::config::Model) {
+    let Ok(file) = std::fs::metadata(config.model_path(model)) else {
+        return;
+    };
+    let available = crate::measure::available_memory();
+    let needed = file.len() + config.runtime.reserve_mb * 1024 * 1024;
+    if available > 0 && needed > available {
+        eprintln!(
+            "warning: {} needs {} MiB for its weights plus the {} MiB reserve, before the context cache, but {} MiB is available; expect paging and call timeouts",
+            model.id,
+            file.len() >> 20,
+            config.runtime.reserve_mb,
+            available >> 20
+        );
+    }
+}
+/// True when the attempt hit a limit before any model call returned.
+pub fn no_call_returned(out: &Outcome) -> bool {
+    out.status == Status::ResourceLimit
+        && out.model_calls > 0
+        && out.turns.iter().all(|t| t.raw_text.is_none())
+}
 pub fn classify(reason: &str) -> Status {
     if reason.contains("interrupted") {
         Status::Interrupted
@@ -817,6 +918,9 @@ pub fn run(
     let root = crate::config::expand_path(&config.runtime.output_dir);
     let _lock = RunLock::acquire(&root)?;
     let machine = crate::measure::machine(&config.runtime)?;
+    for w in crate::measure::preflight_warnings(&config.runtime) {
+        eprintln!("warning: {w}");
+    }
     let mut resume = Resume::open(&root.join("resume.jsonl"))?;
     let mut uploader = Uploader::open(&root)?;
     let mut artifacts = BTreeMap::new();
@@ -852,65 +956,22 @@ pub fn run(
                 SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
             ));
             std::fs::create_dir_all(&group)?;
-            let launched = (|| -> Result<(Server, Loaded)> {
-                let mut server = Server::spawn(config, model, *ctx, &group)?;
-                let monitor = Monitor::start(server.pid(), &config.runtime, cancel.clone())?;
-                let ready = server.ready(config.runtime.startup_seconds, &cancel);
-                let resources = monitor.finish();
-                if resources.memory_exceeded {
-                    bail!("model_load_memory_budget");
-                }
-                let mut props = ready?;
-                let template = props["chat_template"]
-                    .as_str()
-                    .context("missing model template")?
-                    .to_owned();
-                std::fs::write(group.join("chat_template.jinja"), &template)?;
-                if let Some(p) = props.as_object_mut() {
-                    p.remove("chat_template");
-                }
-                let load_ms = server.started.elapsed().as_secs_f64() * 1000.;
-                Ok((
-                    server,
-                    Loaded {
-                        load_ms,
-                        resources,
-                        template,
-                        props,
-                    },
-                ))
-            })();
-            let load_error = launched.as_ref().err().map(ToString::to_string);
-            let load_id = resume.next_load_id(&study)?;
-            let no_resources = Resources::default();
-            let load_error_text = load_error.clone();
-            let record = match &launched {
-                Ok((server, l)) => LoadRecord {
-                    id: &load_id,
+            let (mut launched, mut load_id) = launch(
+                &LoadRequest {
+                    config,
+                    model,
+                    ctx: *ctx,
+                    group: &group,
                     study: &study,
-                    model: model_id,
-                    context: *ctx,
-                    load_ms: l.load_ms,
-                    resources: &l.resources,
-                    template: Some(&l.template),
-                    server_version: Some(&server.version),
-                    props: Some(&l.props),
-                    error: None,
+                    cancel: &cancel,
                 },
-                Err(_) => LoadRecord {
-                    id: &load_id,
-                    study: &study,
-                    model: model_id,
-                    context: *ctx,
-                    load_ms: 0.,
-                    resources: &no_resources,
-                    template: None,
-                    server_version: None,
-                    props: None,
-                    error: load_error_text.as_deref(),
-                },
-            };
-            uploader.submit(payload::load(&record))?;
+                &mut resume,
+                &mut uploader,
+            )?;
+            // Consecutive attempts in which no model call returned
+            let mut stalled = 0;
+            // Set when a call may still be running on the server
+            let mut busy = false;
             for v in &suite.variants {
                 for repeat in 0..suite.warmup + suite.repeats {
                     let phase = if repeat < suite.warmup {
@@ -939,7 +1000,43 @@ pub fn run(
                         let dir = group.join(&key[..16]);
                         std::fs::create_dir_all(&dir)?;
                         let attempt = resume.next_attempt(&study, &key);
+                        let skip = suite.budget.stall_attempts > 0
+                            && stalled >= suite.budget.stall_attempts;
+                        // A busy slot defers the cache erase, so wait for it or start a clean server
+                        let ready = !skip
+                            && launched.as_ref().is_ok_and(|(server, _)| {
+                                (!busy || server.client.settle(SETTLE))
+                                    && (server.client.reset().is_ok()
+                                        || (server.client.settle(SETTLE)
+                                            && server.client.reset().is_ok()))
+                            });
+                        if !skip && !ready && launched.is_ok() {
+                            eprintln!(
+                                "warning: inference server did not become idle; restarting it"
+                            );
+                            // The old process must release the port first
+                            drop(std::mem::replace(
+                                &mut launched,
+                                Err(anyhow::anyhow!("restarting")),
+                            ));
+                            (launched, load_id) = launch(
+                                &LoadRequest {
+                                    config,
+                                    model,
+                                    ctx: *ctx,
+                                    group: &group,
+                                    study: &study,
+                                    cancel: &cancel,
+                                },
+                                &mut resume,
+                                &mut uploader,
+                            )?;
+                        }
+                        busy = false;
                         let result = match &launched {
+                            _ if skip => Err(anyhow::anyhow!(
+                                "model_stalled: skipped after {stalled} attempts with no completed model call"
+                            )),
                             Ok((server, _)) => server.client.reset().and_then(|_| {
                                 task_run(TaskExecution {
                                     client: &server.client,
@@ -955,10 +1052,7 @@ pub fn run(
                                     runtime: &config.runtime,
                                 })
                             }),
-                            Err(_) => Err(anyhow::anyhow!(
-                                "{}",
-                                load_error.as_deref().unwrap_or("model loading failed")
-                            )),
+                            Err(e) => Err(anyhow::anyhow!("{e}")),
                         };
                         let out = match result {
                             Ok(v) => v,
@@ -968,6 +1062,15 @@ pub fn run(
                                 ..Default::default()
                             },
                         };
+                        if !skip {
+                            if no_call_returned(&out) {
+                                stalled += 1;
+                                busy = true;
+                            } else if out.model_calls > 0 {
+                                stalled = 0;
+                                busy = out.status == Status::ResourceLimit;
+                            }
+                        }
                         let meta = RunMeta {
                             study: &study,
                             job: &key,

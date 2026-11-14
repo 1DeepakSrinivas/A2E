@@ -14,6 +14,16 @@ pub use resume::Resume;
 use anyhow::Result;
 use std::path::Path;
 
+/// Where this process sends results, for the notice printed before a run.
+pub fn destination() -> String {
+    if crate::dotenv::local_only() {
+        return "kept on this device (local mode)".into();
+    }
+    match std::env::var("WORKER_URL").ok().filter(|v| !v.is_empty()) {
+        Some(url) => format!("uploading to {url}"),
+        None => "kept on this device (no Worker configured)".into(),
+    }
+}
 pub struct Uploader {
     outbox: Outbox,
     client: Option<Client>,
