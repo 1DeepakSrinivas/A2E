@@ -264,6 +264,12 @@ fn doctor(c: &Config, probe: bool, stop: Arc<AtomicBool>) -> Result<serde_json::
     for m in &c.models {
         let path = c.model_path(m);
         let mut item = json!({"id":m.id,"path":path,"source":m.source,"revision":m.revision,"quant":m.quant,"exists":path.exists()});
+        if let Ok(file) = std::fs::metadata(&path) {
+            // Weights are mapped from the file and must stay in the page cache while the model runs
+            let (weights, available) = (file.len() >> 20, a2e::measure::available_memory() >> 20);
+            let headroom = available as i64 - weights as i64 - c.runtime.reserve_mb as i64;
+            item["memory"] = json!({"weights_mib":weights,"available_mib":available,"headroom_mib":headroom,"fits":headroom > 0,"note":"headroom is what remains for the context cache and buffers after the weights and reserve_mb"});
+        }
         if path.exists() {
             let sha = a2e::hash_file(&path)?;
             item["sha256"] = json!(sha);

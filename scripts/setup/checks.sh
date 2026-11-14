@@ -20,6 +20,17 @@ if [[ "${A2E_PLATFORM:-}" == pi ]]; then
     if command -v vcgencmd >/dev/null; then
         echo "throttled: $(vcgencmd get_throttled)  (0x0 is clean)"
     fi
+    # The 1.2B model needs nearly all of the 1 GB, so the desktop and the GPU split matter
+    if [[ "$(systemctl get-default 2>/dev/null)" == graphical.target ]]; then
+        echo "The desktop is enabled and holds memory the models need: sudo systemctl set-default multi-user.target && sudo reboot"
+    fi
+    if command -v vcgencmd >/dev/null; then
+        gpu="$(vcgencmd get_mem gpu 2>/dev/null | tr -dc '0-9')"
+        if [[ -n "$gpu" && "$gpu" -gt 16 ]]; then
+            echo "GPU memory is ${gpu}M. Set gpu_mem=16 in /boot/firmware/config.txt and reboot to give it to the models."
+        fi
+    fi
+    awk '/MemAvailable/ {printf "available memory: %d MiB (doctor shows the headroom per model)\n", $2/1024}' /proc/meminfo
     if [[ ! -f .env ]]; then
         echo "No .env. Results stay in results/outbox until you copy .env.example to .env and set WORKER_URL and WRITE_TOKEN."
     fi

@@ -27,6 +27,18 @@ sudo dphys-swapfile swapoff
 sudo systemctl disable dphys-swapfile
 ```
 
+The 1.2B model only fits on the 1 GB Pi when almost nothing else holds memory. Its 4-bit weights are about 700 MiB and are mapped from the file, so they must stay in the page cache. Boot to the console and give the GPU the minimum, then reboot.
+
+```bash
+sudo systemctl set-default multi-user.target
+```
+
+```bash
+echo 'gpu_mem=16' | sudo tee -a /boot/firmware/config.txt
+```
+
+After the reboot, `a2e doctor` shows `memory.headroom_mib` for each model: the available memory minus the weights and `reserve_mb`. That headroom must still hold the context cache and buffers, which is about 60 MiB for `lfm2.5-1.2b-instruct-qad` and about 280 MiB for `qwen3-0.6b` at context 2048. A model with less headroom than that will page from storage and time out.
+
 To send results to the cloud, copy `.env.example` to `.env` and set `WORKER_URL` and `WRITE_TOKEN`, or set `A2E_RESULTS_ENV` to the a2e-results `.env` file. Without them, results wait in `results/outbox`.
 
 ## 2. Run a suite in tmux
