@@ -251,6 +251,14 @@ pub enum Mode {
     #[default]
     Autonomous,
     Guided,
+    /// Guided with a prompt prefix that never changes, so the prompt cache survives every stage.
+    GuidedStable,
+}
+impl Mode {
+    /// True for the modes that follow a case's workflow stages.
+    pub fn staged(self) -> bool {
+        self != Self::Autonomous
+    }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

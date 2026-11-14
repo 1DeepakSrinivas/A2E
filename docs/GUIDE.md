@@ -260,6 +260,18 @@ automatically. Chain, recovery, robustness, and web cases must declare their
 stages. A guided variant skips a case that has no stages and the plan reports
 it as not applicable.
 
+`guided_stable` is a second guided mode for devices where prefill is slow. In
+`guided`, the stage instruction is in the system message and the tool list
+changes with the stage. Both are at the start of the prompt, so the server's
+prompt cache is lost at every stage and the whole prompt is processed again. In
+`guided_stable` the prompt start never changes: the tool list holds every
+stage's tools from the first call, and all stage instructions are given once as
+a numbered list after the task. The harness still enforces the order, and a
+call to a later stage's tool is refused with "tool is not available in this
+stage". The two modes are different treatments: `guided` hides tools and
+`guided_stable` does not, so compare their pass rates as well as their prefill
+time. The `test_pi_guided` suite runs both next to autonomous mode.
+
 ### Golden replays
 
 Every case lists `[[golden]]` calls that solve it. The test suite replays them

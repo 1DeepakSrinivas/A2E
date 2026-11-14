@@ -604,3 +604,49 @@ fn attempt_line_reports_the_failure_class_failed_checks_and_trace() {
     let failed = line["failed_checks"].as_array().unwrap();
     assert!(!failed.is_empty() && failed.iter().all(|c| c["passed"] == false));
 }
+
+#[test]
+fn stable_guided_mode_keeps_the_prompt_prefix_and_enforces_stage_order() {
+    let t = task();
+    let stages = t.stage_plan().unwrap();
+    assert!(stages.len() > 1, "needs a multi-stage case");
+    let stable = Variant {
+        name: "guided_stable".into(),
+        mode: Mode::GuidedStable,
+        ..Default::default()
+    };
+    let server = MockServer::new(golden_script(&t), 100, Duration::ZERO);
+    let out = execute(&server, &t, &stable, &suite());
+    assert_eq!(out.status, Status::Success, "{:?}", out.reason);
+    let seen = server.seen.lock().unwrap();
+    let rendered = seen
+        .iter()
+        .filter(|r| r["path"] == "/apply-template")
+        .map(|r| r["body"].clone())
+        .collect::<Vec<_>>();
+    assert!(rendered.len() > 1);
+    // Tools, system message and first user message never change between calls
+    for r in &rendered[1..] {
+        assert_eq!(r["tools"], rendered[0]["tools"]);
+        assert_eq!(r["messages"][0], rendered[0]["messages"][0]);
+        assert_eq!(r["messages"][1], rendered[0]["messages"][1]);
+    }
+    let user = rendered[0]["messages"][1]["content"].as_str().unwrap();
+    for s in &stages {
+        assert!(user.contains(&s.instruction), "{user}");
+    }
+    drop(seen);
+    // A later stage's tool is visible but refused until its stage
+    let later = stages[1]
+        .tools
+        .iter()
+        .find(|n| !stages[0].tools.contains(n))
+        .unwrap();
+    let server = MockServer::new(vec![call(later, json!({}))], 100, Duration::ZERO);
+    let out = execute(&server, &t, &stable, &suite());
+    assert_eq!(
+        out.reason.as_deref(),
+        Some("argument_error: tool is not available in this stage")
+    );
+    assert_eq!(out.tool_invocations, 0);
+}

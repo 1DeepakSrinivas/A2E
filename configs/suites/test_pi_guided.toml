@@ -1,0 +1,32 @@
+name = "test_pi_guided"
+models = ["functiongemma-270m", "qwen3-0.6b", "lfm2.5-1.2b-instruct-qad"]
+contexts = [2048]
+cases = [
+  "../cases/simple/simple-read-file.toml",
+  "../cases/chain/chain-copy.toml",
+  "../cases/chain/chain-move-archive.toml",
+  "../cases/files/files-config-port.toml",
+  "../cases/files/files-count-lines.toml",
+  "../cases/files/files-grep-passcode.toml",
+  "../cases/files/files-copy-config.toml",
+  "../cases/files/files-write-figure.toml",
+  "../cases/recovery/recovery-name-taken.toml",
+  "../cases/recovery/recovery-read-retry.toml",
+]
+split = "dev"
+web_mode = "fixture"
+warmup = 0
+repeats = 1
+seed = 0
+
+[[variants]]
+name = "autonomous"
+mode = "autonomous"
+
+[[variants]]
+name = "guided"
+mode = "guided"
+
+[[variants]]
+name = "guided_stable"
+mode = "guided_stable"
