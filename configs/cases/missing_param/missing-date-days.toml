@@ -17,4 +17,4 @@ tool = "date_add"
 
 [[check]]
 kind = "answer"
-regex = "(?i)\\b(how many|which|what)\\b.*\\bdays?\\b|\\bnumber of days\\b"
+asks = ["day", "number", "amount", "many"]

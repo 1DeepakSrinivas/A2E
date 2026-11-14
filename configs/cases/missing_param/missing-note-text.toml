@@ -18,4 +18,4 @@ tool = "note_add"
 
 [[check]]
 kind = "answer"
-regex = "(?i)\\b(what|which)\\b.*\\b(note|text|say|content)\\b|\\btext\\b"
+asks = ["note", "text", "say", "content", "message"]

@@ -20,4 +20,4 @@ tool = "move_file"
 
 [[check]]
 kind = "answer"
-regex = "(?i)\\b(where|destination|new (name|path|location))\\b"
+asks = ["where", "destination", "location", "path", "folder", "directory", "name"]

@@ -87,20 +87,36 @@ impl Inference {
             .context("cache_reset_failed")?;
         Ok(())
     }
+    /// Waits until no slot is processing. The server defers a cache erase while a slot is
+    /// busy, and a call that timed out keeps running until its current batch ends.
+    pub fn settle(&self, limit: Duration) -> bool {
+        let deadline = Instant::now() + limit;
+        loop {
+            let busy = self.get("/slots").ok().map(|slots| {
+                slots
+                    .as_array()
+                    .is_some_and(|a| a.iter().any(|s| s["is_processing"] == true))
+            });
+            if busy == Some(false) {
+                return true;
+            }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+    }
     /// Raw completion and server-reported timings.
     pub fn complete(&self, body: &Value, remaining: Duration) -> Result<Completion> {
         let start = Instant::now();
         let raw = self.post("/completion", body, remaining)?;
         let t = &raw["timings"];
-        let fresh = t["prompt_n"].as_u64();
-        let cached = raw["tokens_cached"]
-            .as_u64()
-            .or_else(|| t["cache_n"].as_u64());
+        let (prompt_tokens, cached_tokens) = prompt_counts(&raw);
         let timing = Timing {
             prefill_ms: t["prompt_ms"].as_f64(),
             decode_ms: t["predicted_ms"].as_f64(),
-            prompt_tokens: fresh.zip(cached).map(|(f, c)| f + c),
-            cached_tokens: cached,
+            prompt_tokens,
+            cached_tokens,
             generated_tokens: t["predicted_n"].as_u64(),
             http_ms: start.elapsed().as_secs_f64() * 1000.,
         };
@@ -118,6 +134,18 @@ impl Inference {
             truncated,
         })
     }
+}
+/// Prompt length and the part of it reused from the slot cache.
+/// `tokens_cached` is the slot's size after generation, not a reuse count, so it is not read.
+fn prompt_counts(raw: &Value) -> (Option<u64>, Option<u64>) {
+    let t = &raw["timings"];
+    let fresh = t["prompt_n"].as_u64();
+    let reused = t["cache_n"].as_u64();
+    let total = raw["tokens_evaluated"]
+        .as_u64()
+        .or_else(|| fresh.zip(reused).map(|(f, r)| f + r));
+    let cached = reused.or_else(|| total.zip(fresh).map(|(t, f)| t.saturating_sub(f)));
+    (total, cached)
 }
 pub struct Server {
     child: Child,
@@ -170,6 +198,9 @@ impl Server {
                 "--jinja",
                 "--special",
                 "--no-context-shift",
+                // The host-memory prompt cache defaults to 8 GiB and grows the server between tasks
+                "--cache-ram",
+                "0",
                 "--slots",
                 "--slot-save-path",
                 &dir.join("slots").to_string_lossy(),
@@ -219,5 +250,23 @@ impl Server {
 impl Drop for Server {
     fn drop(&mut self) {
         crate::process::kill_group(&mut self.child);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prompt_counts_ignore_the_slot_size_field() {
+        // First call after a cache erase: 314 prompt tokens, none reused, 16 generated
+        let cold = json!({"tokens_evaluated":314,"tokens_cached":329,"timings":{"prompt_n":314,"cache_n":0,"predicted_n":16}});
+        assert_eq!(prompt_counts(&cold), (Some(314), Some(0)));
+        let warm = json!({"tokens_evaluated":376,"tokens_cached":423,"timings":{"prompt_n":67,"cache_n":309}});
+        assert_eq!(prompt_counts(&warm), (Some(376), Some(309)));
+        // Older servers report no reuse count
+        let old = json!({"tokens_evaluated":376,"tokens_cached":423,"timings":{"prompt_n":67}});
+        assert_eq!(prompt_counts(&old), (Some(376), Some(309)));
+        assert_eq!(prompt_counts(&json!({"timings":{}})), (None, None));
     }
 }

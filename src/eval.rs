@@ -82,6 +82,19 @@ fn numbers(text: &str) -> Vec<f64> {
 fn found(pattern: &str, text: &str) -> bool {
     Regex::new(pattern).is_ok_and(|re| re.is_match(text))
 }
+/// Wording that marks an answer as a request for information rather than a result.
+const REQUEST: &str = r"(?i)\?|\b(which|what|where|when|who|whom|how (many|much|long|far)|could you|can you|would you|will you|specify|provide|clarify|confirm|tell me|let me know|(i|i'll|i will|i would|i'd|we) need|missing|unclear|unspecified|not (specified|provided|given|stated|mentioned|clear|sure)|(didn't|did not|haven't|have not) (specify|specified|provide|provided|say|said|mention|mentioned|give|given)|no .{0,40}\b(was|were|is|has been) (specified|provided|given|stated|mentioned))\b";
+/// True when the answer asks for information and names one of the topics.
+/// Topics match whole words, ignoring case and a plural `s`.
+pub fn asks_for(topics: &[String], answer: &str) -> bool {
+    found(REQUEST, answer)
+        && topics.iter().any(|t| {
+            found(
+                &format!(r"(?i)\b{}(s|es)?\b", regex::escape(t.trim())),
+                answer,
+            )
+        })
+}
 fn urls_match(a: &str, b: &str) -> bool {
     a.trim_end_matches('/') == b.trim_end_matches('/')
 }
@@ -226,6 +239,7 @@ pub fn evaluate(case: &Case, obs: &Observation) -> Vec<CheckResult> {
                 regex,
                 exact,
                 number,
+                asks,
             } => {
                 let lower = obs.answer.to_lowercase();
                 let passed = if let Some(part) = contains {
@@ -240,6 +254,8 @@ pub fn evaluate(case: &Case, obs: &Observation) -> Vec<CheckResult> {
                     numbers(obs.answer)
                         .iter()
                         .any(|x| (x - n.value).abs() <= n.tol * x.abs().max(n.value.abs()).max(1.))
+                } else if let Some(topics) = asks {
+                    asks_for(topics, obs.answer)
                 } else {
                     false
                 };
@@ -305,6 +321,28 @@ mod tests {
         )
     }
 
+    #[test]
+    fn clarifying_questions_pass_in_any_phrasing_and_statements_do_not() {
+        let topics = ["file", "path", "name"].map(String::from);
+        for ok in [
+            "Which file should I read?",
+            "I would be happy to read your file. Please provide the path to the file you wish to read.",
+            "I need the file name before I can read it.",
+            "You did not specify a path.",
+            "There are two files, a.txt and b.txt. Which one?",
+        ] {
+            assert!(asks_for(&topics, ok), "{ok}");
+        }
+        for bad in [
+            "I would recommend reading the file.",
+            "The file says alpha.",
+            "I cannot assist with reading files.",
+            "Which one do you mean?",
+            "",
+        ] {
+            assert!(!asks_for(&topics, bad), "{bad}");
+        }
+    }
     #[test]
     fn integer_and_float_arguments_match_within_tolerance() {
         let checks = "[[check]]\nkind = \"call\"\ntool = \"calculate\"\nargs = { a = 17, b = 6 }";

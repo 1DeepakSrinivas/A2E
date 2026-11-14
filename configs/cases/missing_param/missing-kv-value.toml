@@ -18,4 +18,4 @@ tool = "kv_set"
 
 [[check]]
 kind = "answer"
-regex = "(?i)\\b(what|which)\\b.*\\bvalue\\b|\\bvalue\\b.*\\?"
+asks = ["value"]

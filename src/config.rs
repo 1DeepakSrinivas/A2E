@@ -228,6 +228,9 @@ pub struct Budget {
     pub task_seconds: u64,
     pub tool_seconds: u64,
     pub tool_output_bytes: usize,
+    /// Consecutive attempts with no completed model call before the rest of a
+    /// model and context group is skipped; 0 never skips.
+    pub stall_attempts: usize,
 }
 impl Default for Budget {
     fn default() -> Self {
@@ -238,6 +241,7 @@ impl Default for Budget {
             task_seconds: 900,
             tool_seconds: 20,
             tool_output_bytes: 8192,
+            stall_attempts: 3,
         }
     }
 }
@@ -247,6 +251,14 @@ pub enum Mode {
     #[default]
     Autonomous,
     Guided,
+    /// Guided with a prompt prefix that never changes, so the prompt cache survives every stage.
+    GuidedStable,
+}
+impl Mode {
+    /// True for the modes that follow a case's workflow stages.
+    pub fn staged(self) -> bool {
+        self != Self::Autonomous
+    }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

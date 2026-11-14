@@ -83,6 +83,7 @@ impl MockServer {
                     "/props" => json!({"chat_template":"mock template"}),
                     "/apply-template" => json!({"prompt":body.to_string()}),
                     "/tokenize" => json!({"tokens":vec![1;prompt_tokens]}),
+                    "/slots" => json!([{"id":0,"is_processing":false}]),
                     "/slots/0?action=erase" => {
                         index.store(0, Ordering::Relaxed);
                         json!({"id_slot":0})
@@ -90,7 +91,7 @@ impl MockServer {
                     "/completion" => {
                         thread::sleep(delay);
                         let i = index.fetch_add(1, Ordering::Relaxed);
-                        json!({"content":outputs.get(i).cloned().unwrap_or_else(||"done".into()),"stop_type":"eos","tokens_cached":0,"timings":{"prompt_n":prompt_tokens,"prompt_ms":2.0,"predicted_n":12,"predicted_ms":4.0}})
+                        json!({"content":outputs.get(i).cloned().unwrap_or_else(||"done".into()),"stop_type":"eos","tokens_evaluated":prompt_tokens,"tokens_cached":prompt_tokens+12,"timings":{"prompt_n":prompt_tokens,"cache_n":0,"prompt_ms":2.0,"predicted_n":12,"predicted_ms":4.0}})
                     }
                     _ => json!({}),
                 };

@@ -18,4 +18,4 @@ tool = "unit_convert"
 
 [[check]]
 kind = "answer"
-regex = "(?i)\\b(unit|from)\\b"
+asks = ["unit", "from", "source"]

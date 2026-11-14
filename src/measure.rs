@@ -181,6 +181,60 @@ fn pi_thermal() -> (Option<f64>, Option<String>) {
     };
     (temp, throttle)
 }
+/// Available system memory in bytes; 0 when the platform does not report it.
+pub fn available_memory() -> u64 {
+    let mut s = System::new();
+    s.refresh_memory();
+    s.available_memory()
+}
+/// Names for the bits of a Pi `get_throttled` reading; empty for a clean or foreign reading.
+pub fn throttle_flags(v: &str) -> Vec<&'static str> {
+    let v = v.trim().to_ascii_lowercase();
+    let v = v.strip_prefix("throttled=").unwrap_or(&v);
+    let Some(bits) = v
+        .strip_prefix("0x")
+        .and_then(|h| u32::from_str_radix(h, 16).ok())
+    else {
+        return Vec::new();
+    };
+    [
+        (0, "under-voltage now"),
+        (1, "frequency capped now"),
+        (2, "throttled now"),
+        (3, "soft temperature limit now"),
+        (16, "under-voltage since boot"),
+        (17, "frequency capped since boot"),
+        (18, "throttled since boot"),
+        (19, "soft temperature limit since boot"),
+    ]
+    .into_iter()
+    .filter(|(bit, _)| bits & (1 << bit) != 0)
+    .map(|(_, name)| name)
+    .collect()
+}
+/// Problems that make timings from this device unrepresentative; shown by `doctor` and before a run.
+pub fn preflight_warnings(r: &Runtime) -> Vec<String> {
+    let mut out = Vec::new();
+    if let (_, Some(t)) = pi_thermal() {
+        let flags = throttle_flags(&t);
+        if !flags.is_empty() {
+            out.push(format!(
+                "{t} ({}); the firmware slows the CPU under these conditions, so fix the power supply or cooling and reboot before measuring",
+                flags.join(", ")
+            ));
+        }
+    }
+    let mut s = System::new();
+    s.refresh_memory();
+    let total_mb = s.total_memory() >> 20;
+    if total_mb > 0 && r.memory_limit_mb > total_mb {
+        out.push(format!(
+            "memory_limit_mb = {} exceeds the {total_mb} MiB of physical memory, so the memory guard cannot trip",
+            r.memory_limit_mb
+        ));
+    }
+    out
+}
 /// True for a reading with no throttling: `throttled=0x0` on the Pi, `Nominal` pressure on the Mac.
 pub fn throttle_clean(v: &str) -> bool {
     let v = v.trim().to_ascii_lowercase();
@@ -547,6 +601,17 @@ mod tests {
         for clean in ["throttled=0x0", "0x0", "Nominal", ""] {
             assert!(throttle_clean(clean), "{clean}");
         }
+        assert_eq!(
+            throttle_flags("throttled=0x50005"),
+            [
+                "under-voltage now",
+                "throttled now",
+                "under-voltage since boot",
+                "throttled since boot"
+            ]
+        );
+        assert!(throttle_flags("throttled=0x0").is_empty());
+        assert!(throttle_flags("Heavy").is_empty());
         for hot in ["throttled=0x50005", "Heavy"] {
             assert!(!throttle_clean(hot), "{hot}");
         }
