@@ -2,6 +2,7 @@
 
 use crate::{
     case::{Case, FinalAnswer},
+    error::HarnessError,
     eval::{CheckResult, FailureClass},
     measure::Resources,
     record::{ToolEntry, Turn},
@@ -152,6 +153,13 @@ pub fn no_call_returned(out: &Outcome) -> bool {
     out.status == Status::ResourceLimit
         && out.model_calls > 0
         && out.turns.iter().all(|t| t.raw_text.is_none())
+}
+/// Status for an error: harness errors map directly; text from other sources is matched by keyword.
+pub fn classify_error(e: &anyhow::Error) -> Status {
+    match e.chain().find_map(|c| c.downcast_ref::<HarnessError>()) {
+        Some(h) => h.status(),
+        None => classify(&format!("{e:#}")),
+    }
 }
 pub fn classify(reason: &str) -> Status {
     if reason.contains("interrupted") {

@@ -6,6 +6,7 @@ pub mod adapter;
 pub mod case;
 pub mod config;
 pub mod dotenv;
+pub mod error;
 pub mod eval;
 pub mod fixtures;
 pub mod inference;
@@ -19,7 +20,7 @@ pub mod store;
 pub mod tools;
 pub mod upload;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::io::Read;
@@ -48,7 +49,9 @@ pub fn read_bounded(mut r: impl Read, max: usize) -> Result<Vec<u8>> {
     let mut out = Vec::new();
     r.by_ref().take(max as u64 + 1).read_to_end(&mut out)?;
     if out.len() > max {
-        bail!("output_limit: response exceeds {max} bytes");
+        return Err(
+            error::HarnessError::OutputLimit(format!("response exceeds {max} bytes")).into(),
+        );
     }
     Ok(out)
 }

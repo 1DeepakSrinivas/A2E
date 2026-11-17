@@ -3,13 +3,14 @@
 use super::{
     attempt::TaskExecution,
     load::{launch, LoadRequest, Loaded, SETTLE},
-    outcome::{classify, no_call_returned, Outcome, Status},
+    outcome::{classify_error, no_call_returned, Outcome, Status},
     task::{task_run, verify_sandbox},
 };
 use crate::{
     adapter::Adapter,
     case::Case,
     config::{Catalog, Config, Model, Suite, Variant},
+    error::HarnessError,
     inference::Server,
     progress::Progress,
     store::{Phase, RunLock},
@@ -419,10 +420,10 @@ impl Study<'_> {
     /// Runs the task, turning any error into an outcome so the attempt is still recorded.
     fn execute(&self, group: &Group, job: &Job, dir: &Path, skip: bool) -> Outcome {
         let result = match &group.launched {
-            _ if skip => Err(anyhow::anyhow!(
-                "model_stalled: skipped after {} attempts with no completed model call",
-                group.stalled
-            )),
+            _ if skip => Err(HarnessError::ModelStalled {
+                attempts: group.stalled,
+            }
+            .into()),
             Ok((server, _)) => server.client.reset().and_then(|_| {
                 task_run(TaskExecution {
                     client: &server.client,
@@ -441,7 +442,7 @@ impl Study<'_> {
             Err(e) => Err(anyhow::anyhow!("{e}")),
         };
         result.unwrap_or_else(|e| Outcome {
-            status: classify(&e.to_string()),
+            status: classify_error(&e),
             reason: Some(e.to_string()),
             ..Default::default()
         })

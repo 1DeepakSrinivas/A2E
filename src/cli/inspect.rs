@@ -215,7 +215,7 @@ fn probe_model(
     let ready = server.ready(c.runtime.startup_seconds, stop);
     let resources = monitor.finish();
     if resources.memory_exceeded {
-        anyhow::bail!("model_load_memory_budget");
+        return Err(a2e::error::HarnessError::ModelLoadMemoryBudget.into());
     }
     let props = ready?;
     let adapter = a2e::adapter::Adapter::new(&m.adapter)?;

@@ -2,7 +2,7 @@
 
 use super::{
     attempt::{Attempt, TaskExecution, Trace},
-    outcome::{classify, failure_class, Outcome, Status},
+    outcome::{classify_error, failure_class, Outcome, Status},
 };
 use crate::{case::Case, config::WebMode, measure::Monitor, record::Turn, tools::Builtins};
 use anyhow::{Context, Result};
@@ -91,7 +91,7 @@ pub fn task_run(x: TaskExecution<'_>) -> Result<Outcome> {
     out.resources = monitor.finish();
     if let Err(e) = process {
         let reason = format!("{e:#}");
-        out.status = classify(&reason);
+        out.status = classify_error(&e);
         out.reason = Some(reason);
     }
     if out.resources.memory_exceeded {

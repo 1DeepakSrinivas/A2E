@@ -2,6 +2,7 @@
 
 use crate::{
     config::Config,
+    error::HarnessError,
     inference::Server,
     measure::{Monitor, Resources},
     upload::{
@@ -9,7 +10,7 @@ use crate::{
         Resume, Uploader,
     },
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use serde_json::Value;
 use std::{
     path::Path,
@@ -47,7 +48,7 @@ pub(super) fn launch(
         let ready = server.ready(x.config.runtime.startup_seconds, x.cancel);
         let resources = monitor.finish();
         if resources.memory_exceeded {
-            bail!("model_load_memory_budget");
+            return Err(HarnessError::ModelLoadMemoryBudget.into());
         }
         let mut props = ready?;
         let template = props["chat_template"]

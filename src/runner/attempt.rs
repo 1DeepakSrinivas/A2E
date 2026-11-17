@@ -5,6 +5,7 @@ use crate::{
     adapter::{final_tool, Action, Adapter, Call},
     case::{Case, Category},
     config::{Catalog, ContextWindow, Mode, Stage, Suite, ToolSpec, Variant},
+    error::HarnessError,
     eval::{evaluate, milestone_score, Observation},
     inference::{Completion, Inference},
     measure::Monitor,
@@ -41,7 +42,7 @@ impl Trace {
 pub(super) fn remaining(deadline: Instant, max: u64) -> Result<Duration> {
     let d = deadline.saturating_duration_since(Instant::now());
     if d.is_zero() {
-        bail!("task_timeout");
+        return Err(HarnessError::TaskTimeout.into());
     }
     Ok(d.min(Duration::from_secs(max)))
 }
@@ -156,10 +157,10 @@ pub(super) struct Attempt<'a> {
 impl Attempt<'_> {
     fn guard(&self) -> Result<()> {
         if self.x.cancel.load(Ordering::Relaxed) {
-            bail!("interrupted");
+            return Err(HarnessError::Interrupted.into());
         }
         if self.monitor.exceeded.load(Ordering::Relaxed) {
-            bail!("memory_budget");
+            return Err(HarnessError::MemoryBudget.into());
         }
         Ok(())
     }
