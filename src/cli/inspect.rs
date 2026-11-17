@@ -35,6 +35,57 @@ pub enum CasesCommand {
 }
 
 #[derive(Subcommand)]
+pub enum ConfigCommand {
+    /// Print the final settings
+    Show {
+        /// Also print which layer set each key
+        #[arg(long)]
+        source: bool,
+    },
+    /// Load every layer and report errors
+    Check,
+    /// Create configs/local.toml from the example, if it is missing
+    Init,
+}
+
+/// Settings commands; layers are explained in docs/CONFIG.md.
+pub fn config(path: &Path, command: &ConfigCommand) -> Result<Value> {
+    match command {
+        ConfigCommand::Check => {
+            let c = Config::load(path)?;
+            Ok(
+                json!({"ok": true, "host": c.host_id, "host_file": c.host_file, "models": c.models.len()}),
+            )
+        }
+        ConfigCommand::Show { source } => {
+            let c = Config::load(path)?;
+            let settings = serde_json::to_value(&c.settings)?;
+            if !source {
+                return Ok(settings);
+            }
+            let mut out = serde_json::Map::new();
+            for (section, keys) in settings.as_object().into_iter().flatten() {
+                for (key, value) in keys.as_object().into_iter().flatten() {
+                    let name = format!("{section}.{key}");
+                    let from = c.layers.source.get(&name).map_or("default", String::as_str);
+                    out.insert(name, json!({"value": value, "source": from}));
+                }
+            }
+            Ok(Value::Object(out))
+        }
+        ConfigCommand::Init => {
+            let dir = path.parent().unwrap_or(Path::new("."));
+            let (local, example) = (dir.join("local.toml"), dir.join("local.example.toml"));
+            if local.exists() {
+                return Ok(json!({"created": false, "path": local}));
+            }
+            std::fs::copy(&example, &local)?;
+            Ok(json!({"created": true, "path": local}))
+        }
+    }
+}
+
+#[derive(Subcommand)]
 pub enum SandboxCommand {
     /// Generate the sandbox tree
     Init {
@@ -78,7 +129,7 @@ pub fn sandbox(command: &SandboxCommand) -> Result<Value> {
 
 pub fn upload(config: &Path, status: bool) -> Result<Value> {
     let config = Config::load(config)?;
-    let mut uploader = a2e::upload::Uploader::open(&expand_path(&config.runtime.output_dir))?;
+    let mut uploader = a2e::upload::Uploader::open(&expand_path(&config.settings.host.output_dir))?;
     Ok(serde_json::to_value(if status {
         uploader.status()?
     } else {
@@ -149,7 +200,7 @@ pub fn cases(command: &CasesCommand) -> Result<Value> {
 pub fn doctor(config_path: &Path, probe: bool, stop: Arc<AtomicBool>) -> Result<Value> {
     let c = Config::load(config_path)?;
     let machine =
-        a2e::measure::machine(&c.runtime).unwrap_or_else(|e| json!({"error":e.to_string()}));
+        a2e::measure::machine(&c.settings).unwrap_or_else(|e| json!({"error":e.to_string()}));
     let models = c
         .models
         .iter()
@@ -160,10 +211,10 @@ pub fn doctor(config_path: &Path, probe: bool, stop: Arc<AtomicBool>) -> Result<
         "host_file": c.host_file,
         "machine": machine,
         "telemetry": a2e::measure::telemetry(),
-        "warnings": a2e::measure::preflight_warnings(&c.runtime),
+        "warnings": a2e::measure::preflight_warnings(&c.settings),
         "models": models,
-        "llama_server": c.runtime.llama_server,
-        "expected_llama_commit": c.runtime.llama_commit,
+        "llama_server": c.settings.llama.server,
+        "expected_llama_commit": c.settings.llama.commit,
         "pi_energy": "unavailable without a supported measurement source",
     }))
 }
@@ -180,7 +231,7 @@ fn model_report(
     if let Ok(file) = std::fs::metadata(&path) {
         // Weights are mapped from the file and must stay in the page cache while the model runs
         let (weights, available) = (file.len() >> 20, a2e::measure::available_memory() >> 20);
-        let headroom = available as i64 - weights as i64 - c.runtime.reserve_mb as i64;
+        let headroom = available as i64 - weights as i64 - c.settings.limits.reserve_mb as i64;
         item["memory"] = json!({
             "weights_mib": weights,
             "available_mib": available,
@@ -211,7 +262,7 @@ fn probe_model(
     stop: &Arc<AtomicBool>,
 ) -> Result<Value> {
     use std::time::Duration;
-    let root = expand_path(&c.runtime.output_dir);
+    let root = expand_path(&c.settings.host.output_dir);
     let _lock = a2e::store::RunLock::acquire(&root)?;
     let dir = root.join("probes").join(&m.id);
     std::fs::create_dir_all(&dir)?;
@@ -219,8 +270,8 @@ fn probe_model(
         anyhow::bail!("device preflight failed");
     }
     let mut server = a2e::inference::Server::spawn(c, m, 1024, &dir)?;
-    let monitor = a2e::measure::Monitor::start(server.pid(), &c.runtime, stop.clone())?;
-    let ready = server.ready(c.runtime.startup_seconds, stop);
+    let monitor = a2e::measure::Monitor::start(server.pid(), &c.settings, stop.clone())?;
+    let ready = server.ready(c.settings.llama.startup_seconds, stop);
     let resources = monitor.finish();
     if resources.memory_exceeded {
         return Err(a2e::error::HarnessError::ModelLoadMemoryBudget.into());

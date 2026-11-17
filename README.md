@@ -55,7 +55,7 @@ Results are saved under `results`. Judging, scoring and reports live in the A2E-
 - A host is a file named `configs/hosts/<user>@<hostname>.toml`. The program loads the one that matches the current user and host, or the one named by `A2E_HOST_ID`. It prints a warning when none matches.
 - A model is an entry in `configs/models.toml`. A suite with no `models` line runs every model in that file, and `--model` narrows the run to some of them.
 - A variant is a block in `configs/variants.toml`. A suite lists the ones it wants in `use_variants`, and `--variant` narrows the run.
-- Settings that only apply to one machine go in `configs/local.toml`, which Git ignores.
+- Settings that only apply to one machine go in `configs/local.toml`, which Git ignores. Every setting, its default and the order of the layers are in `docs/CONFIG.md`, and `a2e config show --source` prints what a run will use.
 
 ## Suites
 

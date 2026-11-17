@@ -165,3 +165,21 @@ fn file_paths_in_the_docs_exist() {
         missing.join("\n")
     );
 }
+
+#[test]
+fn every_setting_is_documented_in_config_md() {
+    let text = std::fs::read_to_string(repo().join("docs/CONFIG.md")).unwrap();
+    let defaults = serde_json::to_value(a2e::settings::Settings::default()).unwrap();
+    for (section, keys) in defaults.as_object().unwrap() {
+        assert!(
+            text.contains(&format!("## {section}")),
+            "docs/CONFIG.md has no section {section}"
+        );
+        for key in keys.as_object().unwrap().keys() {
+            assert!(
+                text.contains(&format!("`{key}`")),
+                "docs/CONFIG.md does not document {section}.{key}"
+            );
+        }
+    }
+}

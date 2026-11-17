@@ -98,7 +98,7 @@ pub fn task_run(x: TaskExecution<'_>) -> Result<Outcome> {
         out.status = Status::ResourceLimit;
         out.reason = Some("memory_budget".into());
     }
-    if x.runtime.power == "required" && out.resources.energy_j.is_none() {
+    if x.runtime.host.power == "required" && out.resources.energy_j.is_none() {
         out.status = Status::InfrastructureFailure;
         out.reason = Some("required power samples unavailable".into());
     }

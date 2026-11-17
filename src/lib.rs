@@ -16,6 +16,7 @@ pub mod progress;
 pub mod record;
 pub mod runner;
 pub mod sandbox;
+pub mod settings;
 pub mod store;
 pub mod tools;
 pub mod upload;

@@ -19,7 +19,7 @@ rust_version() {
     [[ "$v" == *.*.* ]] || v="$v.0"
     echo "$v"
 }
-llama_pin() { sed -n 's/^llama_commit = "\([0-9a-f]*\)"$/\1/p' configs/models.toml; }
+llama_pin() { sed -n 's/^commit = "\([0-9a-f]*\)"$/\1/p' configs/models.toml; }
 
 detect_platform() {
     if [[ "$(uname -s)" == Linux && "$(uname -m)" == aarch64 ]] && command -v apt-get >/dev/null &&

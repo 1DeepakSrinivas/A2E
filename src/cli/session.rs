@@ -167,6 +167,9 @@ fn queue_command(
     if local {
         command.push("--local".into());
     }
+    for item in a2e::config::overrides() {
+        command.extend(["--set".into(), item.clone()]);
+    }
     command.extend([
         "queue".into(),
         "--log".into(),
@@ -238,7 +241,7 @@ pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value>
         .with_context(|| format!("suite {s} does not plan"))?;
     }
     let config = Config::load(config_path)?;
-    let logs = expand_path(&config.runtime.output_dir).join("logs");
+    let logs = expand_path(&config.settings.host.output_dir).join("logs");
     std::fs::create_dir_all(&logs)?;
     let name = session_name(&suites);
     let log = logs.join(format!("{name}-{}.log", stamp()));
@@ -276,6 +279,11 @@ pub fn queue(args: &QueueArgs, stop: Arc<AtomicBool>) -> Result<Value> {
         let mut child = Command::new(&exe)
             .arg("--config")
             .arg(&args.config)
+            .args(
+                a2e::config::overrides()
+                    .iter()
+                    .flat_map(|i| ["--set", i.as_str()]),
+            )
             .args(["run", suite])
             .args(&args.rest)
             .stdout(Stdio::piped())
@@ -339,7 +347,7 @@ pub fn status(config_path: &Path, name: &str) -> Result<Value> {
 fn latest_log(config_path: &Path, name: &str) -> Result<PathBuf> {
     check_name(name)?;
     let config = Config::load(config_path)?;
-    let dir = expand_path(&config.runtime.output_dir).join("logs");
+    let dir = expand_path(&config.settings.host.output_dir).join("logs");
     let prefix = format!("{name}-");
     std::fs::read_dir(&dir)
         .with_context(|| format!("no log folder at {}", dir.display()))?
@@ -374,7 +382,7 @@ pub fn log_names(config_path: &Path) -> Vec<String> {
     let Ok(config) = Config::load(config_path) else {
         return Vec::new();
     };
-    let dir = expand_path(&config.runtime.output_dir).join("logs");
+    let dir = expand_path(&config.settings.host.output_dir).join("logs");
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .into_iter()
         .flatten()

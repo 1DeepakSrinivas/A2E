@@ -157,7 +157,8 @@ impl Server {
     /// Pinned inference process on loopback.
     pub fn spawn(c: &Config, m: &Model, ctx: usize, dir: &Path) -> Result<Self> {
         std::fs::create_dir_all(dir.join("slots"))?;
-        let binary = crate::config::expand_path(&c.runtime.llama_server);
+        let llama = &c.settings_for(m).llama;
+        let binary = crate::config::expand_path(&llama.server);
         let version = Command::new(&binary)
             .arg("--version")
             .output()
@@ -167,44 +168,16 @@ impl Server {
             String::from_utf8_lossy(&version.stdout),
             String::from_utf8_lossy(&version.stderr)
         );
-        if !version.contains(&c.runtime.llama_commit[..8]) {
-            bail!("llama_commit_mismatch: expected {}", c.runtime.llama_commit);
+        if !version.contains(&llama.commit[..8]) {
+            bail!("llama_commit_mismatch: expected {}", llama.commit);
         }
-        let client = Inference::new(format!("http://127.0.0.1:{}", c.runtime.port))?;
+        let client = Inference::new(format!("http://{}:{}", llama.host, llama.port))?;
         if client.get("/health").is_ok() {
             bail!("inference port is already occupied");
         }
         let started = Instant::now();
         let child = Command::new(binary)
-            .args([
-                "--host",
-                "127.0.0.1",
-                "--port",
-                &c.runtime.port.to_string(),
-                "--model",
-                &c.model_path(m).to_string_lossy(),
-                "--ctx-size",
-                &ctx.to_string(),
-                "--threads",
-                &c.runtime.threads.to_string(),
-                "--n-gpu-layers",
-                &c.runtime.gpu_layers.to_string(),
-                "--parallel",
-                "1",
-                "--batch-size",
-                "128",
-                "--ubatch-size",
-                "64",
-                "--jinja",
-                "--special",
-                "--no-context-shift",
-                // The host-memory prompt cache defaults to 8 GiB and grows the server between tasks
-                "--cache-ram",
-                "0",
-                "--slots",
-                "--slot-save-path",
-                &dir.join("slots").to_string_lossy(),
-            ])
+            .args(llama.args(&c.model_path(m), ctx, &dir.join("slots")))
             .stdin(Stdio::null())
             .stdout(Stdio::from(std::fs::File::create(
                 dir.join("server.stdout"),

@@ -1,15 +1,6 @@
-[runtime]
-llama_commit = "6666a7330c5375dc310ddea1f9621a7770430010"
-llama_server = "deps/llama.cpp/build-a2e/bin/llama-server"
-models_dir = "models"
-output_dir = "results"
-device = "auto"
-threads = 4
-gpu_layers = 0
-memory_limit_mb = 768
-reserve_mb = 128
-sample_ms = 500
-power = "auto"
+# Pinned llama.cpp commit and the model list. Every other setting is in settings.toml.
+[llama]
+commit = "6666a7330c5375dc310ddea1f9621a7770430010"
 
 [[models]]
 id = "functiongemma-270m"

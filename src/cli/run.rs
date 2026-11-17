@@ -143,7 +143,7 @@ fn dry_run(l: &Loaded, plan: Value) -> Value {
             json!({"id":m.id,"path":path,"exists":path.exists(),"size_mib":std::fs::metadata(&path).ok().map(|f| f.len() >> 20)})
         })
         .collect();
-    let server = expand_path(&l.config.runtime.llama_server);
+    let server = expand_path(&l.config.settings.llama.server);
     let missing: Vec<String> = models
         .iter()
         .filter(|m| m["exists"] == false)

@@ -21,7 +21,7 @@ struct Last {
 
 impl Last {
     fn path(config: &Config) -> std::path::PathBuf {
-        expand_path(&config.runtime.output_dir).join(".last-run.toml")
+        expand_path(&config.settings.host.output_dir).join(".last-run.toml")
     }
     fn load(config: &Config) -> Self {
         std::fs::read_to_string(Self::path(config))
