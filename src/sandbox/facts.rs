@@ -1,6 +1,6 @@
-// sandbox/facts.rs
-// Planted files with fixed contents: answers, near-duplicates, traps, and limit cases
-// Case files check these literals, so they do not depend on the seed
+//! Planted files with fixed contents: answers, near-duplicates, traps, and limit cases.
+//!
+//! Case files check these literals, so they do not depend on the seed.
 
 use super::{filler, Entry};
 use std::collections::BTreeSet;
@@ -56,7 +56,6 @@ fn log_with(seed: u64, bytes: usize, replace: &[(usize, &str)], tail: Option<&st
 
 pub fn planted() -> Vec<Entry> {
     let mut v = vec![
-        // Hidden and nested config
         Entry::file("home/.hidden_notes", "reminder: the locker code 5827 is for the gym\n", 12),
         Entry::file(
             "home/.config/app/settings.ini",
@@ -65,7 +64,6 @@ pub fn planted() -> Vec<Entry> {
         ),
         Entry::file("home/.config/app/locked.conf", "mode = locked\n", 30).readonly(),
         Entry::file("home/.bash_history", "ls -a\ncd projects\ngrep -rn TODO .\ntail logs/app.log\n", 40),
-        // Logs
         Entry::file(
             "logs/app.log",
             log_with(
@@ -85,7 +83,6 @@ pub fn planted() -> Vec<Entry> {
             log_with(0xB16, 100_000, &[], Some("2026-01-31 23:59:59 INFO final note: maintenance passcode 7731")),
             149,
         ),
-        // Projects
         Entry::file(
             "projects/sensor-fw/src/config.h",
             "#define SAMPLE_RATE_HZ 250\n#define BUFFER_SIZE 64\n#define UART_BAUD 115200\n",
@@ -103,14 +100,12 @@ pub fn planted() -> Vec<Entry> {
             33,
         ),
         Entry::dir("projects/notes-cli/build"),
-        // Near-duplicates and awkward names
         Entry::file("archive/old/report_final.txt", "Quarterly report\nQ3 revenue: 120 (approved)\n", 10),
         Entry::file("archive/old/report-final.txt", "Quarterly report\nQ3 revenue: 120 DRAFT\n", 11),
         Entry::file("archive/old/report_final_v2.txt", "Quarterly report\nQ3 revenue: 134 (revised)\n", 40),
         Entry::file("archive/old/old report.txt", "Quarterly report\nQ2 revenue: 98\n", 5),
         Entry::file("archive/old/café menu.txt", "Espresso 3.20\nCroissant 2.80\n", 6),
         Entry::dir("archive/empty"),
-        // Notes, docs, data
         Entry::file(
             "notes/2026-03/meeting.txt",
             "Attendees: four\nAction: send the invoice to Dana by Friday\nNext meeting in two weeks\n",
@@ -131,7 +126,6 @@ pub fn planted() -> Vec<Entry> {
             "{\n  \"devices\": [\n    {\"name\": \"fan_1\", \"temp_c\": 41.5},\n    {\"name\": \"pump_2\", \"temp_c\": 55.0}\n  ],\n  \"peak_temp_c\": 78.2\n}\n",
             71,
         ),
-        // Limit cases
         Entry::file("data/blob.bin", vec![0xFF, 0xFE, 0x00, 0x80, 0xC3, 0x28, 0xA0, 0xA1], 90),
         Entry::file("data/export_full.csv", export_full(), 91),
         Entry::dir("scratch"),

@@ -1,5 +1,4 @@
 name = "smoke"
-models = ["functiongemma-270m", "qwen3-0.6b", "lfm2.5-1.2b-instruct-qad"]
 contexts = [1024]
 cases = ["../cases"]
 tags = ["smoke"]
@@ -8,11 +7,4 @@ web_mode = "fixture"
 warmup = 0
 repeats = 1
 seed = 0
-
-[[variants]]
-name = "autonomous"
-mode = "autonomous"
-
-[[variants]]
-name = "guided"
-mode = "guided"
+use_variants = ["autonomous", "guided"]

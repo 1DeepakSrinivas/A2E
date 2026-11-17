@@ -1,6 +1,6 @@
-// tools/misc.rs
-// Arithmetic and simulated device tools
-// Two-operand calculation and bounded device settings
+//! Arithmetic and simulated device tools.
+//!
+//! Two-operand calculation and bounded device settings.
 
 use super::{string, Registry, World};
 use anyhow::{bail, Context, Result};
@@ -41,6 +41,19 @@ fn set_setting(w: &mut World, a: &Value) -> Result<Value> {
         .context("unknown device")?;
     d["setting"] = json!(value);
     Ok(json!({"setting":value}))
+}
+pub fn initialize(w: &mut World, fixtures: &crate::fixtures::Fixtures) -> Result<()> {
+    w.devices = fixtures.devices.clone();
+    w.clock = fixtures
+        .clock
+        .clone()
+        .unwrap_or_else(|| "2026-01-01T00:00:00Z".into());
+    super::parse_date(&w.clock)?;
+    Ok(())
+}
+pub fn snapshot(w: &World, state: &mut Value) {
+    state["devices"] = json!(w.devices);
+    state["clock"] = json!(w.clock);
 }
 pub fn register(r: &mut Registry) {
     r.insert("calculate", calculate);

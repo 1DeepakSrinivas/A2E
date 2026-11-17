@@ -1,9 +1,9 @@
-// tools/store.rs
-// Task-scoped key-value, note, and todo stores
-// Small bounded collections with 1-based IDs
+//! Task-scoped key-value, note, and todo stores.
+//!
+//! Small bounded collections with 1-based IDs.
 
 use super::{string, words, Registry, World};
-use crate::fixtures::{Note, Todo};
+use crate::fixtures::{Fixtures, Note, Todo};
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
 
@@ -115,6 +115,16 @@ fn todo_list(w: &mut World, a: &Value) -> Result<Value> {
         .map(|(i, t)| todo_json(i, t))
         .collect::<Vec<_>>();
     Ok(json!({"todos":todos}))
+}
+pub fn initialize(w: &mut World, fixtures: &Fixtures) {
+    w.kv = fixtures.kv.clone();
+    w.notes = fixtures.notes.clone();
+    w.todos = fixtures.todos.clone();
+}
+pub fn snapshot(w: &World, state: &mut Value) {
+    state["kv"] = json!(w.kv);
+    state["notes"] = json!(w.notes);
+    state["todos"] = json!(w.todos);
 }
 pub fn register(r: &mut Registry) {
     r.insert("kv_set", kv_set);

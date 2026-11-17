@@ -1,10 +1,9 @@
-// case.rs
-// Benchmark cases defined in TOML files
-// Typed scope, checks, judge handoff, validation, and directory loading
+//! Benchmark cases defined in TOML files.
+//!
+//! Typed scope, judge handoff, validation, and directory loading. Checks live in `eval`.
 
-use crate::{config::Stage, fixtures::Fixtures, tools};
+use crate::{config::Stage, eval::Check, fixtures::Fixtures, tools};
 use anyhow::{bail, Context, Result};
-use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -129,134 +128,6 @@ pub fn tolerance() -> f64 {
     1e-9
 }
 
-/// One typed outcome check against observed calls, final state, or the answer.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
-pub enum Check {
-    Call {
-        tool: String,
-        args: Option<Value>,
-        #[serde(default, rename = "match")]
-        mode: MatchMode,
-        min: Option<usize>,
-        max: Option<usize>,
-        #[serde(default = "tolerance")]
-        tol: f64,
-    },
-    NoCall {
-        tool: String,
-    },
-    CallOrder {
-        tools: Vec<String>,
-    },
-    CallsAtMost {
-        max: usize,
-    },
-    File {
-        path: String,
-        eq: Option<String>,
-        contains: Option<String>,
-        regex: Option<String>,
-        json_eq: Option<Value>,
-        #[serde(default)]
-        absent: bool,
-        #[serde(default)]
-        present: bool,
-    },
-    State {
-        path: String,
-        eq: Value,
-    },
-    Answer {
-        contains: Option<String>,
-        not_contains: Option<String>,
-        regex: Option<String>,
-        exact: Option<String>,
-        number: Option<Number>,
-        /// Topics a clarifying question may name; see `eval::asks_for`.
-        asks: Option<Vec<String>>,
-    },
-    FetchedUrl {
-        url: String,
-    },
-    FetchedSource {
-        id: String,
-    },
-    FetchedCount {
-        min: usize,
-    },
-}
-impl Check {
-    fn validate(&self, allowed: &BTreeSet<&str>) -> Result<()> {
-        let known = |t: &String| {
-            allowed
-                .contains(t.as_str())
-                .then_some(())
-                .with_context(|| format!("check references tool {t} outside tools.allowed"))
-        };
-        let pattern = |p: &Option<String>| match p {
-            Some(p) => Regex::new(p)
-                .map(|_| ())
-                .with_context(|| format!("invalid regex {p}")),
-            None => Ok(()),
-        };
-        match self {
-            Self::Call { tool, .. } | Self::NoCall { tool } => known(tool)?,
-            Self::CallOrder { tools } => tools.iter().try_for_each(known)?,
-            Self::File {
-                eq,
-                contains,
-                regex,
-                json_eq,
-                absent,
-                present,
-                path,
-            } => {
-                let set = usize::from(eq.is_some())
-                    + usize::from(contains.is_some())
-                    + usize::from(regex.is_some())
-                    + usize::from(json_eq.is_some())
-                    + usize::from(*absent)
-                    + usize::from(*present);
-                if set != 1 || path.is_empty() {
-                    bail!("file check {path} needs a path and exactly one matcher");
-                }
-                pattern(regex)?;
-            }
-            Self::State { path, .. } if !path.starts_with('/') => {
-                bail!("state path {path} must be a JSON pointer")
-            }
-            Self::Answer {
-                contains,
-                not_contains,
-                regex,
-                exact,
-                number,
-                asks,
-            } => {
-                let set = usize::from(contains.is_some())
-                    + usize::from(not_contains.is_some())
-                    + usize::from(regex.is_some())
-                    + usize::from(exact.is_some())
-                    + usize::from(number.is_some())
-                    + usize::from(asks.is_some());
-                if set != 1 {
-                    bail!("answer check needs exactly one matcher");
-                }
-                if asks
-                    .as_ref()
-                    .is_some_and(|a| a.is_empty() || a.iter().any(|t| t.trim().is_empty()))
-                {
-                    bail!("asks needs at least one non-empty topic");
-                }
-                pattern(regex)?;
-            }
-            _ => (),
-        }
-        Ok(())
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Case {
@@ -284,7 +155,6 @@ pub struct Case {
     pub golden_answer: Option<String>,
 }
 impl Case {
-    /// Structure and cross-reference checks against the tool registry.
     pub fn validate(&self, registry: &BTreeSet<&str>) -> Result<()> {
         let id = &self.id;
         if id.is_empty()

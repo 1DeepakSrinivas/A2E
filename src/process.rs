@@ -1,6 +1,6 @@
-// process.rs
-// Bounded line reads and process-group cleanup for managed children
-// Used by the llama-server launcher and the power sampler
+//! Bounded line reads and process-group cleanup for managed children.
+//!
+//! Used by the llama-server launcher and the power sampler.
 
 use anyhow::{bail, Result};
 use std::{io::BufRead, process::Child};
@@ -23,7 +23,7 @@ pub fn line(reader: &mut impl BufRead, max: usize) -> Result<Option<Vec<u8>>> {
             .map(|i| i + 1)
             .unwrap_or(b.len());
         if out.len() + n > max {
-            bail!("output_limit: line too large");
+            return Err(crate::error::HarnessError::OutputLimit("line too large".into()).into());
         }
         let done = b[n - 1] == b'\n';
         out.extend_from_slice(&b[..n]);

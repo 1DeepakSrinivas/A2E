@@ -1,6 +1,6 @@
-// sandbox/filler.rs
-// Seeded noise files around the planted facts: projects, logs, notes, mail, data, archive, home
-// Vocabulary avoids every planted needle; a test checks each needle appears once
+//! Seeded noise files around the planted facts: projects, logs, notes, mail, data, archive, home.
+//!
+//! Vocabulary avoids every planted needle; a test checks each needle appears once.
 
 use super::Entry;
 use std::collections::BTreeSet;
@@ -31,7 +31,6 @@ impl Rng {
     pub fn new(seed: u64) -> Self {
         Self(seed)
     }
-    /// splitmix64 step.
     pub fn next(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
@@ -137,7 +136,6 @@ pub fn generate(seed: u64, taken: &BTreeSet<String>) -> Vec<Entry> {
         }
     };
 
-    // Projects
     for (name, ext, comment) in [
         ("webapp", "js", "//"),
         ("sensor-fw", "c", "//"),
@@ -161,7 +159,6 @@ pub fn generate(seed: u64, taken: &BTreeSet<String>) -> Vec<Entry> {
         }
     }
 
-    // Logs
     for n in 1..=5 {
         let body = log_lines(&mut r, 90_000).join("\n") + "\n";
         add(Entry::file(
@@ -171,7 +168,6 @@ pub fn generate(seed: u64, taken: &BTreeSet<String>) -> Vec<Entry> {
         ));
     }
 
-    // Notes
     for month in 1..=6 {
         for n in 1..=6 {
             let w = r.word();
@@ -184,7 +180,6 @@ pub fn generate(seed: u64, taken: &BTreeSet<String>) -> Vec<Entry> {
         }
     }
 
-    // Mail
     for n in 1..=40 {
         let (a, b) = (r.word(), r.word());
         let size = 800 + r.below(1500);
@@ -206,7 +201,6 @@ pub fn generate(seed: u64, taken: &BTreeSet<String>) -> Vec<Entry> {
         ));
     }
 
-    // Docs
     for n in 1..=20 {
         let w = r.word();
         let size = 2500 + r.below(3000);
@@ -217,7 +211,6 @@ pub fn generate(seed: u64, taken: &BTreeSet<String>) -> Vec<Entry> {
         ));
     }
 
-    // Data
     for m in 1..=12 {
         let size = 15_000 + r.below(10_000);
         add(Entry::file(
@@ -235,7 +228,6 @@ pub fn generate(seed: u64, taken: &BTreeSet<String>) -> Vec<Entry> {
         ));
     }
 
-    // Archive
     for year in [2024, 2025] {
         for q in 1..=4 {
             let size = 2000 + r.below(2500);
@@ -255,7 +247,6 @@ pub fn generate(seed: u64, taken: &BTreeSet<String>) -> Vec<Entry> {
         ));
     }
 
-    // Home
     for n in 1..=20 {
         let size = 3000 + r.below(6000);
         add(Entry::file(

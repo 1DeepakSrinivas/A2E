@@ -1,6 +1,6 @@
-// tools/text.rs
-// Text and data tools: JSON lookup, CSV filter, regex extraction, word count
-// Small bounded inputs; regexes use the linear-time engine with a size cap
+//! Text and data tools: JSON lookup, CSV filter, regex extraction, word count.
+//!
+//! Small bounded inputs; regexes use the linear-time engine with a size cap.
 
 use super::{files::read_text, string, Registry, World};
 use crate::text_limit;

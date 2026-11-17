@@ -155,7 +155,7 @@ pub fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> Outcome
     };
     task_run(TaskExecution {
         client: &client,
-        adapter: Adapter::Qwen,
+        adapter: Adapter::QWEN3,
         case: t,
         suite: s,
         variant: v,

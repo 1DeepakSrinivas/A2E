@@ -1,6 +1,6 @@
-// measure.rs
-// Device preflight and resource sampling during model loads and tasks
-// Process memory, CPU time, Pi thermals, and optional Mac power readings
+//! Device preflight and resource sampling during model loads and tasks.
+//!
+//! Process memory, CPU time, Pi thermals, and optional Mac power readings.
 
 use crate::config::Runtime;
 use anyhow::{bail, Result};
@@ -53,7 +53,6 @@ pub struct Resources {
     #[serde(skip)]
     pub series: Vec<Sample>,
 }
-/// Device and swap preflight for the baseline.
 pub fn machine(r: &Runtime) -> Result<Value> {
     let mut s = System::new();
     s.refresh_memory();
@@ -243,7 +242,7 @@ pub fn throttle_clean(v: &str) -> bool {
 }
 const POWERMETRICS: &str = "/usr/bin/powermetrics";
 const POWERMETRICS_ARGS: [&str; 4] = ["--samplers", "cpu_power,gpu_power,thermal", "-i", "500"];
-pub const TELEMETRY_SETUP: &str = "bash scripts/setup_mac_telemetry.sh";
+pub const TELEMETRY_SETUP: &str = "./setup.sh telemetry";
 fn is_root() -> bool {
     // SAFETY: No memory preconditions
     unsafe { libc::geteuid() == 0 }
@@ -389,7 +388,6 @@ pub struct Monitor {
     thread: Option<thread::JoinHandle<()>>,
 }
 impl Monitor {
-    /// Background sampling for one loading or task interval.
     pub fn start(pid: u32, r: &Runtime, cancel: Arc<AtomicBool>) -> Result<Self> {
         let power = if r.power != "none" && std::env::consts::OS == "macos" {
             match Power::start() {

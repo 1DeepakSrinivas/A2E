@@ -1,6 +1,6 @@
-// dotenv.rs
-// Loads KEY=VALUE pairs from .env files into the process environment
-// Variables already set in the environment take precedence over the file
+//! Loads KEY=VALUE pairs from .env files into the process environment.
+//!
+//! Variables already set in the environment take precedence over the file.
 
 use anyhow::{Context, Result};
 use std::path::Path;
@@ -59,7 +59,7 @@ pub fn load_only(path: &Path, keys: &[&str]) -> Result<()> {
 /// Variables the runner takes from the file named by `A2E_RESULTS_ENV`.
 const RESULTS_KEYS: [&str; 2] = ["WORKER_URL", "WRITE_TOKEN"];
 
-pub(crate) fn local_only() -> bool {
+pub fn local_only() -> bool {
     std::env::var_os("A2E_LOCAL").is_some_and(|value| value == "1")
 }
 

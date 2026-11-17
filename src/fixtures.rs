@@ -1,6 +1,6 @@
-// fixtures.rs
-// Typed task fixtures shared by case files and the built-in tool host
-// Files, devices, pages, stores, clock, database seed, and injected faults
+//! Typed task fixtures shared by case files and the built-in tool host.
+//!
+//! Files, devices, pages, stores, clock, database seed, and injected faults.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

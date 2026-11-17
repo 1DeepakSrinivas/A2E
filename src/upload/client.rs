@@ -1,6 +1,6 @@
-// upload/client.rs
-// Blocking HTTP client for the A2E-Results Worker write routes
-// Replies are classified as stored, retryable, or rejected
+//! Blocking HTTP client for the A2E-Results Worker write routes.
+//!
+//! Replies are classified as stored, retryable, or rejected.
 
 use crate::read_bounded;
 use anyhow::{Context, Result};
@@ -76,7 +76,6 @@ impl Client {
         classify(status.as_u16(), &text)
     }
 }
-/// Maps an HTTP status and body to a reply.
 pub fn classify(status: u16, body: &str) -> Reply {
     let value: Value = serde_json::from_str(body).unwrap_or(Value::Null);
     if (200..300).contains(&status) {

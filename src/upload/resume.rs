@@ -1,6 +1,6 @@
-// upload/resume.rs
-// Per-device resume state: finished attempts per job and loads per study
-// Append-only JSON lines; the Worker has no read route for the runner
+//! Per-device resume state: finished attempts per job and loads per study.
+//!
+//! Append-only JSON lines; the Worker has no read route for the runner.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -41,7 +41,7 @@ impl Resume {
             loads: HashMap::new(),
         };
         let text = std::fs::read_to_string(path).unwrap_or_default();
-        for line in text.lines() {
+        for (n, line) in text.lines().enumerate() {
             match serde_json::from_str(line) {
                 Ok(Line::Job {
                     study,
@@ -53,7 +53,11 @@ impl Resume {
                     s.jobs.insert((study, job), (attempt, state, status));
                 }
                 Ok(Line::Load { study }) => *s.loads.entry(study).or_default() += 1,
-                Err(_) => {}
+                Err(e) => eprintln!(
+                    "warning: {} line {} was skipped and its attempt may run again: {e}",
+                    path.display(),
+                    n + 1
+                ),
             }
         }
         Ok(s)

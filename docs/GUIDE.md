@@ -16,19 +16,19 @@ registry records the exact files, revisions, and published hashes.
 ## Setup
 
 Run `./setup.sh` as your normal user on a Pi 3B+ with 64-bit Raspberry Pi OS
-or on an Apple Silicon Mac. It runs these steps, each a script that can be run
-alone and repeated:
+or on an Apple Silicon Mac. It runs these steps, and each one can be repeated:
 
-1. `scripts/setup/deps.sh` installs the packages (APT or Homebrew), tmux and
-   Rust 1.96.0. The Pi uses sudo for APT.
-2. `scripts/build_llama.sh` builds the pinned llama.cpp commit and checks that
-   `llama-server --version` contains the first 8 characters of the commit,
-   which the runner requires. It builds with one job on the Pi.
-3. `scripts/setup/build.sh` builds `target/release/a2e`.
-4. `a2e models fetch` downloads the models and checks their hashes.
-5. `scripts/init_sandbox.sh` generates and verifies the file sandbox.
-6. `scripts/setup/checks.sh` validates tools and cases and runs `doctor`
-   (`doctor --probe` on the Mac).
+1. It installs the packages (APT or Homebrew), tmux and the Rust version named
+   by `rust-version` in `Cargo.toml`. The Pi uses sudo for APT.
+2. It builds the llama.cpp commit pinned by `llama_commit` in
+   `configs/models.toml` and checks that `llama-server --version` contains the
+   first 8 characters of the commit, which the runner requires. It builds with
+   one job on the Pi.
+3. It builds `target/release/a2e`.
+4. It runs `a2e models fetch`, which downloads the models and checks their hashes.
+5. It runs `a2e sandbox init` and `a2e sandbox verify` to generate and check the
+   file sandbox.
+6. It validates tools and cases and runs `doctor` (`doctor --probe` on the Mac).
 
 Use `--skip-llama` or `--skip-models` to repeat setup without those steps.
 Builds may need temporary swap on a 1 GB device. The Pi baseline refuses to run
@@ -36,48 +36,59 @@ with swap on, so disable it before measuring. See [RUNBOOK.md](RUNBOOK.md).
 
 The checkout and build live under `deps/llama.cpp`. Git ignores the local
 dependencies, models, and results. Run setup on each machine to build for its
-architecture. Copy `configs/local.example.toml` to
-`configs/local.toml` to override machine settings. A different memory
-limit or GPU setting produces a separate study.
+architecture.
 
-Each device has an optional file `configs/hosts/<user>@<hostname>.toml`,
-for example `deepak@RPi.toml`. The CLI loads the file that matches the current
-user and hostname, or the one named by `A2E_HOST_ID`. The file can hold any
-setting from the models file plus a `[roles]` table with the booleans
-`controller` and `benchmark_target`, which both default to false. Settings
-apply in this order, and the later one wins: the models file, the host file,
-`local.toml`, then environment variables. The variables are `A2E_NATIVE_MODELS_DIR`,
-`A2E_NATIVE_LLAMA_SERVER` and `A2E_NATIVE_OUTPUT_DIR`. `doctor` prints the host, the loaded
-host file and the roles.
+### Settings and hosts
+
+Settings come from four places, and a later one wins over an earlier one.
+
+1. `configs/models.toml` holds the model registry and the shared `[runtime]`
+   settings, including the llama.cpp commit.
+2. `configs/hosts/<user>@<hostname>.toml` holds the settings for one device,
+   for example `deepak@RPi.toml`. The program loads the file that matches the
+   current user and hostname, or the one named by `A2E_HOST_ID`, and it prints
+   a warning when no file matches.
+3. `configs/local.toml` holds settings for this checkout only. Copy
+   `configs/local.example.toml` to start one. Git ignores it.
+4. Environment variables, set in the shell or in `.env`, override the paths:
+   `A2E_MODELS_DIR`, `A2E_LLAMA_SERVER` and `A2E_OUTPUT_DIR`.
+
+A host file or `local.toml` can hold any `[runtime]` setting. A different memory
+limit or GPU setting produces a separate study, because the settings are part of
+the study id. `a2e doctor` prints the host and the host file it loaded.
 
 ## Run and read results
 
 ```bash
-target/release/a2e plan
-target/release/a2e run
+target/release/a2e plan smoke
+target/release/a2e run smoke --dry-run
+target/release/a2e run smoke --local
 target/release/a2e upload --status
 ```
 
-Long runs belong in tmux. Run `scripts/run.sh` with no arguments for a menu that picks the suites. `scripts/run.sh start <suite>` starts the suite in a
+Long runs belong in tmux. Run `a2e` with no arguments for a menu that picks the suites, models and variants. `a2e start <suite>` starts the suite in a
 detached session named `a2e-<suite>` and writes the output to
-`results/logs`. Other arguments, such as `--retry-failed`, are passed to
-`a2e run`. Only one run can hold the runtime lock, so a second start is
+`results/logs`. The options of `a2e run`, such as `--retry-failed`, work with `start` too. Only one run can hold the runtime lock, so a second start is
 refused. `attach`, `status`, `logs` and `stop` take the same suite name.
-Pass `--local` to `start` to keep results in the outbox and off the Worker.
+Pass `--local` to keep results in the outbox and off the Worker.
+
+A suite name such as `smoke` stands for `configs/suites/smoke.toml`. To run part of a suite, add `--model`, `--context` or `--variant` with comma separated values. A name that does not exist gets a "did you mean" hint. The selection is part of the study definition, so a narrowed run is a separate study and never resumes a full one. `--dry-run` prints the runs, the model files and the llama-server path, and says what is missing.
 
 | Command | What it does |
 |---|---|
 | `a2e models fetch` | Download the models and check their hashes |
 | `a2e doctor [--probe]` | Show the machine, the models and the settings; `--probe` also starts each model |
 | `a2e plan [suite]` | List the jobs a suite would run |
-| `a2e run [suite] [--retry-failed]` | Run or resume a suite |
+| `a2e run [suite] [--dry-run] [--retry-failed]` | Run or resume a suite in this terminal |
+| `a2e start <suites>` | Run suites in a tmux session; see also `attach`, `status`, `logs`, `stop` |
 | `a2e upload [--status]` | Send the outbox to the Worker, or show what is waiting |
+| `a2e completions <shell>` | Print completions for bash, zsh, fish or another shell |
 | `a2e cases validate\|list` | Check or count the case files |
 | `a2e tools validate` | Check the tool definitions |
 | `a2e sandbox init\|verify\|info` | Build, check or describe the file sandbox |
 
-Pass a suite file to `plan` or `run`. The shipped suites are listed in the
-suites section below. Set `BRAVE_SEARCH_API_KEY` for the live suite, either in
+Pass a suite name or a suite file to `plan` or `run`. The shipped suites are listed in the
+suites section below, and [CLI.md](CLI.md) lists every command. Set `BRAVE_SEARCH_API_KEY` for the live suite, either in
 the shell or in a `.env` file in the working directory. The CLI reads `.env` at
 start-up as `KEY=VALUE` lines, and a variable already set in the shell wins. The
 other suites use recorded fixture data.
@@ -91,7 +102,7 @@ and the evidence used for judging.
 
 Judging, scoring and reports run in the A2E-Results project
 (https://github.com/1DeepakSrinivas/A2E-Results), which is checked out as the
-submodule `a2e-results` in the repository root. Its `docs/API.md` describes the
+submodule `a2e-results` in the repository root. Its repository describes the
 Worker API. After each attempt the runner posts the study, the model load and the
 finished attempt to the Worker. Set `WORKER_URL` and `WRITE_TOKEN` in the shell
 or in `.env` (see `.env.example`). To avoid copying them, set `A2E_RESULTS_ENV` in
@@ -120,7 +131,7 @@ the `video` group so `vcgencmd` works without root, and you must log in again
 afterwards.
 
 Mac power and thermal pressure come from privileged `powermetrics` samples and
-cover the reported CPU, GPU, and ANE scope. Run `bash scripts/setup_mac_telemetry.sh`
+cover the reported CPU, GPU, and ANE scope. Run `./setup.sh telemetry`
 once to allow `sudo -n powermetrics` for your user only, or start the runner with
 `sudo`. Remove the rule with `sudo rm /etc/sudoers.d/a2e-powermetrics`. `a2e
 doctor` prints a `telemetry` entry that shows what is available.
@@ -290,14 +301,13 @@ changes with the seed.
 Build and check the tree with:
 
 ```
-scripts/init_sandbox.sh            # writes ./sandbox (or $A2E_SANDBOX), then verifies it
+a2e sandbox init                   # writes ./sandbox with the default seed
 a2e sandbox init --force           # rebuild
 a2e sandbox verify                 # compare the tree with sandbox/manifest.json
 a2e sandbox info
-scripts/sync_sandbox.sh pi@host    # copy a tree built elsewhere to a Pi and verify it there
 ```
 
-`setup.sh` runs `scripts/init_sandbox.sh`. The tree is not committed. `run` and `plan` refuse to start when a
+`setup.sh` runs `a2e sandbox init` and `a2e sandbox verify`. The same seed and generator give the same tree on every machine, so a second device builds its own copy and `verify` confirms it matches the manifest. The tree is not committed. `run` and `plan` refuse to start when a
 suite uses it and `verify` fails. The tree hash is part of the study id, so a different tree starts a new study.
 
 A case opts in with `sandbox = "workspace"` under `[fixtures]`. Each attempt gets its own copy of the tree, and
@@ -320,8 +330,13 @@ Run the cases with the `files_dev` and `files_heldout` suites.
 
 A suite picks models, context sizes, variants, repeats, and cases. It selects
 cases by directory, by `tags`, and by `split`. Paths are relative to the suite
-file. The study id is a hash of the suite, the cases, the tool definitions, the
-machine settings, and the binary, so changing any of them starts a new study.
+file. Leave out `models` to run every model in `configs/models.toml`. Name variants from `configs/variants.toml` with
+`use_variants = ["autonomous", "guided"]`, and add a `[[variants]]` block only
+for a variant that no other suite needs. The study id is a hash of the suite after
+selection, the cases, the tool definitions, the machine settings, the binary, the llama-server
+hash, the git commit and whether the working tree has changes, so changing any of them starts a new study. Reproducible here
+means another person can rerun the same definition, and it does not mean the
+timings come out identical.
 
 - `smoke` runs the cases tagged `smoke` from the dev split, once.
 - `files_dev` runs the file cases from the dev split once, and `files_heldout`
@@ -331,6 +346,20 @@ machine settings, and the binary, so changing any of them starts a new study.
 - `harness` compares the autonomous variant with guided, filter, recent
   context, constrained decoding, and repair, on the cases tagged `tier2`.
 - `web_live` runs the live search cases.
+- `test_filesystem`, `test_compute` and `test_data_web` run the dev split of one
+  tool family in autonomous and guided mode, and `test_pi_100`, `test_pi_ablation` and
+  `test_pi_guided` are sized for the Pi. The README table describes each one.
+
+## Add a host, model, suite or variant
+
+- A host is one new file, `configs/hosts/<user>@<hostname>.toml`, with the
+  `[runtime]` settings that differ on that device.
+- A model is one new `[[models]]` entry in `configs/models.toml` with its
+  `adapter`, source, 40 character revision and SHA-256. Suites without a
+  `models` line pick it up with no other edit. `a2e models fetch` downloads it.
+- A suite is one new file in `configs/suites`. Copy `smoke.toml`, change the
+  cases and tags, and list the variants it needs. `a2e plan <name>` checks it.
+- A variant is one new `[[variants]]` block in `configs/variants.toml`.
 
 ## Add a tool
 
@@ -347,16 +376,31 @@ parts.
    sees, so wording changes can be tried without rebuilding.
 
 Then list the tool in a case's `tools.allowed`. Run `a2e tools validate`
-to check that every definition has a handler and a valid schema. Keep handlers
+to check that every definition has a handler and a valid schema. A tool that keeps
+state in a new domain also needs `initialize` and `snapshot` functions in its module,
+listed in `Builtins::initialize` and `Builtins::snapshot` in `src/tools/mod.rs`. Keep handlers
 bounded in time and output, because the harness stops an attempt when a call
 passes `budget.tool_seconds` or returns more than `budget.tool_output_bytes`.
+
+## Add a check or a model format
+
+A check kind is a struct in `src/eval/checks` that implements `CheckKind` with
+`validate` and `evaluate`. Add one variant to `Check` in `src/eval/check.rs`
+and one line to `Check::kind`. The compiler reports a missing line, and the
+case file then accepts `kind = "<name>"` with the struct's fields.
+
+A model format is a file in `src/adapter` that implements `ModelFormat`: the
+stop strings, the call markers, how to parse one call, and the grammar rules. Add
+the format to `FORMATS` and an `Adapter` constant in `src/adapter/mod.rs`, then set
+`adapter = "<name>"` on a model. Raise `parse_rules` for a format when its parsing changes, because
+the version is part of the study id.
 
 ## Results, judging and reports
 
 This program only produces results. The A2E-Results project stores them in a
 Cloudflare D1 database and does the judging, scoring, summaries, CSV export and
 reports. See `a2e-results/README.md` for its commands and
-`a2e-results/docs/API.md` for the Worker API this program follows.
+the A2E-Results repository for the Worker API this program follows.
 
 Each attempt is posted as one request with its turns, tool calls, checks and
 resource samples. The ids are `<first 12 characters of the study id>-<first 16

@@ -1,6 +1,6 @@
-// record.rs
-// Per-turn and per-tool-call records kept in memory during an attempt
-// Written to SQLite after the attempt's wall time is fixed
+//! Per-turn and per-tool-call records kept in memory during an attempt.
+//!
+//! Written to SQLite after the attempt's wall time is fixed.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

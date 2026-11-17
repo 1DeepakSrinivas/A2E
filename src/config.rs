@@ -1,6 +1,6 @@
-// config.rs
-// Runtime settings, model registry, and experiment definitions
-// Local overrides, pinned model downloads, and task and tool schema checks
+//! Runtime settings, model registry, and experiment definitions.
+//!
+//! Local overrides, pinned model downloads, and task and tool schema checks.
 
 use crate::case::{self, Case, Split};
 use anyhow::{bail, Context, Result};
@@ -44,8 +44,8 @@ impl Default for Runtime {
     fn default() -> Self {
         Self {
             llama_server: "deps/llama.cpp/build-a2e/bin/llama-server".into(),
-            llama_commit: "6666a7330c5375dc310ddea1f9621a7770430010".into(),
-            models_dir: "~/models".into(),
+            llama_commit: String::new(),
+            models_dir: "models".into(),
             output_dir: "results".into(),
             device: "auto".into(),
             port: 8197,
@@ -60,20 +60,11 @@ impl Default for Runtime {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Roles {
-    pub controller: bool,
-    pub benchmark_target: bool,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
     #[serde(default)]
     pub runtime: Runtime,
-    #[serde(default)]
-    pub roles: Roles,
     pub models: Vec<Model>,
     #[serde(skip)]
     pub host_id: String,
@@ -160,13 +151,18 @@ impl Config {
         }
         Ok(output)
     }
-    /// Configuration with local overrides and validation.
     pub fn load(path: &Path) -> Result<Self> {
         let mut v: toml::Value = toml::from_str(&std::fs::read_to_string(path)?)?;
         let dir = path.parent().unwrap_or(Path::new("."));
         let host_id = host_id();
         let host_file = dir.join("hosts").join(format!("{host_id}.toml"));
         let host_file = host_file.exists().then_some(host_file);
+        if host_file.is_none() {
+            eprintln!(
+                "warning: no host file for {host_id}; using shared settings only. Add {}/hosts/{host_id}.toml or set A2E_HOST_ID.",
+                dir.display()
+            );
+        }
         if let Some(f) = &host_file {
             merge(&mut v, toml::from_str(&std::fs::read_to_string(f)?)?);
         }
@@ -196,12 +192,11 @@ impl Config {
                 bail!("model {} requires a pinned source revision", m.id);
             }
         }
-        if c.runtime.llama_commit.len() != 40
-            || c.runtime.threads == 0
-            || c.runtime.sample_ms < 100
-            || c.runtime.memory_limit_mb == 0
-        {
-            bail!("invalid runtime limits or llama.cpp commit");
+        if c.runtime.llama_commit.len() != 40 {
+            bail!("llama_commit must be a full 40 character SHA in the [runtime] table");
+        }
+        if c.runtime.threads == 0 || c.runtime.sample_ms < 100 || c.runtime.memory_limit_mb == 0 {
+            bail!("invalid runtime limits");
         }
         if !["auto", "none", "required"].contains(&c.runtime.power.as_str()) {
             bail!("power must be auto, none, or required");
@@ -299,6 +294,8 @@ impl Default for Variant {
 #[serde(deny_unknown_fields)]
 pub struct Suite {
     pub name: String,
+    /// Empty means every model in the registry; `resolve` fills it in.
+    #[serde(default)]
     pub models: Vec<String>,
     pub contexts: Vec<usize>,
     pub cases: Vec<String>,
@@ -312,13 +309,107 @@ pub struct Suite {
     pub seed: u64,
     #[serde(default)]
     pub budget: Budget,
+    /// Names from `configs/variants.toml`, placed before the inline variants.
+    #[serde(default, skip_serializing)]
+    pub use_variants: Vec<String>,
+    #[serde(default)]
     pub variants: Vec<Variant>,
 }
+
+/// Narrows a suite to the named models, contexts and variants; empty lists keep everything.
+#[derive(Clone, Debug, Default)]
+pub struct Selection {
+    pub models: Vec<String>,
+    pub contexts: Vec<usize>,
+    pub variants: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SharedVariants {
+    variants: Vec<Variant>,
+}
+
+/// Error for a name that is not in `known`, with the closest match as a hint.
+pub fn unknown_name(kind: &str, name: &str, known: &[String]) -> anyhow::Error {
+    let nearest = known
+        .iter()
+        .find(|k| k.starts_with(name) || k.contains(name))
+        .or_else(|| {
+            known
+                .iter()
+                .min_by_key(|k| edit_distance(name, k))
+                .filter(|k| edit_distance(name, k) <= name.len().max(3) / 2)
+        });
+    let list = known.join(", ");
+    match nearest {
+        Some(k) => anyhow::anyhow!("unknown {kind} {name}; did you mean {k}? Known: {list}"),
+        None => anyhow::anyhow!("unknown {kind} {name}. Known: {list}"),
+    }
+}
+
+fn edit_distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let above = row[j + 1];
+            row[j + 1] = (above + 1)
+                .min(row[j] + 1)
+                .min(diagonal + usize::from(ca != *cb));
+            diagonal = above;
+        }
+    }
+    row[b.len()]
+}
+
+fn keep_named<T>(
+    items: &mut Vec<T>,
+    kind: &str,
+    wanted: &[String],
+    name: impl Fn(&T) -> &str,
+) -> Result<()> {
+    if wanted.is_empty() {
+        return Ok(());
+    }
+    let known: Vec<String> = items.iter().map(|i| name(i).to_string()).collect();
+    for w in wanted {
+        if !known.contains(w) {
+            return Err(unknown_name(kind, w, &known));
+        }
+    }
+    items.retain(|i| wanted.iter().any(|w| w == name(i)));
+    Ok(())
+}
+
 impl Suite {
     pub fn load(path: &Path) -> Result<Self> {
-        let s: Self = toml::from_str(&std::fs::read_to_string(path)?)?;
-        if s.models.is_empty()
-            || s.contexts.is_empty()
+        let mut s: Self = toml::from_str(&std::fs::read_to_string(path)?)?;
+        if !s.use_variants.is_empty() {
+            let file = path
+                .parent()
+                .unwrap_or(Path::new("."))
+                .join("../variants.toml");
+            let shared: SharedVariants = toml::from_str(
+                &std::fs::read_to_string(&file)
+                    .with_context(|| format!("suite {} needs {}", s.name, file.display()))?,
+            )?;
+            let known: Vec<String> = shared.variants.iter().map(|v| v.name.clone()).collect();
+            let mut chosen = Vec::new();
+            for name in &s.use_variants {
+                let found = shared
+                    .variants
+                    .iter()
+                    .find(|v| &v.name == name)
+                    .ok_or_else(|| unknown_name("shared variant", name, &known))?;
+                chosen.push(found.clone());
+            }
+            chosen.append(&mut s.variants);
+            s.variants = chosen;
+        }
+        if s.contexts.is_empty()
             || s.cases.is_empty()
             || s.variants.is_empty()
             || s.repeats == 0
@@ -343,6 +434,38 @@ impl Suite {
             }
         }
         Ok(s)
+    }
+    /// Fills in the model list and applies `selection`; fails on names that do not exist.
+    pub fn resolve(mut self, config: &Config, selection: &Selection) -> Result<Self> {
+        let all: Vec<String> = config.models.iter().map(|m| m.id.clone()).collect();
+        if self.models.is_empty() {
+            self.models = all.clone();
+        }
+        for id in &self.models {
+            if !all.contains(id) {
+                return Err(unknown_name("model", id, &all));
+            }
+        }
+        keep_named(&mut self.models, "model", &selection.models, |m| m.as_str())?;
+        keep_named(&mut self.variants, "variant", &selection.variants, |v| {
+            v.name.as_str()
+        })?;
+        if !selection.contexts.is_empty() {
+            for c in &selection.contexts {
+                if !self.contexts.contains(c) {
+                    bail!(
+                        "suite {} has no context {c}; it has {:?}",
+                        self.name,
+                        self.contexts
+                    );
+                }
+            }
+            self.contexts.retain(|c| selection.contexts.contains(c));
+        }
+        if self.models.is_empty() {
+            bail!("suite {} has no models", self.name);
+        }
+        Ok(self)
     }
     /// Cases for this suite's split and tags; paths resolve against the suite file.
     pub fn load_cases(&self, path: &Path) -> Result<Vec<Case>> {
@@ -396,7 +519,6 @@ pub struct Catalog {
     pub tools: Vec<ToolSpec>,
 }
 pub fn validate_schema(schema: &Value) -> Result<()> {
-    // Local schemas for offline validation
     fn inspect(v: &Value) -> Result<()> {
         match v {
             Value::Object(m) => {
@@ -455,7 +577,7 @@ impl Catalog {
 mod tests {
     use super::*;
 
-    const BASE: &str = "[runtime]\nthreads = 4\n\n[[models]]\nid = \"m\"\nadapter = \"qwen3\"\nquant = \"q\"\nsource = \"o/r\"\nrevision = \"0123456789012345678901234567890123456789\"\nfile = \"m.gguf\"\n";
+    const BASE: &str = "[runtime]\nthreads = 4\nllama_commit = \"0123456789012345678901234567890123456789\"\n\n[[models]]\nid = \"m\"\nadapter = \"qwen3\"\nquant = \"q\"\nsource = \"o/r\"\nrevision = \"0123456789012345678901234567890123456789\"\nfile = \"m.gguf\"\n";
 
     fn setup(host: Option<&str>, local: Option<&str>) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().unwrap();
@@ -473,23 +595,22 @@ mod tests {
 
     // Tests share the process environment, so one test sets A2E_HOST_ID for all.
     #[test]
-    fn host_file_roles_and_precedence() {
+    fn host_file_and_precedence() {
         std::env::set_var("A2E_HOST_ID", "test@host");
 
         let (_d, base) = setup(None, None);
-        let c = Config::load(&base).unwrap();
-        assert!(c.host_file.is_none() && !c.roles.controller && !c.roles.benchmark_target);
+        assert!(Config::load(&base).unwrap().host_file.is_none());
 
-        let host = "[roles]\ncontroller = true\n[runtime]\nthreads = 2\n";
+        let host = "[runtime]\nthreads = 2\n";
         let (_d, base) = setup(Some(host), None);
         let c = Config::load(&base).unwrap();
-        assert!(c.host_file.is_some() && c.roles.controller && !c.roles.benchmark_target);
+        assert!(c.host_file.is_some());
         assert_eq!(c.runtime.threads, 2);
 
         let (_d, base) = setup(Some(host), Some("[runtime]\nthreads = 3\n"));
         assert_eq!(Config::load(&base).unwrap().runtime.threads, 3);
 
-        let (_d, base) = setup(Some("[roles]\nunknown = true\n"), None);
+        let (_d, base) = setup(Some("[runtime]\nunknown = true\n"), None);
         assert!(Config::load(&base).is_err());
     }
 }

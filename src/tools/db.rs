@@ -1,6 +1,6 @@
-// tools/db.rs
-// Read-only SQLite retrieval over a per-task in-memory database
-// Structured lookup, free SQL with authorizer, row cap, and time cap
+//! Read-only SQLite retrieval over a per-task in-memory database.
+//!
+//! Structured lookup, free SQL with authorizer, row cap, and time cap.
 
 use super::{string, Registry, World};
 use anyhow::{bail, Context, Result};
@@ -200,6 +200,15 @@ fn db_query(w: &mut World, a: &Value) -> Result<Value> {
         bail!("send one statement without semicolons");
     }
     db(w)?.run(sql, &[])
+}
+/// Opens the seeded database, or none when the case has no database fixture.
+pub fn initialize(w: &mut World, fixtures: &crate::fixtures::Fixtures) -> Result<()> {
+    w.db = fixtures
+        .db
+        .as_ref()
+        .map(|d| Db::open(d.sql.as_deref().context("database seed needs sql")?))
+        .transpose()?;
+    Ok(())
 }
 pub fn register(r: &mut Registry) {
     r.insert("db_schema", db_schema);

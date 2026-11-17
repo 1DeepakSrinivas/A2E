@@ -2,7 +2,7 @@
 
 This runbook covers setting up a device, running suites in tmux, resuming and uploading, and fixing the problems seen in practice. The guide in [GUIDE.md](GUIDE.md) explains the settings, cases and tools.
 
-The short path is three commands: `./setup.sh`, then `scripts/run.sh` to pick suites, then `scripts/run.sh attach <suite>` to watch. The sections below explain each step and what to do when one fails.
+The short path is three commands: `./setup.sh`, then `target/release/a2e` to pick suites from a menu, then `target/release/a2e attach <suite>` to watch. The sections below explain each step and what to do when one fails.
 
 1. [Set up a device](#1-set-up-a-device)
 2. [Run a suite in tmux](#2-run-a-suite-in-tmux)
@@ -18,7 +18,7 @@ Run this from the project checkout as your normal user, on a Raspberry Pi 3B+ wi
 ./setup.sh
 ```
 
-Setup installs the packages and Rust, builds llama.cpp at the commit pinned in `configs/models.toml`, builds `target/release/a2e`, downloads the three models and checks their hashes, generates the file sandbox, and runs the checks. Each step is a script that can be run alone, so a failed step can be repeated without the others. Pass `--skip-llama` or `--skip-models` to leave those steps out.
+Setup installs the packages and Rust, builds llama.cpp at the commit pinned in `configs/models.toml`, builds `target/release/a2e`, downloads the three models and checks their hashes, generates the file sandbox, and runs the checks. Every step can be repeated, so a failed step can be fixed and setup run again. Pass `--skip-llama` or `--skip-models` to leave those steps out. The Rust version comes from `rust-version` in `Cargo.toml`.
 
 On the Pi, the llama.cpp build with one job takes a long time. A 1 GB device may need temporary swap to build. Turn swap off afterwards, because the Pi baseline refuses to run with swap on.
 
@@ -45,17 +45,17 @@ To send results to the cloud, copy `.env.example` to `.env` and set `WORKER_URL`
 
 A full suite takes hours on the Pi, so run it in tmux. The session keeps running after you close the terminal or lose the SSH connection.
 
-Run `scripts/run.sh` with no arguments for a menu. It lists the suites in `configs/suites`, lets you pick one or several by number (or `a` for all), asks whether to upload to the Worker and whether to retry failed attempts, and then starts the session. Several suites run one after another in a session named `a2e-queue`. The same menu attaches to, shows the log of, or stops a run. The commands below do the same without the menu.
+Run `a2e` with no arguments on a terminal for a menu. It lists the suites in `configs/suites`, then asks for the models and variants, whether to keep results on the device, and whether to retry failed attempts. It then shows how many attempts the choice makes and asks before it starts the session. Esc goes back one step, and the menu remembers your last choices in `results/.last-run.toml`. Several suites run one after another in a session named `a2e-queue`. The same menu attaches to, shows the log of, or stops a run. The commands below do the same without the menu.
 
 ```bash
-scripts/run.sh start smoke        # start a detached session named a2e-smoke
-scripts/run.sh attach smoke       # watch it; detach with Ctrl-b d
-scripts/run.sh status smoke       # session state and the upload queue
-scripts/run.sh logs smoke         # follow the newest log in results/logs
-scripts/run.sh stop smoke         # send Ctrl-C; the session closes when the runner exits
+a2e start smoke        # start a detached session named a2e-smoke
+a2e attach smoke       # watch it; detach with Ctrl-b d
+a2e status smoke       # session state and the upload queue
+a2e logs smoke         # follow the newest log in results/logs
+a2e stop smoke         # send Ctrl-C; the session closes when the runner exits
 ```
 
-`start` checks that the sandbox verifies and that the suite plans, and then starts the run. Only one run can hold the runtime lock, so it refuses to start while another `a2e-` session exists. Extra arguments go to `a2e run`, for example `scripts/run.sh start smoke --retry-failed`. Give several suites as `start smoke,files_dev`; they run in order in the session `a2e-queue`.
+`start` checks that the sandbox verifies and that each suite plans, and then starts the run. Only one run can hold the runtime lock, so it refuses to start while another `a2e-` session exists. The options of `a2e run` work here too, for example `a2e start smoke --retry-failed` or `a2e start core --model qwen3-0.6b --variant guided`. Give several suites as `start smoke,files_dev`, and they run in order in the session `a2e-queue`. To see the runs and check the files first, use `a2e run <suite> --dry-run`.
 
 The repository `.env` normally holds the real Worker credentials, so a normal start uploads results to the live Worker. Add `--local` to keep a test run off the Worker. Results then stay in `results/outbox`.
 
@@ -69,14 +69,16 @@ The repository `.env` normally holds the real Worker credentials, so a normal st
 
 ## 4. Build elsewhere and copy to a Pi
 
-Use this route only when the Pi cannot build, for example because it runs out of memory. Build on a Mac with Docker for `linux/arm64`, using an image such as `rust:1-bookworm`. Build the `a2e` binary and then `llama-server` from the pinned commit, with the same CMake options as `scripts/build_llama.sh`.
+Use this route only when the Pi cannot build, for example because it runs out of memory. Build on a Mac with Docker for `linux/arm64`, using an image such as `rust:1-bookworm`. Build the `a2e` binary and then `llama-server` from the pinned commit, with the same CMake options as the `build_llama` function in `setup.sh`.
 
 - A source copy without `.git` has no commit in its version string. Make the build report the first 8 characters of the pin, then check `llama-server --version` on the Pi.
-- Copy `a2e`, the two llama.cpp binaries, `configs`, `.env` and the models, and do not copy `results`. Generate the sandbox on the Pi with `./a2e sandbox init`, or copy it with `scripts/sync_sandbox.sh <user@host>`.
+- Copy `a2e`, the two llama.cpp binaries, `configs`, `.env` and the models, and do not copy `results`. Generate the sandbox on the Pi with `./a2e sandbox init`. The same seed gives the same tree, and `./a2e sandbox verify` checks it against its manifest.
 
 ## 5. Troubleshooting
 
-**`llama_commit_mismatch` on every attempt.** The runner needs the first 8 characters of the pinned commit in the output of `llama-server --version`. A binary built from a git clone with the default 7 character hash, or from a copy without `.git` (where the hash is `unknown`), fails this check. `scripts/build_llama.sh` sets `core.abbrev 8` and checks the version after the build. Copy the right binary to the machine that runs it, make it executable, run `llama-server --version`, and then use `--retry-failed`.
+**`llama_commit_mismatch` on every attempt.** The runner needs the first 8 characters of the pinned commit in the output of `llama-server --version`. A binary built from a git clone with the default 7 character hash, or from a copy without `.git` (where the hash is `unknown`), fails this check. `setup.sh` sets `core.abbrev 8` and checks the version after the build. Copy the right binary to the machine that runs it, make it executable, run `llama-server --version`, and then use `--retry-failed`.
+
+**A run stops with "model file ... is missing".** The model is not in the models folder. Run `a2e models fetch`, or pass `--allow-missing-model` when you want the run to continue and record that model's attempts as failures.
 
 **Pi baseline refuses to run.** The message says swap must be disabled. Turn swap off as in section 1.
 
@@ -96,4 +98,4 @@ Use this route only when the Pi cannot build, for example because it runs out of
 
 **The sandbox is missing.** `run` and `plan` only check the sandbox, and they stop with an error when it is absent. Run `a2e sandbox init` and `a2e sandbox verify`. Stop any run first, because the files change under it.
 
-**Another run holds the lock.** Look for an `a2e-` tmux session with `tmux ls`. Attach to it, or stop it with `scripts/run.sh stop <suite>`.
+**Another run holds the lock.** Look for an `a2e-` tmux session with `tmux ls`. Attach to it, or stop it with `a2e stop <suite>`.

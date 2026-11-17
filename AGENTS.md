@@ -17,3 +17,12 @@ calls, and the tests replay them through the agent loop. Run
 Missing measurement data stays unavailable. Do not turn missing power or
 inference timings into zeros, and do not report software power assumptions as
 measured energy.
+
+Each extension point has one registry. Add a tool in `src/tools` plus
+`configs/tools/standard.toml`, a check kind in `src/eval/checks`, a model format in
+`src/adapter`, a model in `configs/models.toml`, a suite in `configs/suites`, and a
+shared variant in `configs/variants.toml`. `docs/GUIDE.md` lists the steps for each.
+
+Write documents and help text in plain words, with short headings in sentence case. A
+test in `tests/docs.rs` fails when a document names a command, flag, environment
+variable or path that does not exist, so update the docs in the same change as the code.

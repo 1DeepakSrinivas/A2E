@@ -3,9 +3,12 @@
 
 use a2e::{
     adapter::Call,
-    case::{load_all, Case, Category, Check},
+    case::{load_all, Case, Category},
     config::Catalog,
-    eval::{evaluate, CheckResult, Observation},
+    eval::{
+        checks::{AnswerCheck, FileCheck},
+        evaluate, Check, CheckResult, Observation,
+    },
     tools::Builtins,
 };
 use serde_json::{json, Value};
@@ -190,10 +193,10 @@ fn a_wrong_answer_fails_cases_that_check_the_answer() {
         let has_answer_check = case.checks.iter().any(|c| {
             matches!(
                 c,
-                Check::Answer {
+                Check::Answer(AnswerCheck {
                     not_contains: None,
                     ..
-                }
+                })
             )
         });
         if !has_answer_check {
@@ -210,10 +213,12 @@ fn a_wrong_answer_fails_cases_that_check_the_answer() {
 #[test]
 fn dropping_the_last_golden_call_fails_cases_with_state_checks() {
     for case in library().iter().filter(|c| offline(c)) {
-        let writes = case
-            .checks
-            .iter()
-            .any(|c| matches!(c, Check::File { absent: false, .. } | Check::State { .. }));
+        let writes = case.checks.iter().any(|c| {
+            matches!(
+                c,
+                Check::File(FileCheck { absent: false, .. }) | Check::State(_)
+            )
+        });
         let mut calls = golden(case);
         if !writes || calls.len() < 2 {
             continue;

@@ -1,6 +1,6 @@
-// store/mod.rs
-// Attempt phase, serde tags for text fields, and the single-run lock
-// Results go to the A2E-Results Worker; see the upload module
+//! Attempt phase, serde tags for text fields, and the single-run lock.
+//!
+//! Results go to the A2E-Results Worker; see the upload module.
 
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};

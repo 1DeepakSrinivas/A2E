@@ -1,3 +1,6 @@
+# Settings for this checkout only. Copy to configs/local.toml, which Git ignores.
+# Order of precedence, later wins: models.toml, hosts/<user>@<host>.toml, local.toml, environment variables.
+
 [runtime]
 # Paths are resolved from the working directory; run commands at the repository root.
 llama_server = "deps/llama.cpp/build-a2e/bin/llama-server"
@@ -5,7 +8,3 @@ models_dir = "models"
 # Increase only for a separately labelled Mac resource envelope.
 memory_limit_mb = 768
 gpu_layers = 0
-
-[roles]
-controller = false
-benchmark_target = false

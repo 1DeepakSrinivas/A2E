@@ -1,6 +1,6 @@
-// upload/outbox.rs
-// Spool folder of write requests that are posted in order
-// A request leaves the folder once stored, or moves to rejected/ with its error
+//! Spool folder of write requests that are posted in order.
+//!
+//! A request leaves the folder once stored, or moves to rejected/ with its error.
 
 use super::client::{Client, Reply, Request};
 use anyhow::Result;

@@ -1,6 +1,6 @@
-// upload/mod.rs
-// Sends results to the A2E-Results Worker; the Worker judges, scores and reports
-// Requests are spooled to an outbox first, so an offline device uploads later
+//! Sends results to the A2E-Results Worker; the Worker judges, scores and reports.
+//!
+//! Requests are spooled to an outbox first, so an offline device uploads later.
 
 mod client;
 mod outbox;
@@ -52,7 +52,6 @@ impl Uploader {
         }
         Ok(())
     }
-    /// Posts every pending request now.
     pub fn flush(&mut self) -> Result<Flush> {
         let Some(client) = &self.client else {
             return self.status();
