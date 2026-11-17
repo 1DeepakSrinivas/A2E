@@ -1,11 +1,15 @@
-// eval.rs
-// Outcome checks over observed calls, final tool state, and the answer
-// Tolerant argument matching and failure classes for error analysis
+//! Outcome checks over observed calls, final tool state, and the answer.
+//!
+//! Argument matching is tolerant. Failure classes support error analysis.
+
+pub mod check;
+pub mod checks;
 
 use crate::{
     adapter::Call,
-    case::{tolerance, Case, Check, MatchMode},
+    case::{Case, MatchMode},
 };
+pub use check::Check;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -69,7 +73,7 @@ pub fn values_match(expected: &Value, actual: &Value, mode: MatchMode, tol: f64)
         _ => expected == actual,
     }
 }
-fn numbers(text: &str) -> Vec<f64> {
+pub(crate) fn numbers(text: &str) -> Vec<f64> {
     let cleaned = text.replace(',', "");
     Regex::new(r"-?\d+(?:\.\d+)?")
         .map(|re| {
@@ -79,7 +83,7 @@ fn numbers(text: &str) -> Vec<f64> {
         })
         .unwrap_or_default()
 }
-fn found(pattern: &str, text: &str) -> bool {
+pub(crate) fn found(pattern: &str, text: &str) -> bool {
     Regex::new(pattern).is_ok_and(|re| re.is_match(text))
 }
 /// Wording that marks an answer as a request for information rather than a result.
@@ -95,52 +99,19 @@ pub fn asks_for(topics: &[String], answer: &str) -> bool {
             )
         })
 }
-fn urls_match(a: &str, b: &str) -> bool {
+pub(crate) fn urls_match(a: &str, b: &str) -> bool {
     a.trim_end_matches('/') == b.trim_end_matches('/')
 }
-fn string_list(v: &Value) -> impl Iterator<Item = &str> {
+pub(crate) fn string_list(v: &Value) -> impl Iterator<Item = &str> {
     v.as_array().into_iter().flatten().filter_map(Value::as_str)
 }
-fn result(kind: &str, label: String, passed: bool, class: FailureClass) -> CheckResult {
+pub(crate) fn result(kind: &str, label: String, passed: bool, class: FailureClass) -> CheckResult {
     CheckResult {
         kind: kind.into(),
         label,
         passed,
         class: (!passed).then_some(class),
     }
-}
-fn call_check(c: &Check, calls: &[Call], attempted: &[Call]) -> CheckResult {
-    let Check::Call {
-        tool,
-        args,
-        mode,
-        min,
-        max,
-        tol,
-    } = c
-    else {
-        unreachable!("call_check receives call checks")
-    };
-    let named = attempted.iter().filter(|c| &c.name == tool).count();
-    let hits = calls
-        .iter()
-        .filter(|c| &c.name == tool)
-        .filter(|c| {
-            args.as_ref()
-                .is_none_or(|a| values_match(a, &c.arguments, *mode, *tol))
-        })
-        .count();
-    let passed = hits >= min.unwrap_or(1) && max.is_none_or(|m| hits <= m);
-    let class = if max.is_some_and(|m| hits > m) {
-        FailureClass::ExtraCall
-    } else if named > 0 {
-        FailureClass::WrongArgs
-    } else if attempted.is_empty() {
-        FailureClass::MissingCall
-    } else {
-        FailureClass::WrongTool
-    };
-    result("call", format!("call {tool}"), passed, class)
 }
 /// Share of milestone checks passed; any failed minefield (`no_call`, `calls_at_most`) zeroes it.
 pub fn milestone_score(checks: &[CheckResult]) -> Option<f64> {
@@ -161,131 +132,13 @@ pub fn milestone_score(checks: &[CheckResult]) -> Option<f64> {
 }
 /// Every configured check plus an existence check for each required output file.
 pub fn evaluate(case: &Case, obs: &Observation) -> Vec<CheckResult> {
-    let files = &obs.state["files"];
     let mut out = Vec::with_capacity(case.checks.len() + case.output.files.len());
-    for c in &case.checks {
-        out.push(match c {
-            Check::Call { .. } => call_check(c, obs.calls, obs.attempted),
-            Check::NoCall { tool } => result(
-                "no_call",
-                format!("no_call {tool}"),
-                !obs.attempted.iter().any(|c| &c.name == tool),
-                FailureClass::ExtraCall,
-            ),
-            Check::CallOrder { tools } => {
-                let mut next = tools.iter().peekable();
-                for call in obs.calls {
-                    if next.peek().is_some_and(|t| **t == call.name) {
-                        next.next();
-                    }
-                }
-                result(
-                    "call_order",
-                    format!("call_order {}", tools.join(" > ")),
-                    next.peek().is_none(),
-                    FailureClass::WrongOrder,
-                )
-            }
-            Check::CallsAtMost { max } => result(
-                "calls_at_most",
-                format!("calls_at_most {max}"),
-                obs.attempted.len() <= *max,
-                FailureClass::ExtraCall,
-            ),
-            Check::File {
-                path,
-                eq,
-                contains,
-                regex,
-                json_eq,
-                absent,
-                present,
-            } => {
-                let body = files.get(path).and_then(Value::as_str);
-                let passed = if *absent {
-                    files.get(path).is_none()
-                } else if *present {
-                    files.get(path).is_some()
-                } else if let Some(want) = eq {
-                    body == Some(want.as_str())
-                } else if let Some(part) = contains {
-                    body.is_some_and(|b| b.contains(part.as_str()))
-                } else if let Some(p) = regex {
-                    body.is_some_and(|b| found(p, b))
-                } else if let Some(want) = json_eq {
-                    body.and_then(|b| serde_json::from_str::<Value>(b).ok())
-                        .is_some_and(|v| values_match(want, &v, MatchMode::Exact, tolerance()))
-                } else {
-                    false
-                };
-                result(
-                    "file",
-                    format!("file {path}"),
-                    passed,
-                    FailureClass::StateMismatch,
-                )
-            }
-            Check::State { path, eq } => result(
-                "state",
-                format!("state {path}"),
-                obs.state
-                    .pointer(path)
-                    .is_some_and(|v| values_match(eq, v, MatchMode::Exact, tolerance())),
-                FailureClass::StateMismatch,
-            ),
-            Check::Answer {
-                contains,
-                not_contains,
-                regex,
-                exact,
-                number,
-                asks,
-            } => {
-                let lower = obs.answer.to_lowercase();
-                let passed = if let Some(part) = contains {
-                    lower.contains(&part.to_lowercase())
-                } else if let Some(part) = not_contains {
-                    !lower.contains(&part.to_lowercase())
-                } else if let Some(p) = regex {
-                    found(p, obs.answer)
-                } else if let Some(want) = exact {
-                    obs.answer.trim() == want.trim()
-                } else if let Some(n) = number {
-                    numbers(obs.answer)
-                        .iter()
-                        .any(|x| (x - n.value).abs() <= n.tol * x.abs().max(n.value.abs()).max(1.))
-                } else if let Some(topics) = asks {
-                    asks_for(topics, obs.answer)
-                } else {
-                    false
-                };
-                result("answer", "answer".into(), passed, FailureClass::BadAnswer)
-            }
-            Check::FetchedUrl { url } => result(
-                "fetched_url",
-                format!("fetched_url {url}"),
-                string_list(&obs.state["fetched_urls"]).any(|u| urls_match(u, url)),
-                FailureClass::MissingCall,
-            ),
-            Check::FetchedSource { id } => result(
-                "fetched_source",
-                format!("fetched_source {id}"),
-                string_list(&obs.state["fetched_sources"]).any(|s| s == id),
-                FailureClass::MissingCall,
-            ),
-            Check::FetchedCount { min } => result(
-                "fetched_count",
-                format!("fetched_count {min}"),
-                obs.state["fetched_sources"].as_array().map_or(0, Vec::len) >= *min,
-                FailureClass::MissingCall,
-            ),
-        });
-    }
+    out.extend(case.checks.iter().map(|c| c.evaluate(obs)));
     for path in &case.output.files {
         out.push(result(
             "output_file",
             format!("output_file {path}"),
-            files.get(path).is_some(),
+            obs.state["files"].get(path).is_some(),
             FailureClass::StateMismatch,
         ));
     }
