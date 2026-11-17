@@ -283,6 +283,69 @@ impl Attempt<'_> {
         self.out.reason = Some(format!("parse_failure: {error}"));
         Step::Stop
     }
+    /// Why the call cannot run, or `None` when it is allowed and its arguments fit the schema.
+    fn invalid_reason(&self, specs: &[ToolSpec], call: &Call) -> Result<Option<String>> {
+        const UNAVAILABLE: &str = "tool is not available in this stage";
+        // The stable mode shows every tool, so the stage order is enforced here
+        let out_of_stage = self.x.variant.mode == Mode::GuidedStable
+            && self
+                .stages
+                .get(self.stage)
+                .is_some_and(|s| !s.tools.contains(&call.name));
+        let Some(spec) = specs.iter().find(|s| s.name == call.name) else {
+            return Ok(Some(UNAVAILABLE.into()));
+        };
+        if out_of_stage {
+            return Ok(Some(UNAVAILABLE.into()));
+        }
+        let validator =
+            jsonschema::validator_for(&spec.parameters).map_err(|e| anyhow::anyhow!("{e}"))?;
+        Ok(validator
+            .validate(&call.arguments)
+            .err()
+            .map(|e| e.to_string()))
+    }
+    /// Runs a valid call. Returns its output and a reason when the call broke a tool budget.
+    fn run_tool(
+        &mut self,
+        call: &Call,
+        entry: &mut ToolEntry,
+    ) -> Result<(Value, Option<&'static str>)> {
+        let budget = &self.x.suite.budget;
+        self.out.valid_tool_calls += 1;
+        self.out.tool_invocations += 1;
+        let limit = remaining(self.deadline, budget.tool_seconds)?;
+        let t = Instant::now();
+        let result = self.tools.call(&call.name, call.arguments.clone());
+        let elapsed = t.elapsed();
+        entry.ms = elapsed.as_secs_f64() * 1000.;
+        Ok(match result {
+            _ if elapsed > limit => (json!({"error":"tool_timeout"}), Some("tool_timeout")),
+            Ok(v) => {
+                entry.output_bytes = v.to_string().len();
+                entry.ok = true;
+                let fatal = (entry.output_bytes > budget.tool_output_bytes)
+                    .then_some("output_limit: tool result exceeds the budget");
+                (v, fatal)
+            }
+            Err(e) => {
+                entry.error = Some(e.to_string());
+                (json!({"error":e.to_string()}), None)
+            }
+        })
+    }
+    /// Moves to the next workflow stage once the current one has enough successful calls.
+    fn count_stage_success(&mut self) {
+        self.stage_successes += 1;
+        if self
+            .stages
+            .get(self.stage)
+            .is_some_and(|s| self.stage_successes >= s.successes)
+        {
+            self.stage += 1;
+            self.stage_successes = 0;
+        }
+    }
     fn act(&mut self, specs: &[ToolSpec], action: Action) -> Result<Step> {
         let call = match action {
             Action::Final(answer) => {
@@ -294,29 +357,14 @@ impl Attempt<'_> {
         };
         self.turn.parse_status = ParseStatus::Call;
         self.attempted.push(call.clone());
-        let (suite, variant) = (self.x.suite, self.x.variant);
+        let variant = self.x.variant;
         let t = Instant::now();
-        // The stable mode shows every tool, so the stage order is enforced here
-        let out_of_stage = variant.mode == Mode::GuidedStable
-            && self
-                .stages
-                .get(self.stage)
-                .is_some_and(|s| !s.tools.contains(&call.name));
-        let validation = if out_of_stage {
-            Err(anyhow::anyhow!("tool is not available in this stage"))
-        } else if let Some(spec) = specs.iter().find(|s| s.name == call.name) {
-            let v =
-                jsonschema::validator_for(&spec.parameters).map_err(|e| anyhow::anyhow!("{e}"))?;
-            v.validate(&call.arguments)
-                .map_err(|e| anyhow::anyhow!("{e}"))
-        } else {
-            Err(anyhow::anyhow!("tool is not available in this stage"))
-        };
+        let invalid = self.invalid_reason(specs, &call)?;
         let mut entry = ToolEntry {
             turn: self.turn.idx,
             tool: call.name.clone(),
             arguments: call.arguments.clone(),
-            valid: validation.is_ok(),
+            valid: invalid.is_none(),
             ok: false,
             validate_ms: t.elapsed().as_secs_f64() * 1000.,
             ms: 0.,
@@ -334,44 +382,22 @@ impl Attempt<'_> {
         self.last_call = Some(signature);
         self.history.push(Adapter::assistant(&call));
         let mut fatal = None;
-        let output = match validation {
-            Err(e) => {
+        let output = match invalid {
+            Some(reason) => {
                 self.out.argument_errors += 1;
-                entry.error = Some(e.to_string());
+                entry.error = Some(reason.clone());
                 if self.out.repairs >= variant.repairs as u64 {
-                    self.out.reason = Some(format!("argument_error: {e}"));
+                    self.out.reason = Some(format!("argument_error: {reason}"));
                     self.out.tool_log.push(entry);
                     return Ok(Step::Stop);
                 }
                 self.out.repairs += 1;
-                json!({"error":e.to_string()})
+                json!({"error":reason})
             }
-            Ok(()) => {
-                self.out.valid_tool_calls += 1;
-                self.out.tool_invocations += 1;
-                let limit = remaining(self.deadline, suite.budget.tool_seconds)?;
-                let t = Instant::now();
-                let result = self.tools.call(&call.name, call.arguments.clone());
-                let elapsed = t.elapsed();
-                entry.ms = elapsed.as_secs_f64() * 1000.;
-                match result {
-                    _ if elapsed > limit => {
-                        fatal = Some("tool_timeout");
-                        json!({"error":"tool_timeout"})
-                    }
-                    Ok(v) => {
-                        entry.output_bytes = v.to_string().len();
-                        if entry.output_bytes > suite.budget.tool_output_bytes {
-                            fatal = Some("output_limit: tool result exceeds the budget");
-                        }
-                        entry.ok = true;
-                        v
-                    }
-                    Err(e) => {
-                        entry.error = Some(e.to_string());
-                        json!({"error":e.to_string()})
-                    }
-                }
+            None => {
+                let (output, limit) = self.run_tool(&call, &mut entry)?;
+                fatal = limit;
+                output
             }
         };
         let executed = entry.ok;
@@ -396,15 +422,7 @@ impl Attempt<'_> {
         if executed {
             self.calls.push(call);
             if variant.mode.staged() {
-                self.stage_successes += 1;
-                if self
-                    .stages
-                    .get(self.stage)
-                    .is_some_and(|s| self.stage_successes >= s.successes)
-                {
-                    self.stage += 1;
-                    self.stage_successes = 0;
-                }
+                self.count_stage_success();
             }
         }
         if self.repeats >= 2 {
