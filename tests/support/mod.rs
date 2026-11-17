@@ -4,9 +4,10 @@
 use a2e::{
     adapter::Adapter,
     case::Case,
-    config::{Catalog, Runtime, Suite, Variant},
+    config::{Catalog, Suite, Variant},
     inference::Inference,
     runner::{task_run, Outcome, TaskExecution},
+    settings::Settings,
 };
 use serde_json::{json, Value};
 use std::{
@@ -147,12 +148,10 @@ pub fn use_sandbox() {
 pub fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> Outcome {
     let dir = tempfile::tempdir().unwrap();
     let client = Inference::new(server.url.clone()).unwrap();
-    let runtime = Runtime {
-        memory_limit_mb: 1_000_000,
-        reserve_mb: 0,
-        power: "none".into(),
-        ..Runtime::default()
-    };
+    let mut runtime = Settings::default();
+    runtime.limits.memory_mb = 1_000_000;
+    runtime.limits.reserve_mb = 0;
+    runtime.host.power = "none".into();
     task_run(TaskExecution {
         client: &client,
         adapter: Adapter::QWEN3,

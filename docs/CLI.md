@@ -2,11 +2,11 @@
 
 This page lists every command of the `a2e` program. Run `a2e --help` or `a2e <command> --help` to see the same information with the exact flags of your build. The setup steps are in the [README](../README.md), and the settings are in the [guide](GUIDE.md).
 
-Commands that print data write JSON to stdout. Progress, warnings and prompts go to stderr or to the terminal, so you can pipe the output of a command into another tool. Two options work with every command. `--config <path>` names the model registry, and the default is `configs/models.toml`. `--local` keeps results on the device and sends nothing to the Worker, the same as setting `A2E_LOCAL=1`.
+Commands that print data write JSON to stdout. Progress, warnings and prompts go to stderr or to the terminal, so you can pipe the output of a command into another tool. Three options work with every command. `--config <path>` names the model registry, and the default is `configs/models.toml`. `--local` keeps results on the device and sends nothing to the Worker, the same as setting `A2E_LOCAL=1`. `--set section.key=value` overrides one setting for that command, and you can repeat it. `docs/CONFIG.md` lists the settings.
 
 ## Menu
 
-Run `a2e` with no command on a terminal to open a menu. The menu offers to start a run, check what a suite would do, show the status of a run, attach to a run, follow a log, stop a run, run `doctor`, and send waiting results. Starting a run asks for the suites, models, variants, whether to keep results on the device, and whether to retry failed attempts. It then shows how many attempts the choice makes and asks before it starts. Esc goes back one step, and Ctrl-C leaves the menu. The menu remembers your last choices in `results/.last-run.toml`. Without a terminal, `a2e` prints the help and exits with code 2, so scripts never wait for input.
+Run `a2e` with no command on a terminal to open a menu. The menu offers to start a run, check what a suite would do, show the status of a run, attach to a run, follow a log, stop a run, run `doctor`, show every setting and the layer it came from, add a model from Hugging Face, and send waiting results. Starting a run asks for the suites, models, variants, whether to keep results on the device, and whether to retry failed attempts. It then shows how many attempts the choice makes and asks before it starts. Esc goes back one step, and Ctrl-C leaves the menu. The menu remembers your last choices in `results/.last-run.toml`. Without a terminal, `a2e` prints the help and exits with code 2, so scripts never wait for input.
 
 ## Run
 
@@ -14,6 +14,7 @@ Run `a2e` with no command on a terminal to open a menu. The menu offers to start
 
 - `--model`, `--context` and `--variant` take comma separated values and run only that part of the suite. An unknown name stops the command and suggests the closest known name.
 - `--retry-failed` runs again the attempts that did not succeed.
+- `--model hf:<repo>:<quant>` runs a Hugging Face GGUF with no setup step. The harness looks up the newest commit, downloads the file, and runs it. The model is marked unpinned, because the commit can change, and its results are not uploaded. Add `--local`, or pass `--allow-unpinned` to upload them anyway. Run `a2e models add` to pin it.
 - `--allow-missing-model` lets a run continue when a model file is missing. Without it the run stops before it starts.
 - `--dry-run` prints the runs and checks that the model files and llama-server exist, and then stops without starting a model.
 - `--tools <file>` names the tool definitions, and the default is `configs/tools/standard.toml`.
@@ -46,7 +47,9 @@ a2e stop queue
 
 - `a2e doctor` shows the host, the machine, the memory headroom of each model and the settings. With `--probe` it also loads each model once and checks its output format.
 - `a2e models fetch` downloads the pinned models and checks their hashes.
+- `a2e models add <repo>[:quant]` looks up a Hugging Face repository, picks one GGUF file, downloads it with a progress bar, checks it against the hash Hugging Face publishes, and writes a pinned `[[models]]` entry to `configs/local.toml`. With no quant it prefers `Q4_K_M`. `--id` names the model, `--file` names the file when the quant does not pick one, `--adapter` sets the tool-call format, and `--shared` writes to `configs/models.toml` instead. Set `HF_TOKEN` for a gated repository. Sharded GGUF files are not supported yet.
 - `a2e cases validate [path]` checks every case against the tool definitions and rubrics, and `a2e cases list [path] [--ids]` counts cases by category and split.
+- `a2e config show [--source]` prints the final settings, and with `--source` also the layer that set each key. `a2e config check` loads every layer and reports the first error. `a2e config init` creates `configs/local.toml` from the example.
 - `a2e tools validate [file]` checks that every tool definition has a handler and a valid schema.
 - `a2e sandbox init [--seed N] [--out dir] [--force]` builds the file sandbox, `a2e sandbox verify [--dir dir]` checks it against its manifest, and `a2e sandbox info [--dir dir]` prints the manifest.
 - `a2e upload [--status]` sends waiting results to the Worker, or shows what is waiting.
@@ -60,10 +63,11 @@ To install completions for zsh, write the output to a file in a folder on your `
 |---|---|
 | `A2E_LOCAL` | Keeps results on the device when set to `1` |
 | `A2E_HOST_ID` | Picks the host file `configs/hosts/<id>.toml` instead of the detected user and host |
-| `A2E_MODELS_DIR` | Overrides `models_dir` |
-| `A2E_LLAMA_SERVER` | Overrides `llama_server` |
-| `A2E_OUTPUT_DIR` | Overrides `output_dir` |
-| `A2E_SANDBOX` | Folder of the file sandbox, `sandbox` by default |
+| `A2E_<SECTION>_<KEY>` | Overrides one setting, for example `A2E_LIMITS_MEMORY_MB`. See `docs/CONFIG.md` |
+| `A2E_MODELS_DIR` | Overrides `host.models_dir` |
+| `A2E_LLAMA_SERVER` | Overrides `llama.server` |
+| `A2E_OUTPUT_DIR` | Overrides `host.output_dir` |
+| `A2E_SANDBOX` | Folder of the file sandbox; overrides `host.sandbox_dir`, which is `sandbox` by default |
 | `A2E_RESULTS_ENV` | Path of an `.env` file that holds `WORKER_URL` and `WRITE_TOKEN` |
 | `WORKER_URL`, `WRITE_TOKEN` | Where results are sent and the token that allows it |
 | `BRAVE_SEARCH_API_KEY` | Key for the live search suite |

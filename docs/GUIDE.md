@@ -20,7 +20,7 @@ or on an Apple Silicon Mac. It runs these steps, and each one can be repeated:
 
 1. It installs the packages (APT or Homebrew), tmux and the Rust version named
    by `rust-version` in `Cargo.toml`. The Pi uses sudo for APT.
-2. It builds the llama.cpp commit pinned by `llama_commit` in
+2. It builds the llama.cpp commit pinned by `commit` in the `[llama]` table of
    `configs/models.toml` and checks that `llama-server --version` contains the
    first 8 characters of the commit, which the runner requires. It builds with
    one job on the Pi.
@@ -40,22 +40,23 @@ architecture.
 
 ### Settings and hosts
 
-Settings come from four places, and a later one wins over an earlier one.
+Settings are read in layers, and a later layer wins over an earlier one. `docs/CONFIG.md` lists every key, its default and what it does.
 
-1. `configs/models.toml` holds the model registry and the shared `[runtime]`
-   settings, including the llama.cpp commit.
-2. `configs/hosts/<user>@<hostname>.toml` holds the settings for one device,
+1. `configs/models.toml` holds the model registry and the pinned llama.cpp commit.
+2. `configs/settings.toml` holds the defaults for limits, sampling, llama-server flags, host paths and rare limits. It is the file most people edit.
+3. `configs/hosts/<user>@<hostname>.toml` holds the settings for one device,
    for example `deepak@RPi.toml`. The program loads the file that matches the
    current user and hostname, or the one named by `A2E_HOST_ID`, and it prints
    a warning when no file matches.
-3. `configs/local.toml` holds settings for this checkout only. Copy
-   `configs/local.example.toml` to start one. Git ignores it.
-4. Environment variables, set in the shell or in `.env`, override the paths:
-   `A2E_MODELS_DIR`, `A2E_LLAMA_SERVER` and `A2E_OUTPUT_DIR`.
+4. `configs/local.toml` holds settings for this checkout only. `a2e config init`
+   creates one from `configs/local.example.toml`. Git ignores it.
+5. A suite file, environment variables named `A2E_<SECTION>_<KEY>`, and
+   `--set section.key=value` come last.
 
-A host file or `local.toml` can hold any `[runtime]` setting. A different memory
-limit or GPU setting produces a separate study, because the settings are part of
-the study id. `a2e doctor` prints the host and the host file it loaded.
+`a2e config show --source` prints the final value of every setting and the layer
+that set it. A different memory limit, thread count or sampling value produces a
+separate study, because the settings are part of the study id. `a2e doctor`
+prints the host and the host file it loaded.
 
 ## Run and read results
 
@@ -77,6 +78,8 @@ A suite name such as `smoke` stands for `configs/suites/smoke.toml`. To run part
 | Command | What it does |
 |---|---|
 | `a2e models fetch` | Download the models and check their hashes |
+| `a2e models add <repo>:<quant>` | Download a GGUF from Hugging Face and pin it |
+| `a2e config show --source` | Print every setting and the layer that set it |
 | `a2e doctor [--probe]` | Show the machine, the models and the settings; `--probe` also starts each model |
 | `a2e plan [suite]` | List the jobs a suite would run |
 | `a2e run [suite] [--dry-run] [--retry-failed]` | Run or resume a suite in this terminal |
@@ -353,10 +356,19 @@ timings come out identical.
 ## Add a host, model, suite or variant
 
 - A host is one new file, `configs/hosts/<user>@<hostname>.toml`, with the
-  `[runtime]` settings that differ on that device.
-- A model is one new `[[models]]` entry in `configs/models.toml` with its
-  `adapter`, source, 40 character revision and SHA-256. Suites without a
-  `models` line pick it up with no other edit. `a2e models fetch` downloads it.
+  settings that differ on that device.
+- A model from Hugging Face is one command: `a2e models add <repo>:<quant>`. It
+  downloads the GGUF file, pins the commit and the SHA-256, and writes the
+  entry to `configs/local.toml`. Suites without a `models` line pick it up with
+  no other edit. To write the entry by hand, add a `[[models]]` entry with its
+  source, 40 character revision, file and SHA-256; `a2e models fetch` downloads
+  it. The `adapter` key is optional. A model with no family adapter uses
+  `jinja`, which reads a JSON call between `<tool_call>` tags, as most recent
+  instruction models write it. Run `a2e doctor --probe` to check that a new
+  model's output parses.
+- To try a model once with no setup, use `--model hf:<repo>:<quant>`. The run is
+  marked unpinned, and its results stay on the device unless you pass
+  `--allow-unpinned`.
 - A suite is one new file in `configs/suites`. Copy `smoke.toml`, change the
   cases and tags, and list the variants it needs. `a2e plan <name>` checks it.
 - A variant is one new `[[variants]]` block in `configs/variants.toml`.

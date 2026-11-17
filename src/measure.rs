@@ -2,7 +2,7 @@
 //!
 //! Process memory, CPU time, Pi thermals, and optional Mac power readings.
 
-use crate::config::Runtime;
+use crate::settings::Settings;
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -34,7 +34,6 @@ pub struct Sample {
     pub major_faults: Option<u64>,
 }
 /// Samples kept per interval; summary statistics still cover every sample.
-pub const MAX_SAMPLES: usize = 20_000;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Resources {
     pub harness_peak_bytes: u64,
@@ -53,7 +52,7 @@ pub struct Resources {
     #[serde(skip)]
     pub series: Vec<Sample>,
 }
-pub fn machine(r: &Runtime) -> Result<Value> {
+pub fn machine(r: &Settings) -> Result<Value> {
     let mut s = System::new();
     s.refresh_memory();
     let model = std::fs::read_to_string("/proc/device-tree/model").unwrap_or_default();
@@ -64,10 +63,10 @@ pub fn machine(r: &Runtime) -> Result<Value> {
     } else {
         "unsupported"
     };
-    let device = if r.device == "auto" {
+    let device = if r.host.device == "auto" {
         detected
     } else {
-        &r.device
+        &r.host.device
     };
     if !["pi3bplus", "mac"].contains(&device) {
         bail!("unsupported device; expected Pi 3B+ or Apple Silicon Mac");
@@ -149,7 +148,7 @@ fn is_pi3bplus() -> bool {
         .is_ok_and(|m| m.contains("Raspberry Pi 3 Model B Plus"))
 }
 fn pi_thermal() -> (Option<f64>, Option<String>) {
-    let temp = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp")
+    let temp = std::fs::read_to_string(&crate::settings::active().host.thermal_path)
         .ok()
         .and_then(|v| v.trim().parse::<f64>().ok())
         .map(|v| v / 1000.)
@@ -212,7 +211,7 @@ pub fn throttle_flags(v: &str) -> Vec<&'static str> {
     .collect()
 }
 /// Problems that make timings from this device unrepresentative; shown by `doctor` and before a run.
-pub fn preflight_warnings(r: &Runtime) -> Vec<String> {
+pub fn preflight_warnings(r: &Settings) -> Vec<String> {
     let mut out = Vec::new();
     if let (_, Some(t)) = pi_thermal() {
         let flags = throttle_flags(&t);
@@ -226,10 +225,10 @@ pub fn preflight_warnings(r: &Runtime) -> Vec<String> {
     let mut s = System::new();
     s.refresh_memory();
     let total_mb = s.total_memory() >> 20;
-    if total_mb > 0 && r.memory_limit_mb > total_mb {
+    if total_mb > 0 && r.limits.memory_mb > total_mb {
         out.push(format!(
             "memory_limit_mb = {} exceeds the {total_mb} MiB of physical memory, so the memory guard cannot trip",
-            r.memory_limit_mb
+            r.limits.memory_mb
         ));
     }
     out
@@ -241,7 +240,14 @@ pub fn throttle_clean(v: &str) -> bool {
     v.is_empty() || v == "0x0" || v == "nominal"
 }
 const POWERMETRICS: &str = "/usr/bin/powermetrics";
-const POWERMETRICS_ARGS: [&str; 4] = ["--samplers", "cpu_power,gpu_power,thermal", "-i", "500"];
+fn powermetrics_args() -> [String; 4] {
+    [
+        "--samplers".into(),
+        "cpu_power,gpu_power,thermal".into(),
+        "-i".into(),
+        crate::settings::active().host.sample_ms.to_string(),
+    ]
+}
 pub const TELEMETRY_SETUP: &str = "./setup.sh telemetry";
 fn is_root() -> bool {
     // SAFETY: No memory preconditions
@@ -257,7 +263,7 @@ pub fn power_access() -> Result<()> {
     }
     let allowed = Command::new("sudo")
         .args(["-n", "-l", "--", POWERMETRICS])
-        .args(POWERMETRICS_ARGS)
+        .args(powermetrics_args())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -306,7 +312,7 @@ impl Power {
             c
         };
         let mut child = command
-            .args(POWERMETRICS_ARGS)
+            .args(powermetrics_args())
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -388,11 +394,11 @@ pub struct Monitor {
     thread: Option<thread::JoinHandle<()>>,
 }
 impl Monitor {
-    pub fn start(pid: u32, r: &Runtime, cancel: Arc<AtomicBool>) -> Result<Self> {
-        let power = if r.power != "none" && std::env::consts::OS == "macos" {
+    pub fn start(pid: u32, r: &Settings, cancel: Arc<AtomicBool>) -> Result<Self> {
+        let power = if r.host.power != "none" && std::env::consts::OS == "macos" {
             match Power::start() {
                 Ok(p) => Some(p),
-                Err(e) if r.power == "required" => bail!("power_required: {e}"),
+                Err(e) if r.host.power == "required" => bail!("power_required: {e}"),
                 Err(e) => {
                     static WARNED: std::sync::Once = std::sync::Once::new();
                     WARNED.call_once(|| eprintln!("warning: power and thermal unavailable: {e}"));
@@ -402,10 +408,10 @@ impl Monitor {
         } else {
             None
         };
-        if r.power == "required" && power.is_none() {
+        if r.host.power == "required" && power.is_none() {
             bail!("power_required: supported telemetry unavailable");
         }
-        let modeled = power.is_none() && r.power == "auto" && is_pi3bplus();
+        let modeled = power.is_none() && r.host.power == "auto" && is_pi3bplus();
         let stop = Arc::new(AtomicBool::new(false));
         let exceeded = Arc::new(AtomicBool::new(false));
         let summary = Arc::new(Mutex::new(Resources {
@@ -484,8 +490,8 @@ impl Monitor {
                 }
                 previous_power = watts.map(|w| (elapsed, w));
                 let available = Some(system.available_memory()).filter(|a| *a > 0);
-                let exceeded = h + m > r.memory_limit_mb * 1024 * 1024
-                    || available.is_some_and(|a| a < r.reserve_mb * 1024 * 1024);
+                let exceeded = h + m > r.limits.memory_mb * 1024 * 1024
+                    || available.is_some_and(|a| a < r.limits.reserve_mb * 1024 * 1024);
                 {
                     let mut s = stats.lock().unwrap_or_else(|e| e.into_inner());
                     s.harness_peak_bytes = s.harness_peak_bytes.max(h);
@@ -503,7 +509,7 @@ impl Monitor {
                         (a, b) => a.or(b),
                     };
                     let (minor, major) = (s.minor_faults, s.major_faults);
-                    if s.series.len() < MAX_SAMPLES {
+                    if s.series.len() < crate::settings::active().advanced.max_samples {
                         s.series.push(Sample {
                             t_ms: elapsed * 1000.,
                             harness_bytes: h,
@@ -535,7 +541,7 @@ impl Monitor {
                 if last {
                     break;
                 }
-                thread::park_timeout(Duration::from_millis(r.sample_ms));
+                thread::park_timeout(Duration::from_millis(r.host.sample_ms));
             }
             drop(power);
         });
@@ -577,11 +583,9 @@ mod tests {
 
     #[test]
     fn a_short_interval_still_gets_a_start_and_an_end_sample() {
-        let runtime = Runtime {
-            power: "none".into(),
-            sample_ms: 5_000,
-            ..Runtime::default()
-        };
+        let mut runtime = Settings::default();
+        runtime.host.power = "none".into();
+        runtime.host.sample_ms = 5_000;
         let mut child = Command::new("sleep").arg("5").spawn().unwrap();
         let monitor =
             Monitor::start(child.id(), &runtime, Arc::new(AtomicBool::new(false))).unwrap();

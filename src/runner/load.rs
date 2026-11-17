@@ -25,7 +25,9 @@ pub(super) struct Loaded {
     pub(super) props: Value,
 }
 /// Longest wait for a cancelled call to leave its slot before the server is restarted.
-pub(super) const SETTLE: Duration = Duration::from_secs(60);
+pub(super) fn settle() -> Duration {
+    Duration::from_secs(crate::settings::active().advanced.settle_timeout_s)
+}
 pub(super) struct LoadRequest<'a> {
     pub(super) config: &'a Config,
     pub(super) model: &'a crate::config::Model,
@@ -43,8 +45,15 @@ pub(super) fn launch(
     warn_if_tight(x.config, x.model);
     let launched = (|| -> Result<(Server, Loaded)> {
         let mut server = Server::spawn(x.config, x.model, x.ctx, x.group)?;
-        let monitor = Monitor::start(server.pid(), &x.config.runtime, x.cancel.clone())?;
-        let ready = server.ready(x.config.runtime.startup_seconds, x.cancel);
+        let monitor = Monitor::start(
+            server.pid(),
+            x.config.settings_for(x.model),
+            x.cancel.clone(),
+        )?;
+        let ready = server.ready(
+            x.config.settings_for(x.model).llama.startup_seconds,
+            x.cancel,
+        );
         let resources = monitor.finish();
         if resources.memory_exceeded {
             return Err(HarnessError::ModelLoadMemoryBudget.into());
@@ -108,13 +117,13 @@ pub(super) fn warn_if_tight(config: &Config, model: &crate::config::Model) {
         return;
     };
     let available = crate::measure::available_memory();
-    let needed = file.len() + config.runtime.reserve_mb * 1024 * 1024;
+    let needed = file.len() + config.settings.limits.reserve_mb * 1024 * 1024;
     if available > 0 && needed > available {
         eprintln!(
             "warning: {} needs {} MiB for its weights plus the {} MiB reserve, before the context cache, but {} MiB is available; expect paging and call timeouts",
             model.id,
             file.len() >> 20,
-            config.runtime.reserve_mb,
+            config.settings.limits.reserve_mb,
             available >> 20
         );
     }

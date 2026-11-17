@@ -1,0 +1,71 @@
+# Default settings for every run. Each value shown is the built-in default.
+# Later layers win: hosts/<user>@<host>.toml, local.toml, [models.settings] in models.toml
+# (llama and sampling only), a suite file, A2E_<SECTION>_<KEY> variables, then --set section.key=value.
+# `a2e config show --source` prints the final value of every key and which layer set it.
+# Documented in docs/CONFIG.md.
+
+[limits]
+memory_mb = 768          # harness plus server; raise only for a separately labelled Mac envelope
+reserve_mb = 128         # free memory that must remain
+context = [1024]         # context sizes to test
+input_tokens = 0         # longest prompt; 0 means only the context size limits it
+output_tokens = 256      # tokens one model call may generate
+model_calls = 8
+call_seconds = 300
+task_seconds = 900
+tool_seconds = 20
+tool_output_bytes = 8192
+stall_attempts = 3       # 0 never skips a stalled model
+
+[sampling]
+temperature = 0.0
+top_p = 1.0
+top_k = 0                # 0 turns top-k off
+min_p = 0.0
+seed = 0
+repeats = 1
+warmup = 0
+
+[llama]                  # llama-server flags; the commit is in models.toml
+server = "deps/llama.cpp/build-a2e/bin/llama-server"
+host = "127.0.0.1"
+port = 8197
+threads = 4
+gpu_layers = 0
+parallel = 1
+batch_size = 128
+ubatch_size = 64
+cache_ram = 0            # MiB of host-memory prompt cache
+jinja = true
+special = true
+context_shift = false
+flash_attn = "auto"      # auto, on or off
+cache_type_k = "f16"
+cache_type_v = "f16"
+mlock = false
+mmap = true
+chat_template = ""       # empty uses the template inside the model file
+extra_args = []          # raw flags appended last
+startup_seconds = 300
+
+[host]
+device = "auto"
+power = "auto"           # auto, none or required
+sample_ms = 500
+thermal_path = "/sys/class/thermal/thermal_zone0/temp"
+models_dir = "models"
+output_dir = "results"
+sandbox_dir = "sandbox"
+sandbox_tmp = ""         # empty uses a workspace folder in each run directory
+
+[advanced]
+inference_timeout_s = 300
+settle_timeout_s = 60
+slot_erase_timeout_s = 10
+upload_timeout_s = 30
+upload_body_bytes = 2000000
+max_samples = 20000
+web_timeout_s = 12
+dns_timeout_s = 3
+download_timeout_s = 1800
+download_max_bytes = 8589934592

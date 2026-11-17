@@ -129,7 +129,7 @@ pub struct TaskExecution<'a> {
     pub dir: &'a Path,
     pub cancel: Arc<AtomicBool>,
     pub server_pid: u32,
-    pub runtime: &'a crate::config::Runtime,
+    pub runtime: &'a crate::settings::Settings,
 }
 pub(super) enum Step {
     Next,
@@ -213,7 +213,21 @@ impl Attempt<'_> {
         if prompt_len + suite.budget.generated_tokens > self.x.ctx {
             bail!("context_budget");
         }
-        let mut request = json!({"prompt":prompt,"n_predict":suite.budget.generated_tokens,"temperature":0,"seed":suite.seed,"cache_prompt":true,"stop":self.x.adapter.generation_stops(),"id_slot":0});
+        let cap = self.x.runtime.limits.input_tokens;
+        if cap > 0 && prompt_len > cap {
+            bail!("context_budget");
+        }
+        let sampling = &self.x.runtime.sampling;
+        let mut request = json!({"prompt":prompt,"n_predict":suite.budget.generated_tokens,"temperature":sampling.temperature,"seed":suite.seed,"cache_prompt":true,"stop":self.x.adapter.generation_stops(),"id_slot":0});
+        if sampling.top_p < 1.0 {
+            request["top_p"] = json!(sampling.top_p);
+        }
+        if sampling.top_k > 0 {
+            request["top_k"] = json!(sampling.top_k);
+        }
+        if sampling.min_p > 0.0 {
+            request["min_p"] = json!(sampling.min_p);
+        }
         if variant.constrained {
             request["grammar"] = json!(self.x.adapter.grammar(specs));
         }

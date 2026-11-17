@@ -43,7 +43,7 @@ Unknown keys in any file are errors, so a misspelled setting stops the run inste
 
 ## 4. Model serving
 
-The harness starts one `llama-server` process per model and context size, and stops it afterwards. It sends each model call to `/completion` with `cache_prompt` on and formats prompts with the server's `/apply-template` and the model's own chat template. The llama.cpp commit is fixed by `llama_commit` in `configs/models.toml`, and `setup.sh` builds that commit.
+The harness starts one `llama-server` process per model and context size, and stops it afterwards. It sends each model call to `/completion` with `cache_prompt` on and formats prompts with the server's `/apply-template` and the model's own chat template. The llama.cpp commit is fixed by `commit` in the `[llama]` table of `configs/models.toml`, and `setup.sh` builds that commit.
 
 Every model file is checked against its published SHA-256 before it is used. Decoding is greedy for every attempt. Each model has an adapter in `src/adapter` that writes the tool list in the model's own format and reads calls from the reply, because the three models use different call syntax.
 
@@ -146,7 +146,7 @@ Tools run inside the harness process, so they are limited in what they can touch
 
 ## 13. Portability
 
-The program builds with Rust 1.96 or newer on Linux (including `aarch64` for the Pi) and macOS. CI formats, lints and tests on both, and cross-builds for the Pi. Device settings come from `configs/models.toml`, a host file and `configs/local.toml`, in that order, and environment variables override them.
+The program builds with Rust 1.96 or newer on Linux (including `aarch64` for the Pi) and macOS. CI formats, lints and tests on both, and cross-builds for the Pi. Settings come from `configs/models.toml`, `configs/settings.toml`, a host file and `configs/local.toml`, in that order, and environment variables and `--set` override them (see `docs/CONFIG.md`).
 
 ## 14. Licensing and sources
 

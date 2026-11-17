@@ -37,7 +37,9 @@ impl Client {
             base: base.trim_end_matches('/').to_owned(),
             token: token.to_owned(),
             http: Http::builder()
-                .timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(
+                    crate::settings::active().advanced.upload_timeout_s,
+                ))
                 .build()
                 .context("cannot build the HTTP client")?,
         })

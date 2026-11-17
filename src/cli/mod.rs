@@ -4,6 +4,7 @@
 
 mod inspect;
 mod menu;
+mod models;
 mod run;
 mod session;
 
@@ -34,6 +35,9 @@ Inspect and set up:
   a2e cases list --ids         list case ids
   a2e cases validate           check cases, tools and rubrics after any change
   a2e models fetch             download the pinned models
+  a2e models add unsloth/Qwen3-0.6B-GGUF:Q4_K_M   download and pin any GGUF from Hugging Face
+  a2e config show --source     print every setting and the layer that set it
+  a2e run core --set limits.output_tokens=512   change one setting for one run
   a2e completions zsh          print shell completions";
 
 #[derive(Parser)]
@@ -49,6 +53,9 @@ struct Cli {
     /// Keep results on this device; nothing is sent to the Worker (same as A2E_LOCAL=1)
     #[arg(long, global = true)]
     local: bool,
+    /// Override one setting, for example --set limits.output_tokens=512; repeat for more
+    #[arg(long = "set", global = true, value_name = "KEY=VALUE")]
+    set: Vec<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -79,6 +86,11 @@ enum Command {
     Models {
         #[command(subcommand)]
         command: ModelsCommand,
+    },
+    /// Show, check or create settings
+    Config {
+        #[command(subcommand)]
+        command: inspect::ConfigCommand,
     },
     /// Check tool definitions
     Tools {
@@ -112,6 +124,8 @@ enum Command {
 enum ModelsCommand {
     /// Download the pinned models and check their hashes
     Fetch,
+    /// Download a GGUF from Hugging Face and add it as a pinned model
+    Add(models::AddArgs),
 }
 
 #[derive(Subcommand)]
@@ -138,6 +152,7 @@ pub fn main() {
 
 fn entry() -> Result<()> {
     let cli = Cli::parse();
+    a2e::config::set_overrides(cli.set.clone());
     if cli.local {
         // Set before any thread starts and before the credentials file is read
         std::env::set_var("A2E_LOCAL", "1");
@@ -163,9 +178,13 @@ fn entry() -> Result<()> {
         Command::Models {
             command: ModelsCommand::Fetch,
         } => serde_json::to_value(a2e::config::Config::load(&cli.config)?.fetch_models()?)?,
+        Command::Models {
+            command: ModelsCommand::Add(args),
+        } => models::add(&cli.config, &args)?,
         Command::Tools {
             command: ToolsCommand::Validate { tools },
         } => inspect::validate_tools(&tools)?,
+        Command::Config { command } => inspect::config(&cli.config, &command)?,
         Command::Cases { command } => inspect::cases(&command)?,
         Command::Upload { status } => inspect::upload(&cli.config, status)?,
         Command::Sandbox { command } => inspect::sandbox(&command)?,

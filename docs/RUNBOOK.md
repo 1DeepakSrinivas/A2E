@@ -37,7 +37,7 @@ sudo systemctl set-default multi-user.target
 echo 'gpu_mem=16' | sudo tee -a /boot/firmware/config.txt
 ```
 
-After the reboot, `a2e doctor` shows `memory.headroom_mib` for each model: the available memory minus the weights and `reserve_mb`. That headroom must still hold the context cache and buffers, which is about 60 MiB for `lfm2.5-1.2b-instruct-qad` and about 280 MiB for `qwen3-0.6b` at context 2048. A model with less headroom than that will page from storage and time out.
+After the reboot, `a2e doctor` shows `memory.headroom_mib` for each model: the available memory minus the weights and `limits.reserve_mb`. That headroom must still hold the context cache and buffers, which is about 60 MiB for `lfm2.5-1.2b-instruct-qad` and about 280 MiB for `qwen3-0.6b` at context 2048. A model with less headroom than that will page from storage and time out.
 
 To send results to the cloud, copy `.env.example` to `.env` and set `WORKER_URL` and `WRITE_TOKEN`, or set `A2E_RESULTS_ENV` to the a2e-results `.env` file. Without them, results wait in `results/outbox`.
 
@@ -86,13 +86,13 @@ Use this route only when the Pi cannot build, for example because it runs out of
 
 `a2e doctor` lists this under `warnings`, and `a2e run` prints the same warning before it starts. The flags `0x50005` mean under-voltage and throttling both now and since boot. Reboot after fixing the supply, because the "since boot" bits only clear then.
 
-**Most attempts end in `operation timed out`, with many major page faults.** The model does not fit in memory. llama.cpp maps the weights from the file, so when the weights, the context cache and the rest of the system need more than the physical memory, the kernel drops and re-reads weight pages on every token. On the 1 GB Pi 3B+ this happens with `lfm2.5-1.2b-instruct-qad` (weights larger than the free memory) and is marginal with `qwen3-0.6b` at context 2048. The runner warns before loading when the weights plus `reserve_mb` exceed the available memory. Close other programs, boot to the console instead of the desktop, or leave the model out of the suite on that device.
+**Most attempts end in `operation timed out`, with many major page faults.** The model does not fit in memory. llama.cpp maps the weights from the file, so when the weights, the context cache and the rest of the system need more than the physical memory, the kernel drops and re-reads weight pages on every token. On the 1 GB Pi 3B+ this happens with `lfm2.5-1.2b-instruct-qad` (weights larger than the free memory) and is marginal with `qwen3-0.6b` at context 2048. The runner warns before loading when the weights plus `limits.reserve_mb` exceed the available memory. Close other programs, boot to the console instead of the desktop, or leave the model out of the suite on that device.
 
 **`model_stalled: skipped after 3 attempts with no completed model call`.** Three attempts in a row for one model and context ended before any model call returned, so the runner skipped the rest of that group instead of waiting out every timeout. The skipped attempts are recorded as excluded, not as model failures. Fix the cause, then rerun with `--retry-failed`. Set `stall_attempts = 0` under `[budget]` in the suite to turn this off.
 
 **`cache_reset_failed`.** The server defers a cache erase while its slot is busy, which happened after a call timed out. The runner now waits up to 60 seconds for the slot and restarts the server when it stays busy, so this should only appear when the restart itself fails.
 
-**`memory_limit_mb` is larger than the device memory.** The memory guard compares the two processes with this limit, so a limit above the physical memory can never trip. `a2e doctor` warns about it. The default is 768.
+**`limits.memory_mb` is larger than the device memory.** The memory guard compares the two processes with this limit, so a limit above the physical memory can never trip. `a2e doctor` warns about it. The default is 768.
 
 **exFAT drive.** exFAT has no execute bit, so run `chmod +x` on the binaries after copying. A Mac adds `._*` files, and a case file with that name breaks parsing with a UTF-8 error. Remove them with `find . -name '._*' -delete` or `dot_clean`. The device name can change between mounts (for example `sda1` and `sdb1`), so run `lsblk -f` before mounting. Mount with `sudo mount -o uid=$(id -u),gid=$(id -g) /dev/sdb1 /mnt/usb`.
 

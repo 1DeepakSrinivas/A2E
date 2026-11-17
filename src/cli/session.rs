@@ -130,18 +130,16 @@ pub fn session_name(suites: &[String]) -> String {
     }
 }
 
-/// Settings that change a run. Secrets are left out because they would show in the process list;
-/// the run reads them from `.env` in the working directory.
-const FORWARDED_ENV: [&str; 8] = [
-    "A2E_HOST_ID",
-    "A2E_MODELS_DIR",
-    "A2E_LLAMA_SERVER",
-    "A2E_OUTPUT_DIR",
-    "A2E_RESULTS_ENV",
-    "A2E_SANDBOX",
-    "A2E_SANDBOX_TMP",
-    "PATH",
-];
+/// Variables forwarded to the tmux session: every `A2E_` setting, `HF_ENDPOINT` and `PATH`. Secrets are
+/// left out because they would show in the process list; the run reads them from `.env`.
+fn forwarded_env() -> Vec<String> {
+    let mut vars: Vec<String> = std::env::vars()
+        .filter(|(k, _)| k.starts_with("A2E_") || k == "HF_ENDPOINT" || k == "PATH")
+        .map(|(k, v)| format!("{k}={v}"))
+        .collect();
+    vars.sort();
+    vars
+}
 
 /// The command tmux runs: this binary's hidden `queue` command with the run options.
 fn queue_command(
@@ -154,11 +152,7 @@ fn queue_command(
 ) -> Vec<String> {
     // tmux starts the command with its server's environment, so pass the settings explicitly.
     let mut command = vec!["env".to_string()];
-    command.extend(FORWARDED_ENV.iter().filter_map(|key| {
-        std::env::var(key)
-            .ok()
-            .map(|value| format!("{key}={value}"))
-    }));
+    command.extend(forwarded_env());
     command.push(exe.to_string_lossy().into_owned());
     command.extend([
         "--config".into(),
@@ -166,6 +160,9 @@ fn queue_command(
     ]);
     if local {
         command.push("--local".into());
+    }
+    for item in a2e::config::overrides() {
+        command.extend(["--set".into(), item.clone()]);
     }
     command.extend([
         "queue".into(),
@@ -238,7 +235,7 @@ pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value>
         .with_context(|| format!("suite {s} does not plan"))?;
     }
     let config = Config::load(config_path)?;
-    let logs = expand_path(&config.runtime.output_dir).join("logs");
+    let logs = expand_path(&config.settings.host.output_dir).join("logs");
     std::fs::create_dir_all(&logs)?;
     let name = session_name(&suites);
     let log = logs.join(format!("{name}-{}.log", stamp()));
@@ -276,6 +273,11 @@ pub fn queue(args: &QueueArgs, stop: Arc<AtomicBool>) -> Result<Value> {
         let mut child = Command::new(&exe)
             .arg("--config")
             .arg(&args.config)
+            .args(
+                a2e::config::overrides()
+                    .iter()
+                    .flat_map(|i| ["--set", i.as_str()]),
+            )
             .args(["run", suite])
             .args(&args.rest)
             .stdout(Stdio::piped())
@@ -339,7 +341,7 @@ pub fn status(config_path: &Path, name: &str) -> Result<Value> {
 fn latest_log(config_path: &Path, name: &str) -> Result<PathBuf> {
     check_name(name)?;
     let config = Config::load(config_path)?;
-    let dir = expand_path(&config.runtime.output_dir).join("logs");
+    let dir = expand_path(&config.settings.host.output_dir).join("logs");
     let prefix = format!("{name}-");
     std::fs::read_dir(&dir)
         .with_context(|| format!("no log folder at {}", dir.display()))?
@@ -374,7 +376,7 @@ pub fn log_names(config_path: &Path) -> Vec<String> {
     let Ok(config) = Config::load(config_path) else {
         return Vec::new();
     };
-    let dir = expand_path(&config.runtime.output_dir).join("logs");
+    let dir = expand_path(&config.settings.host.output_dir).join("logs");
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .into_iter()
         .flatten()

@@ -2,7 +2,7 @@
 
 use super::{
     attempt::TaskExecution,
-    load::{launch, LoadRequest, Loaded, SETTLE},
+    load::{launch, settle, LoadRequest, Loaded},
     outcome::{classify_error, no_call_returned, Outcome, Status},
     task::{task_run, verify_sandbox},
 };
@@ -102,7 +102,7 @@ pub(super) fn git_state() -> Value {
 
 /// Hash of the inference binary; null when it cannot be read, which `launch` reports later.
 pub(super) fn llama_server_hash(config: &Config) -> Value {
-    crate::hash_file(&crate::config::expand_path(&config.runtime.llama_server))
+    crate::hash_file(&crate::config::expand_path(&config.settings.llama.server))
         .map_or(Value::Null, |h| json!(h))
 }
 
@@ -203,12 +203,12 @@ fn definition(
     catalog: &Catalog,
     sandbox: Option<&crate::sandbox::Manifest>,
 ) -> Result<Value> {
-    let machine = crate::measure::machine(&config.runtime)?;
+    let machine = crate::measure::machine(&config.settings)?;
     let mut definition = json!({
         "suite": suite,
         "cases": cases,
         "tools": catalog,
-        "runtime": config.runtime,
+        "settings": config.settings,
         "artifacts": artifacts(config, suite)?,
         "device": machine["device"],
         "kernel": machine["kernel"],
@@ -240,9 +240,9 @@ pub fn run(
     plan(config, suite, cases, catalog)?;
     require_model_files(config, suite, options)?;
     let sandbox = verify_sandbox(cases)?;
-    let root = crate::config::expand_path(&config.runtime.output_dir);
+    let root = crate::config::expand_path(&config.settings.host.output_dir);
     let _lock = RunLock::acquire(&root)?;
-    for w in crate::measure::preflight_warnings(&config.runtime) {
+    for w in crate::measure::preflight_warnings(&config.settings) {
         eprintln!("warning: {w}");
     }
     let definition = definition(config, suite, cases, catalog, sandbox.as_ref())?;
@@ -400,9 +400,9 @@ impl Study<'_> {
     /// A busy slot defers the cache erase, so wait for it or start a clean server.
     fn ensure_idle_server(&mut self, group: &mut Group) -> Result<()> {
         let ready = group.launched.as_ref().is_ok_and(|(server, _)| {
-            (!group.busy || server.client.settle(SETTLE))
+            (!group.busy || server.client.settle(settle()))
                 && (server.client.reset().is_ok()
-                    || (server.client.settle(SETTLE) && server.client.reset().is_ok()))
+                    || (server.client.settle(settle()) && server.client.reset().is_ok()))
         });
         if !ready && group.launched.is_ok() {
             eprintln!("warning: inference server did not become idle; restarting it");
@@ -436,7 +436,7 @@ impl Study<'_> {
                     dir,
                     cancel: self.cancel.clone(),
                     server_pid: server.pid(),
-                    runtime: &self.config.runtime,
+                    runtime: self.config.settings_for(group.model),
                 })
             }),
             Err(e) => Err(anyhow::anyhow!("{e}")),

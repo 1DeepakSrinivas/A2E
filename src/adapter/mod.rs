@@ -5,6 +5,7 @@
 //! requests and grammar assembly live here.
 
 mod functiongemma;
+mod generic;
 mod liquid;
 mod literal;
 mod qwen;
@@ -47,8 +48,12 @@ pub trait ModelFormat: Sync {
     }
 }
 
-static FORMATS: [&dyn ModelFormat; 3] =
-    [&functiongemma::FunctionGemma, &qwen::Qwen, &liquid::Liquid];
+static FORMATS: [&dyn ModelFormat; 4] = [
+    &functiongemma::FunctionGemma,
+    &qwen::Qwen,
+    &liquid::Liquid,
+    &generic::Generic,
+];
 
 /// A model family's tool call format.
 #[derive(Clone, Copy)]
@@ -78,6 +83,7 @@ impl Adapter {
     pub const FUNCTIONGEMMA: Adapter = Adapter(&functiongemma::FunctionGemma);
     pub const QWEN3: Adapter = Adapter(&qwen::Qwen);
     pub const LFM2: Adapter = Adapter(&liquid::Liquid);
+    pub const JINJA: Adapter = Adapter(&generic::Generic);
 
     pub fn new(name: &str) -> Result<Self> {
         FORMATS

@@ -81,7 +81,9 @@ fn resolve_public(u: &Url) -> Result<Vec<SocketAddr>> {
         let _ = tx.send(r);
     });
     let addresses = rx
-        .recv_timeout(Duration::from_secs(3))
+        .recv_timeout(Duration::from_secs(
+            crate::settings::active().advanced.dns_timeout_s,
+        ))
         .context("DNS timeout")??;
     if addresses.is_empty() || addresses.iter().any(|a| !public_ip(a.ip())) {
         bail!("nonpublic DNS result denied");
@@ -148,7 +150,9 @@ impl Web {
             let key =
                 std::env::var("BRAVE_SEARCH_API_KEY").context("BRAVE_SEARCH_API_KEY is missing")?;
             let response = Client::builder()
-                .timeout(Duration::from_secs(12))
+                .timeout(Duration::from_secs(
+                    crate::settings::active().advanced.web_timeout_s,
+                ))
                 .redirect(reqwest::redirect::Policy::none())
                 .build()?
                 .get("https://api.search.brave.com/res/v1/web/search")
@@ -210,7 +214,9 @@ impl Web {
                 // DNS pinning across validation and connection
                 let client = Client::builder()
                     .no_proxy()
-                    .timeout(Duration::from_secs(12))
+                    .timeout(Duration::from_secs(
+                        crate::settings::active().advanced.web_timeout_s,
+                    ))
                     .redirect(reqwest::redirect::Policy::none())
                     .resolve_to_addrs(url.host_str().context("missing host")?, &addresses)
                     .build()?;
