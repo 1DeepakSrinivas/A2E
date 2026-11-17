@@ -84,6 +84,8 @@ fn every_flag_in_cli_md_exists_in_some_help_text() {
         ["sandbox", "init"],
         ["sandbox", "verify"],
         ["sandbox", "info"],
+        ["models", "add"],
+        ["config", "show"],
     ] {
         all.push_str(&help(&sub));
     }

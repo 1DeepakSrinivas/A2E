@@ -4,7 +4,7 @@ Every value that changes how a study runs is a setting. This page lists them all
 
 ## Where settings come from
 
-Settings are TOML. They are read in layers, and a later layer wins over an earlier one. Each key is merged on its own, so a layer only needs the keys it changes. Lists replace the earlier list.
+Settings are TOML. They are read in layers, and a later layer wins over an earlier one. Each key is merged on its own, so a layer only needs the keys it changes. Lists replace the earlier list. The one exception is `[[models]]`: a later file adds its models to the earlier ones, and an entry with the same `id` replaces the earlier entry. That is how `a2e models add` can write to `configs/local.toml` without hiding the models in `configs/models.toml`.
 
 1. Built-in defaults.
 2. `configs/models.toml`. It holds the model list and the pinned llama.cpp commit.
@@ -23,6 +23,8 @@ Three commands help:
 - `a2e config show` prints the final settings.
 - `a2e config show --source` also prints which layer set each key.
 - `a2e config check` loads every layer and reports the first error.
+
+Two variables belong to Hugging Face and not to the harness: `HF_TOKEN` for gated repositories, and `HF_ENDPOINT` for a mirror.
 
 Secrets are not settings. `WORKER_URL`, `WRITE_TOKEN` and `BRAVE_SEARCH_API_KEY` stay in `.env`.
 

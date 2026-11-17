@@ -18,6 +18,8 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct Model {
     pub id: String,
+    /// Tool-call format; models without their own adapter use `jinja`.
+    #[serde(default = "default_adapter")]
     pub adapter: String,
     pub quant: String,
     pub source: String,
@@ -27,6 +29,19 @@ pub struct Model {
     /// Overrides of the `llama` and `sampling` sections for this model only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settings: Option<toml::Value>,
+    /// False for a model named as `hf:repo:quant` on the command line; its result is flagged.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub pinned: bool,
+}
+fn yes() -> bool {
+    true
+}
+fn is_true(b: &bool) -> bool {
+    *b
+}
+
+fn default_adapter() -> String {
+    "jinja".into()
 }
 
 #[derive(Clone, Debug)]
@@ -170,14 +185,23 @@ impl Config {
             files.push((local, "local.toml".into()));
         }
         let mut layers = Layers::new();
-        let mut models = toml::Value::Array(Vec::new());
+        let mut models: Vec<toml::Value> = Vec::new();
         for (file, name) in files {
             let mut v: toml::Value = toml::from_str(&std::fs::read_to_string(&file)?)
                 .with_context(|| format!("read {}", file.display()))?;
             settings::upgrade_legacy(&mut v, &name)?;
             if let Some(t) = v.as_table_mut() {
-                if let Some(m) = t.remove("models") {
-                    models = m;
+                if let Some(toml::Value::Array(list)) = t.remove("models") {
+                    // A later layer adds models and replaces one with the same id
+                    for m in list {
+                        let id = m.get("id").and_then(|i| i.as_str()).map(str::to_string);
+                        match models.iter().position(|old| {
+                            id.is_some() && old.get("id").and_then(|i| i.as_str()) == id.as_deref()
+                        }) {
+                            Some(at) => models[at] = m,
+                            None => models.push(m),
+                        }
+                    }
                 }
             }
             layers.add(v, &name, false);
@@ -185,7 +209,7 @@ impl Config {
         layers.add(settings::env_layer(), "environment", true);
         layers.add(cli_layer()?, "--set", true);
         let settings = layers.settings()?;
-        let models: Vec<Model> = models.try_into()?;
+        let models: Vec<Model> = toml::Value::Array(models).try_into()?;
         let mut names = BTreeSet::new();
         let mut per_model = BTreeMap::new();
         for m in &models {
@@ -209,6 +233,11 @@ impl Config {
             layers,
             per_model,
         })
+    }
+    /// Adds a model not in any file, for an `hf:` reference on the command line.
+    pub fn add_model(&mut self, m: Model) {
+        self.models.retain(|old| old.id != m.id);
+        self.models.push(m);
     }
     pub fn model(&self, id: &str) -> Result<&Model> {
         self.models
@@ -767,6 +796,17 @@ mod tests {
         std::fs::write(&base, with("[models.settings.limits]\nmemory_mb = 5\n")).unwrap();
         assert!(Config::load(&base).is_err());
         drop(d);
+    }
+
+    #[test]
+    fn local_models_add_to_the_shared_list_and_replace_by_id() {
+        std::env::set_var("A2E_HOST_ID", "test@host");
+        let extra = "[[models]]\nid = \"n\"\nsource = \"o/n\"\nquant = \"q\"\nrevision = \"0123456789012345678901234567890123456789\"\nfile = \"n.gguf\"\n";
+        let (_d, base) = setup(None, Some(extra));
+        let c = Config::load(&base).unwrap();
+        assert_eq!(c.models.len(), 2);
+        assert_eq!(c.model("n").unwrap().adapter, "jinja");
+        assert!(c.model("n").unwrap().pinned);
     }
 
     #[test]

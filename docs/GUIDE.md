@@ -78,6 +78,8 @@ A suite name such as `smoke` stands for `configs/suites/smoke.toml`. To run part
 | Command | What it does |
 |---|---|
 | `a2e models fetch` | Download the models and check their hashes |
+| `a2e models add <repo>:<quant>` | Download a GGUF from Hugging Face and pin it |
+| `a2e config show --source` | Print every setting and the layer that set it |
 | `a2e doctor [--probe]` | Show the machine, the models and the settings; `--probe` also starts each model |
 | `a2e plan [suite]` | List the jobs a suite would run |
 | `a2e run [suite] [--dry-run] [--retry-failed]` | Run or resume a suite in this terminal |
@@ -355,9 +357,18 @@ timings come out identical.
 
 - A host is one new file, `configs/hosts/<user>@<hostname>.toml`, with the
   settings that differ on that device.
-- A model is one new `[[models]]` entry in `configs/models.toml` with its
-  `adapter`, source, 40 character revision and SHA-256. Suites without a
-  `models` line pick it up with no other edit. `a2e models fetch` downloads it.
+- A model from Hugging Face is one command: `a2e models add <repo>:<quant>`. It
+  downloads the GGUF file, pins the commit and the SHA-256, and writes the
+  entry to `configs/local.toml`. Suites without a `models` line pick it up with
+  no other edit. To write the entry by hand, add a `[[models]]` entry with its
+  source, 40 character revision, file and SHA-256; `a2e models fetch` downloads
+  it. The `adapter` key is optional. A model with no family adapter uses
+  `jinja`, which reads a JSON call between `<tool_call>` tags, as most recent
+  instruction models write it. Run `a2e doctor --probe` to check that a new
+  model's output parses.
+- To try a model once with no setup, use `--model hf:<repo>:<quant>`. The run is
+  marked unpinned, and its results stay on the device unless you pass
+  `--allow-unpinned`.
 - A suite is one new file in `configs/suites`. Copy `smoke.toml`, change the
   cases and tags, and list the variants it needs. `a2e plan <name>` checks it.
 - A variant is one new `[[variants]]` block in `configs/variants.toml`.

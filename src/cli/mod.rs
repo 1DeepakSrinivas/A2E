@@ -4,6 +4,7 @@
 
 mod inspect;
 mod menu;
+mod models;
 mod run;
 mod session;
 
@@ -34,6 +35,7 @@ Inspect and set up:
   a2e cases list --ids         list case ids
   a2e cases validate           check cases, tools and rubrics after any change
   a2e models fetch             download the pinned models
+  a2e models add unsloth/Qwen3-0.6B-GGUF:Q4_K_M   download and pin any GGUF from Hugging Face
   a2e config show --source     print every setting and the layer that set it
   a2e run core --set limits.output_tokens=512   change one setting for one run
   a2e completions zsh          print shell completions";
@@ -122,6 +124,8 @@ enum Command {
 enum ModelsCommand {
     /// Download the pinned models and check their hashes
     Fetch,
+    /// Download a GGUF from Hugging Face and add it as a pinned model
+    Add(models::AddArgs),
 }
 
 #[derive(Subcommand)]
@@ -174,6 +178,9 @@ fn entry() -> Result<()> {
         Command::Models {
             command: ModelsCommand::Fetch,
         } => serde_json::to_value(a2e::config::Config::load(&cli.config)?.fetch_models()?)?,
+        Command::Models {
+            command: ModelsCommand::Add(args),
+        } => models::add(&cli.config, &args)?,
         Command::Tools {
             command: ToolsCommand::Validate { tools },
         } => inspect::validate_tools(&tools)?,

@@ -62,6 +62,9 @@ pub struct RunArgs {
     /// Print the runs and check the files they need, then stop
     #[arg(long)]
     pub dry_run: bool,
+    /// Upload results of unpinned `hf:` models too; they are not reproducible
+    #[arg(long)]
+    pub allow_unpinned: bool,
 }
 
 /// Names of the suite files next to the model registry.
@@ -101,9 +104,15 @@ pub struct Loaded {
 }
 
 pub fn load(config_path: &Path, name: &str, select: &SelectArgs) -> Result<Loaded> {
-    let config = Config::load(config_path)?;
+    let mut config = Config::load(config_path)?;
     let path = suite_path(config_path, name)?;
-    let suite = Suite::load(&path)?.resolve(&config, &select.selection())?;
+    let mut selection = select.selection();
+    for m in &mut selection.models {
+        if a2e::hub::is_ref(m) {
+            *m = super::models::unpinned(&mut config, m)?;
+        }
+    }
+    let suite = Suite::load(&path)?.resolve(&config, &selection)?;
     Ok(Loaded {
         config,
         suite,
@@ -170,6 +179,17 @@ pub fn run(config_path: &Path, args: &RunArgs, stop: Arc<AtomicBool>) -> Result<
     if args.dry_run {
         return Ok(dry_run(&l, plan));
     }
+    let unpinned = l
+        .suite
+        .models
+        .iter()
+        .any(|id| l.config.model(id).is_ok_and(|m| !m.pinned));
+    if unpinned && !args.allow_unpinned && !a2e::dotenv::local_only() {
+        anyhow::bail!(
+            "an hf: model is not pinned, so its results are not reproducible and are not uploaded. Add --local, pin it with a2e models add, or pass --allow-unpinned"
+        );
+    }
+    super::models::fetch_unpinned(&l.config, &l.suite.models)?;
     eprintln!("results: {}", a2e::upload::destination());
     let progress = Progress::new(total_attempts(&plan, &l.suite));
     a2e::runner::run(

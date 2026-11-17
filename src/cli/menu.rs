@@ -71,7 +71,7 @@ pub fn open(config_path: &Path, local: bool) -> Result<()> {
         super::print_help();
         std::process::exit(2);
     }
-    const ACTIONS: [&str; 9] = [
+    const ACTIONS: [&str; 11] = [
         "Start a run",
         "Check what a suite would do",
         "Status",
@@ -79,6 +79,8 @@ pub fn open(config_path: &Path, local: bool) -> Result<()> {
         "Show a log",
         "Stop a run",
         "Check this machine (doctor)",
+        "Show settings and where each comes from",
+        "Add a model from Hugging Face",
         "Send waiting results",
         "Quit",
     ];
@@ -117,6 +119,32 @@ pub fn open(config_path: &Path, local: bool) -> Result<()> {
                 false,
                 Default::default(),
             )?),
+            "Show settings and where each comes from" => print_json(&super::inspect::config(
+                config_path,
+                &super::inspect::ConfigCommand::Show { source: true },
+            )?),
+            "Add a model from Hugging Face" => {
+                match answer(
+                    inquire::Text::new(
+                        "Repository and quant, for example unsloth/Qwen3-0.6B-GGUF:Q4_K_M:",
+                    )
+                    .prompt(),
+                )? {
+                    Some(reference) if !reference.trim().is_empty() => {
+                        print_json(&super::models::add(
+                            config_path,
+                            &super::models::AddArgs {
+                                reference: reference.trim().to_string(),
+                                id: None,
+                                file: None,
+                                adapter: None,
+                                shared: false,
+                            },
+                        )?)
+                    }
+                    _ => Ok(()),
+                }
+            }
             "Send waiting results" => print_json(&super::inspect::upload(config_path, false)?),
             _ => return Ok(()),
         };
@@ -159,6 +187,7 @@ fn dry_run_flow(config_path: &Path) -> Result<()> {
         retry_failed: false,
         allow_missing_model: false,
         dry_run: true,
+        allow_unpinned: false,
     };
     print_json(&run::run(config_path, &args, Default::default())?)
 }

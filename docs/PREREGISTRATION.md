@@ -33,6 +33,7 @@ On the Mac, energy is the software estimate from `powermetrics`, which covers CP
 ## Factors
 
 - Device: Raspberry Pi 3B+ (1 GB) and Apple Silicon Mac.
+- Settings: the harness reads its settings from layered files (see `docs/CONFIG.md`). Their defaults equal the values used before the settings files existed, so a default run is unchanged. The final settings are now part of the study definition, so the study ids differ from studies run before this change even when the effective values are the same.
 - Model: the three registered models, each at the quant in `configs/models.toml`.
 - Variant: autonomous and guided in the `core` suite, and autonomous, guided, filter, recent, constrained and repair in the `harness` suite.
 - Category: the eight case categories, held-out split.

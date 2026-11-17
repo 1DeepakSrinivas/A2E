@@ -6,7 +6,7 @@ Commands that print data write JSON to stdout. Progress, warnings and prompts go
 
 ## Menu
 
-Run `a2e` with no command on a terminal to open a menu. The menu offers to start a run, check what a suite would do, show the status of a run, attach to a run, follow a log, stop a run, run `doctor`, and send waiting results. Starting a run asks for the suites, models, variants, whether to keep results on the device, and whether to retry failed attempts. It then shows how many attempts the choice makes and asks before it starts. Esc goes back one step, and Ctrl-C leaves the menu. The menu remembers your last choices in `results/.last-run.toml`. Without a terminal, `a2e` prints the help and exits with code 2, so scripts never wait for input.
+Run `a2e` with no command on a terminal to open a menu. The menu offers to start a run, check what a suite would do, show the status of a run, attach to a run, follow a log, stop a run, run `doctor`, show every setting and the layer it came from, add a model from Hugging Face, and send waiting results. Starting a run asks for the suites, models, variants, whether to keep results on the device, and whether to retry failed attempts. It then shows how many attempts the choice makes and asks before it starts. Esc goes back one step, and Ctrl-C leaves the menu. The menu remembers your last choices in `results/.last-run.toml`. Without a terminal, `a2e` prints the help and exits with code 2, so scripts never wait for input.
 
 ## Run
 
@@ -14,6 +14,7 @@ Run `a2e` with no command on a terminal to open a menu. The menu offers to start
 
 - `--model`, `--context` and `--variant` take comma separated values and run only that part of the suite. An unknown name stops the command and suggests the closest known name.
 - `--retry-failed` runs again the attempts that did not succeed.
+- `--model hf:<repo>:<quant>` runs a Hugging Face GGUF with no setup step. The harness looks up the newest commit, downloads the file, and runs it. The model is marked unpinned, because the commit can change, and its results are not uploaded. Add `--local`, or pass `--allow-unpinned` to upload them anyway. Run `a2e models add` to pin it.
 - `--allow-missing-model` lets a run continue when a model file is missing. Without it the run stops before it starts.
 - `--dry-run` prints the runs and checks that the model files and llama-server exist, and then stops without starting a model.
 - `--tools <file>` names the tool definitions, and the default is `configs/tools/standard.toml`.
@@ -46,6 +47,7 @@ a2e stop queue
 
 - `a2e doctor` shows the host, the machine, the memory headroom of each model and the settings. With `--probe` it also loads each model once and checks its output format.
 - `a2e models fetch` downloads the pinned models and checks their hashes.
+- `a2e models add <repo>[:quant]` looks up a Hugging Face repository, picks one GGUF file, downloads it with a progress bar, checks it against the hash Hugging Face publishes, and writes a pinned `[[models]]` entry to `configs/local.toml`. With no quant it prefers `Q4_K_M`. `--id` names the model, `--file` names the file when the quant does not pick one, `--adapter` sets the tool-call format, and `--shared` writes to `configs/models.toml` instead. Set `HF_TOKEN` for a gated repository. Sharded GGUF files are not supported yet.
 - `a2e cases validate [path]` checks every case against the tool definitions and rubrics, and `a2e cases list [path] [--ids]` counts cases by category and split.
 - `a2e config show [--source]` prints the final settings, and with `--source` also the layer that set each key. `a2e config check` loads every layer and reports the first error. `a2e config init` creates `configs/local.toml` from the example.
 - `a2e tools validate [file]` checks that every tool definition has a handler and a valid schema.

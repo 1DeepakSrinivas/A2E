@@ -9,6 +9,7 @@ pub mod dotenv;
 pub mod error;
 pub mod eval;
 mod fixtures;
+pub mod hub;
 pub mod inference;
 pub mod measure;
 mod process;
