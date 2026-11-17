@@ -58,7 +58,7 @@ enum Command {
     /// Run one suite in this terminal
     Run(run::RunArgs),
     /// Show the runs a suite would make, without starting a model
-    Plan(run::RunArgs),
+    Plan(run::PlanArgs),
     /// Run one or more suites in a detached tmux session
     Start(session::StartArgs),
     /// Watch a running session; detach with Ctrl-b then d
@@ -92,6 +92,7 @@ enum Command {
     },
     /// Send waiting results to the Worker, or show what is waiting
     Upload {
+        /// Show what is waiting instead of sending it
         #[arg(long)]
         status: bool,
     },
@@ -109,12 +110,15 @@ enum Command {
 
 #[derive(Subcommand)]
 enum ModelsCommand {
+    /// Download the pinned models and check their hashes
     Fetch,
 }
 
 #[derive(Subcommand)]
 enum ToolsCommand {
+    /// Check that every tool definition has a handler and a valid schema
     Validate {
+        /// Tool definition file
         #[arg(default_value = "configs/tools/standard.toml")]
         tools: PathBuf,
     },

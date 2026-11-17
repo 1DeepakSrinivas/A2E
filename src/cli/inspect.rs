@@ -13,8 +13,10 @@ use std::{
 pub enum CasesCommand {
     /// Check every case against the tools and rubrics
     Validate {
+        /// Case file or folder
         #[arg(default_value = "configs/cases")]
         path: PathBuf,
+        /// Tool definitions the cases are checked against
         #[arg(long, default_value = "configs/tools/standard.toml")]
         tools: PathBuf,
         /// Folder of rubric files from the a2e-results project
@@ -23,6 +25,7 @@ pub enum CasesCommand {
     },
     /// Count cases by category and split
     List {
+        /// Case file or folder
         #[arg(default_value = "configs/cases")]
         path: PathBuf,
         /// Also print one entry per case
@@ -35,20 +38,25 @@ pub enum CasesCommand {
 pub enum SandboxCommand {
     /// Generate the sandbox tree
     Init {
+        /// Seed for the filler text; the planted facts do not depend on it
         #[arg(long, default_value_t = a2e::sandbox::DEFAULT_SEED)]
         seed: u64,
+        /// Folder to write
         #[arg(long, default_value = "sandbox")]
         out: PathBuf,
+        /// Replace an existing tree
         #[arg(long)]
         force: bool,
     },
     /// Check the tree against its manifest
     Verify {
+        /// Folder holding the tree and its manifest
         #[arg(long, default_value = "sandbox")]
         dir: PathBuf,
     },
     /// Print the manifest
     Info {
+        /// Folder holding the tree and its manifest
         #[arg(long, default_value = "sandbox")]
         dir: PathBuf,
     },

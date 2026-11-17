@@ -21,27 +21,41 @@ sudo dphys-swapfile swapoff
 sudo systemctl disable dphys-swapfile
 ```
 
-**3. Start a run.** Runs take hours on the Pi, so they go in tmux, which keeps them going if you close the terminal or lose the SSH link. Run the script with no arguments to pick suites from a menu.
+**3. Check what a run would do.** The `smoke` suite is the quickest, so try it first. The dry run lists the runs and reports any model file or llama-server that is missing.
 
 ```bash
-scripts/run.sh
+target/release/a2e run smoke --dry-run
 ```
 
-Or start one suite directly. The `smoke` suite is the quickest, so try it first. Add `--local` to keep the results on the device instead of sending them to the cloud.
+**4. Start a run.** Runs take hours on the Pi, so they go in tmux, which keeps them going if you close the terminal or lose the SSH link. Run `a2e` with no arguments on a terminal to pick the suite, models and variants from a menu. Press Esc to go back one step.
 
 ```bash
-scripts/run.sh start smoke --local
+target/release/a2e
 ```
 
-**4. Watch it and read the results.**
+Or start a suite directly. Add `--local` to keep the results on the device instead of sending them to the cloud, and add `--model`, `--context` or `--variant` to run only part of a suite.
 
 ```bash
-scripts/run.sh attach smoke    # watch it live; detach with Ctrl-b then d
-scripts/run.sh status smoke    # is it running, and what is waiting to upload
-scripts/run.sh stop smoke      # stop it; run the same start command later to resume
+target/release/a2e start smoke --local
+target/release/a2e start core --model qwen3-0.6b --variant guided --local
 ```
 
-Results are saved under `results`. Judging, scoring and reports live in the A2E-Results project ([github.com/1DeepakSrinivas/A2E-Results](https://github.com/1DeepakSrinivas/A2E-Results)), which is the submodule `a2e-results`. To send results there, copy `.env.example` to `.env` and fill in the Worker settings. See the runbook for the details.
+Then watch the run and read its state.
+
+```bash
+target/release/a2e attach smoke    # watch it live; detach with Ctrl-b then d
+target/release/a2e status smoke    # is it running, and what is waiting to upload
+target/release/a2e stop smoke      # stop it; run the same start command later to resume
+```
+
+Results are saved under `results`. Judging, scoring and reports live in the A2E-Results project ([github.com/1DeepakSrinivas/A2E-Results](https://github.com/1DeepakSrinivas/A2E-Results)), which is the submodule `a2e-results`. To send results there, copy `.env.example` to `.env` and fill in the Worker settings. See the runbook for the details. Every command and flag is listed in [docs/CLI.md](docs/CLI.md).
+
+## Switch hosts, models and suites
+
+- A host is a file named `configs/hosts/<user>@<hostname>.toml`. The program loads the one that matches the current user and host, or the one named by `A2E_HOST_ID`. It prints a warning when none matches.
+- A model is an entry in `configs/models.toml`. A suite with no `models` line runs every model in that file, and `--model` narrows the run to some of them.
+- A variant is a block in `configs/variants.toml`. A suite lists the ones it wants in `use_variants`, and `--variant` narrows the run.
+- Settings that only apply to one machine go in `configs/local.toml`, which Git ignores.
 
 ## Suites
 
@@ -65,7 +79,8 @@ Results are saved under `results`. Judging, scoring and reports live in the A2E-
 | I want to | Read |
 |---|---|
 | Set up a device, run in tmux, resume, upload, or fix a problem | [docs/RUNBOOK.md](docs/RUNBOOK.md) |
-| Change settings, write cases or tools, or understand the commands | [docs/GUIDE.md](docs/GUIDE.md) |
+| Change settings, add a host, model, suite, tool, check or model format | [docs/GUIDE.md](docs/GUIDE.md) |
+| Look up a command or flag | [docs/CLI.md](docs/CLI.md) |
 | Know how the study measures things | [docs/REPORT.md](docs/REPORT.md) |
 | See the research question and hypotheses | [docs/PREREGISTRATION.md](docs/PREREGISTRATION.md) |
 | Check a source, tool or dataset | [REFERENCES.md](REFERENCES.md) |

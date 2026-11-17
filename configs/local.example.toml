@@ -1,3 +1,6 @@
+# Settings for this checkout only. Copy to configs/local.toml, which Git ignores.
+# Order of precedence, later wins: models.toml, hosts/<user>@<host>.toml, local.toml, environment variables.
+
 [runtime]
 # Paths are resolved from the working directory; run commands at the repository root.
 llama_server = "deps/llama.cpp/build-a2e/bin/llama-server"

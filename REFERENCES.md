@@ -20,7 +20,7 @@ The models and exact files are set in `configs/models.toml`. Each entry records 
 | Qwen3-0.6B | Q4_K_M | https://huggingface.co/unsloth/Qwen3-0.6B-GGUF |
 | LFM2.5-1.2B-Instruct | QAD_Q4_0 | https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF |
 
-Status: Verified for file names and hashes by the download script. License and tool-call format of each model are pending verification. The tool-call format of each model is handled in `src/adapter.rs`.
+Status: Verified for file names and hashes by the download script. License and tool-call format of each model are pending verification. The tool-call format of each model is handled in `src/adapter`.
 
 ---
 
@@ -64,7 +64,7 @@ Status: Verified for file names and hashes by the download script. License and t
 
 ### JSON Schema
 - **Use:** validation of tool arguments with the `jsonschema` crate.
-- **Where used:** `src/config.rs` and `src/runner.rs`.
+- **Where used:** `src/config.rs` and `src/runner`.
 
 ---
 

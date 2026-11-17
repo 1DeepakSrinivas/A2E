@@ -208,13 +208,10 @@ pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value>
     for s in &suites {
         run::plan(
             config_path,
-            &run::RunArgs {
+            &run::PlanArgs {
                 suite: s.clone(),
                 tools: args.tools.clone(),
                 select: args.select.clone(),
-                retry_failed: false,
-                allow_missing_model: false,
-                dry_run: false,
             },
         )
         .with_context(|| format!("suite {s} does not plan"))?;

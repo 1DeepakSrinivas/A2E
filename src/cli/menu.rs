@@ -151,9 +151,11 @@ fn dry_run_flow(config_path: &Path) -> Result<()> {
         return Ok(());
     };
     let args = run::RunArgs {
-        suite,
-        tools: "configs/tools/standard.toml".into(),
-        select: Default::default(),
+        plan: run::PlanArgs {
+            suite,
+            tools: "configs/tools/standard.toml".into(),
+            select: Default::default(),
+        },
         retry_failed: false,
         allow_missing_model: false,
         dry_run: true,

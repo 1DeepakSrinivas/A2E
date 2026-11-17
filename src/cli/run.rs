@@ -36,15 +36,23 @@ impl SelectArgs {
     }
 }
 
+/// What `plan` needs: the suite, the tool definitions and which part of the suite to use.
 #[derive(Args, Clone)]
-pub struct RunArgs {
+pub struct PlanArgs {
     /// Suite name such as `smoke`, or a path to a suite file
     #[arg(default_value = "smoke")]
     pub suite: String,
+    /// Tool definitions
     #[arg(long, default_value = "configs/tools/standard.toml")]
     pub tools: PathBuf,
     #[command(flatten)]
     pub select: SelectArgs,
+}
+
+#[derive(Args, Clone)]
+pub struct RunArgs {
+    #[command(flatten)]
+    pub plan: PlanArgs,
     /// Run again the attempts that failed before
     #[arg(long)]
     pub retry_failed: bool,
@@ -103,7 +111,7 @@ pub fn load(config_path: &Path, name: &str, select: &SelectArgs) -> Result<Loade
     })
 }
 
-pub fn plan(config_path: &Path, args: &RunArgs) -> Result<Value> {
+pub fn plan(config_path: &Path, args: &PlanArgs) -> Result<Value> {
     let l = load(config_path, &args.suite, &args.select)?;
     let cases = l.suite.load_cases(&l.path)?;
     a2e::runner::plan(&l.config, &l.suite, &cases, &Catalog::load(&args.tools)?)
@@ -155,9 +163,9 @@ fn dry_run(l: &Loaded, plan: Value) -> Value {
 }
 
 pub fn run(config_path: &Path, args: &RunArgs, stop: Arc<AtomicBool>) -> Result<Value> {
-    let l = load(config_path, &args.suite, &args.select)?;
+    let l = load(config_path, &args.plan.suite, &args.plan.select)?;
     let cases = l.suite.load_cases(&l.path)?;
-    let catalog = Catalog::load(&args.tools)?;
+    let catalog = Catalog::load(&args.plan.tools)?;
     let plan = a2e::runner::plan(&l.config, &l.suite, &cases, &catalog)?;
     if args.dry_run {
         return Ok(dry_run(&l, plan));
