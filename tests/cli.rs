@@ -71,3 +71,18 @@ fn no_command_without_a_terminal_prints_help() {
     assert_eq!(out.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&out.stdout).contains("Usage: a2e"));
 }
+
+#[test]
+fn a_run_stops_early_when_a_model_file_is_missing() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_a2e"))
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .args(["run", "smoke", "--model", "qwen3-0.6b"])
+        .env("A2E_LOCAL", "1")
+        .env("A2E_HOST_ID", "test@host")
+        .env("A2E_MODELS_DIR", dir.path())
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    assert!(stderr(&out).contains("is missing"), "{}", stderr(&out));
+}

@@ -48,6 +48,9 @@ pub struct RunArgs {
     /// Run again the attempts that failed before
     #[arg(long)]
     pub retry_failed: bool,
+    /// Run even when a model file is missing; its attempts fail
+    #[arg(long)]
+    pub allow_missing_model: bool,
     /// Print the runs and check the files they need, then stop
     #[arg(long)]
     pub dry_run: bool,
@@ -166,7 +169,10 @@ pub fn run(config_path: &Path, args: &RunArgs, stop: Arc<AtomicBool>) -> Result<
         &l.suite,
         &cases,
         &catalog,
-        args.retry_failed,
+        a2e::runner::RunOptions {
+            retry_failed: args.retry_failed,
+            allow_missing_model: args.allow_missing_model,
+        },
         stop,
         &progress,
     )

@@ -30,6 +30,9 @@ pub struct StartArgs {
     /// Run again the attempts that failed before
     #[arg(long)]
     pub retry_failed: bool,
+    /// Run even when a model file is missing; its attempts fail
+    #[arg(long)]
+    pub allow_missing_model: bool,
 }
 
 #[derive(Args)]
@@ -156,6 +159,7 @@ pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value>
                 tools: args.tools.clone(),
                 select: args.select.clone(),
                 retry_failed: false,
+                allow_missing_model: false,
                 dry_run: false,
             },
         )
@@ -205,6 +209,9 @@ pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value>
     }
     if args.retry_failed {
         command.push("--retry-failed".into());
+    }
+    if args.allow_missing_model {
+        command.push("--allow-missing-model".into());
     }
     let status = tmux()?
         .args(["new-session", "-d", "-s", &format!("a2e-{name}"), "--"])

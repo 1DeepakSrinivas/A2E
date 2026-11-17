@@ -937,17 +937,62 @@ pub fn attempt_line(meta: &RunMeta, out: &Outcome) -> Value {
         "trace": meta.trace,
     })
 }
+/// Settings that change how a run proceeds but not what it measures.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RunOptions {
+    pub retry_failed: bool,
+    /// Run with a model file that is not on disk; its attempts fail and its hash is recorded as null.
+    pub allow_missing_model: bool,
+}
+
+/// Commit and tree state of the checkout, so a result can be traced to its code.
+fn git_state() -> Value {
+    let git = |args: &[&str]| {
+        std::process::Command::new("git")
+            .args(args)
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+    };
+    let Some(head) = git(&["rev-parse", "HEAD"]) else {
+        return json!({"sha":null,"dirty":null});
+    };
+    let dirty = git(&["status", "--porcelain"]).map(|o| !o.stdout.is_empty());
+    json!({"sha":String::from_utf8_lossy(&head.stdout).trim(),"dirty":dirty})
+}
+
+/// Hash of the inference binary; null when it cannot be read, which `launch` reports later.
+fn llama_server_hash(config: &Config) -> Value {
+    crate::hash_file(&crate::config::expand_path(&config.runtime.llama_server))
+        .map_or(Value::Null, |h| json!(h))
+}
+
+/// Version of the study definition layout, bumped when its fields change.
+const DEFINITION_SCHEMA: u32 = 1;
+
 /// Serial study execution with one loaded model at a time.
 pub fn run(
     config: &Config,
     suite: &Suite,
     cases: &[Case],
     catalog: &Catalog,
-    retry_failed: bool,
+    options: RunOptions,
     cancel: Arc<AtomicBool>,
     progress: &crate::progress::Progress,
 ) -> Result<Value> {
+    let retry_failed = options.retry_failed;
     plan(config, suite, cases, catalog)?;
+    if !options.allow_missing_model {
+        for id in &suite.models {
+            let path = config.model_path(config.model(id)?);
+            if !path.exists() {
+                bail!(
+                    "model file {} is missing. Run: a2e models fetch (or pass --allow-missing-model)",
+                    path.display()
+                );
+            }
+        }
+    }
     let sandbox = verify_sandbox(cases)?;
     let root = crate::config::expand_path(&config.runtime.output_dir);
     let _lock = RunLock::acquire(&root)?;
@@ -972,7 +1017,7 @@ pub fn run(
         };
         artifacts.insert(id, json!({"model":m,"sha256":hash}));
     }
-    let mut definition = json!({"suite":suite,"cases":cases,"tools":catalog,"runtime":config.runtime,"artifacts":artifacts,"device":machine["device"],"kernel":machine["kernel"],"arch":machine["arch"],"total_memory_bytes":machine["total_memory_bytes"],"runtime_version":env!("CARGO_PKG_VERSION"),"parse_rules":crate::adapter::PARSE_RULES,"binary_sha256":crate::hash_file(&std::env::current_exe()?)?});
+    let mut definition = json!({"suite":suite,"cases":cases,"tools":catalog,"runtime":config.runtime,"artifacts":artifacts,"device":machine["device"],"kernel":machine["kernel"],"arch":machine["arch"],"total_memory_bytes":machine["total_memory_bytes"],"runtime_version":env!("CARGO_PKG_VERSION"),"parse_rules":crate::adapter::PARSE_RULES,"binary_sha256":crate::hash_file(&std::env::current_exe()?)?,"schema_version":DEFINITION_SCHEMA,"git":git_state(),"llama_server_sha256":llama_server_hash(config)});
     if let Some(m) = &sandbox {
         definition["sandbox"] = json!({"version":m.version,"seed":m.seed,"sha256":m.sha256});
     }

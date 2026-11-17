@@ -149,6 +149,7 @@ fn dry_run_flow(config_path: &Path) -> Result<()> {
         tools: "configs/tools/standard.toml".into(),
         select: Default::default(),
         retry_failed: false,
+        allow_missing_model: false,
         dry_run: true,
     };
     print_json(&run::run(config_path, &args, Default::default())?)
@@ -260,6 +261,7 @@ fn start_flow(config_path: &Path, local_flag: bool) -> Result<()> {
                         variant: picked.variants.clone(),
                     },
                     retry_failed: picked.retry_failed,
+                    allow_missing_model: false,
                 };
                 let mut total = 0;
                 for s in &picked.suites {
