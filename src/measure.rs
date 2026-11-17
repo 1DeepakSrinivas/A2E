@@ -243,7 +243,7 @@ pub fn throttle_clean(v: &str) -> bool {
 }
 const POWERMETRICS: &str = "/usr/bin/powermetrics";
 const POWERMETRICS_ARGS: [&str; 4] = ["--samplers", "cpu_power,gpu_power,thermal", "-i", "500"];
-pub const TELEMETRY_SETUP: &str = "bash scripts/setup_mac_telemetry.sh";
+pub const TELEMETRY_SETUP: &str = "./setup.sh telemetry";
 fn is_root() -> bool {
     // SAFETY: No memory preconditions
     unsafe { libc::geteuid() == 0 }

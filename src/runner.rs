@@ -945,6 +945,7 @@ pub fn run(
     catalog: &Catalog,
     retry_failed: bool,
     cancel: Arc<AtomicBool>,
+    progress: &crate::progress::Progress,
 ) -> Result<Value> {
     plan(config, suite, cases, catalog)?;
     let sandbox = verify_sandbox(cases)?;
@@ -1001,6 +1002,7 @@ pub fn run(
                 &mut resume,
                 &mut uploader,
             )?;
+            progress.set_stage(format!("{model_id} @ {ctx}"));
             // Consecutive attempts in which no model call returned
             let mut stalled = 0;
             // Set when a call may still be running on the server
@@ -1014,6 +1016,7 @@ pub fn run(
                     };
                     for case in cases {
                         if cancel.load(Ordering::Relaxed) {
+                            progress.finish();
                             let upload = uploader.flush()?;
                             return Ok(
                                 json!({"study":study,"completed":completed,"skipped":skipped,"not_applicable":not_applicable,"interrupted":true,"upload":upload}),
@@ -1021,6 +1024,7 @@ pub fn run(
                         }
                         if v.mode.staged() && case.stage_plan().is_none() {
                             not_applicable += 1;
+                            progress.advance();
                             continue;
                         }
                         let key = crate::canonical_hash(
@@ -1028,6 +1032,7 @@ pub fn run(
                         )?;
                         if !resume.should_run(&study, &key, retry_failed) {
                             skipped += 1;
+                            progress.advance();
                             continue;
                         }
                         let dir = group.join(&key[..16]);
@@ -1131,12 +1136,14 @@ pub fn run(
                             Some(&crate::store::tag(&out.status)),
                         )?;
                         completed += 1;
-                        println!("{}", attempt_line(&meta, &out));
+                        progress.line(&attempt_line(&meta, &out).to_string());
+                        progress.advance();
                     }
                 }
             }
         }
     }
+    progress.finish();
     let upload = uploader.flush()?;
     Ok(
         json!({"study":study,"completed":completed,"skipped":skipped,"not_applicable":not_applicable,"upload":upload}),

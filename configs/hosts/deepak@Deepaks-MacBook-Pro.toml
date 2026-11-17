@@ -1,3 +1,1 @@
-[roles]
-controller = true
-benchmark_target = false
+# Settings for user deepak on host Deepaks-MacBook-Pro. Overrides configs/models.toml; configs/local.toml overrides this.

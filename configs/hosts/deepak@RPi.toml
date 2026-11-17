@@ -1,3 +1,1 @@
-[roles]
-controller = false
-benchmark_target = true
+# Settings for user deepak on host RPi. Overrides configs/models.toml; configs/local.toml overrides this.

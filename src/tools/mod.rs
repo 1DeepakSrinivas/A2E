@@ -136,7 +136,7 @@ impl Builtins {
             let base = self
                 .sandbox_base
                 .as_ref()
-                .context("sandbox base is not set; run scripts/init_sandbox.sh")?;
+                .context("sandbox base is not set; run: a2e sandbox init")?;
             crate::sandbox::copy_into(base, &w.root)?;
             fs::index(w)?;
         }

@@ -1,5 +1,4 @@
 name = "test_filesystem"
-models = ["functiongemma-270m", "qwen3-0.6b", "lfm2.5-1.2b-instruct-qad"]
 contexts = [2048]
 cases = ["../cases"]
 tags = ["fs"]
@@ -8,31 +7,4 @@ web_mode = "fixture"
 warmup = 0
 repeats = 1
 seed = 0
-
-[[variants]]
-name = "autonomous"
-mode = "autonomous"
-
-[[variants]]
-name = "guided"
-mode = "guided"
-
-[[variants]]
-name = "filter"
-mode = "autonomous"
-filter_top_k = 2
-
-[[variants]]
-name = "recent"
-mode = "autonomous"
-context = "recent"
-
-[[variants]]
-name = "constrained"
-mode = "autonomous"
-constrained = true
-
-[[variants]]
-name = "repair"
-mode = "autonomous"
-repairs = 1
+use_variants = ["autonomous", "guided", "filter", "recent", "constrained", "repair"]

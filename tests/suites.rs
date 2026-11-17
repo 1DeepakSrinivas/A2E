@@ -4,7 +4,7 @@
 mod support;
 use a2e::{
     case::Case,
-    config::{Config, ContextWindow, Mode, Suite},
+    config::{Config, ContextWindow, Mode, Selection, Suite},
     runner::Status,
 };
 use std::{collections::BTreeSet, path::PathBuf, time::Duration};
@@ -17,7 +17,11 @@ fn path(name: &str) -> PathBuf {
 }
 fn load(name: &str) -> (Suite, Vec<Case>) {
     use_sandbox();
-    let s = Suite::load(&path(name)).unwrap();
+    let config = Config::load(&repo().join("configs/models.toml")).unwrap();
+    let s = Suite::load(&path(name))
+        .unwrap()
+        .resolve(&config, &Selection::default())
+        .unwrap();
     let cases = s.load_cases(&path(name)).unwrap();
     (s, cases)
 }

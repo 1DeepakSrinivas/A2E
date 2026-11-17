@@ -5,7 +5,7 @@ mod support;
 use a2e::{
     adapter::Call,
     case::{Case, FinalAnswer},
-    config::{Config, Mode, Suite, Variant},
+    config::{Config, Mode, Selection, Suite, Variant},
     eval::{evaluate, FailureClass, Observation},
     runner::{select_tools, Status},
     tools::Builtins,
@@ -15,7 +15,11 @@ use std::time::Duration;
 use support::{call, catalog, execute, golden_script, repo, use_sandbox, MockServer};
 
 fn suite() -> Suite {
-    Suite::load(&repo().join("configs/suites/smoke.toml")).unwrap()
+    let config = Config::load(&repo().join("configs/models.toml")).unwrap();
+    Suite::load(&repo().join("configs/suites/smoke.toml"))
+        .unwrap()
+        .resolve(&config, &Selection::default())
+        .unwrap()
 }
 fn task() -> Case {
     let s = suite();
@@ -250,7 +254,10 @@ fn every_shipped_suite_validates_and_has_disjoint_splits() {
     let m = catalog();
     for entry in std::fs::read_dir(repo().join("configs/suites")).unwrap() {
         let path = entry.unwrap().path();
-        let s = Suite::load(&path).unwrap();
+        let s = Suite::load(&path)
+            .unwrap()
+            .resolve(&cfg, &Selection::default())
+            .unwrap();
         let cases = s.load_cases(&path).unwrap();
         assert!(a2e::runner::plan(&cfg, &s, &cases, &m).is_ok());
         assert!(cases.iter().all(|c| c.split == s.split));

@@ -176,7 +176,7 @@ fn walk(
 pub fn read_manifest(dir: &Path) -> Result<Manifest> {
     let p = dir.join("manifest.json");
     let text = fs::read_to_string(&p)
-        .with_context(|| format!("{} is missing; run scripts/init_sandbox.sh", p.display()))?;
+        .with_context(|| format!("{} is missing; run: a2e sandbox init", p.display()))?;
     Ok(serde_json::from_str(&text)?)
 }
 /// Recomputes the base hash and compares it with the manifest.

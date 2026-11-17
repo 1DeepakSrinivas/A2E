@@ -51,11 +51,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          for script in setup.sh scripts/*.sh scripts/setup/*.sh; do
-            bash -n "$script"
-          done
-      - run: shellcheck --severity=warning setup.sh scripts/*.sh scripts/setup/*.sh
+      - run: bash -n setup.sh
+      - run: shellcheck --severity=warning setup.sh
   pi-build:
     runs-on: ubuntu-latest
     steps:

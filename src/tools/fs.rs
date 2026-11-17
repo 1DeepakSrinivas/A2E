@@ -663,16 +663,19 @@ mod tests {
         h.call("touch", json!({"path":"scratch/new.txt"})).unwrap();
         assert!(h.call("rm", json!({"path":"scratch/out"})).is_err());
         h.call("rm", json!({"path":"scratch/out/deep"})).unwrap();
-        assert!(h
-            .call("rm", json!({"path":"home/.config/app/locked.conf"}))
-            .is_err());
-        let err = h
-            .call(
-                "write_file",
-                json!({"path":"home/.config/app/locked.conf","content":"x"}),
-            )
-            .unwrap_err();
-        assert!(err.to_string().contains("cannot write"));
+        // Root ignores file modes, so the read-only checks only hold for other users.
+        if unsafe { libc::geteuid() } != 0 {
+            assert!(h
+                .call("rm", json!({"path":"home/.config/app/locked.conf"}))
+                .is_err());
+            let err = h
+                .call(
+                    "write_file",
+                    json!({"path":"home/.config/app/locked.conf","content":"x"}),
+                )
+                .unwrap_err();
+            assert!(err.to_string().contains("cannot write"));
+        }
         let s = h.snapshot().unwrap();
         assert!(s["files"]["scratch/out/inv.csv"]
             .as_str()

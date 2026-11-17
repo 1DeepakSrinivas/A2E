@@ -1,0 +1,33 @@
+# Variants that suites pick by name with use_variants = ["autonomous", "guided"].
+
+[[variants]]
+name = "autonomous"
+mode = "autonomous"
+
+[[variants]]
+name = "guided"
+mode = "guided"
+
+[[variants]]
+name = "filter"
+mode = "autonomous"
+filter_top_k = 2
+
+[[variants]]
+name = "recent"
+mode = "autonomous"
+context = "recent"
+
+[[variants]]
+name = "constrained"
+mode = "autonomous"
+constrained = true
+
+[[variants]]
+name = "repair"
+mode = "autonomous"
+repairs = 1
+
+[[variants]]
+name = "guided_stable"
+mode = "guided_stable"

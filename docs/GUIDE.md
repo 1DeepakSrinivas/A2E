@@ -46,8 +46,8 @@ user and hostname, or the one named by `A2E_HOST_ID`. The file can hold any
 setting from the models file plus a `[roles]` table with the booleans
 `controller` and `benchmark_target`, which both default to false. Settings
 apply in this order, and the later one wins: the models file, the host file,
-`local.toml`, then environment variables. The variables are `A2E_NATIVE_MODELS_DIR`,
-`A2E_NATIVE_LLAMA_SERVER` and `A2E_NATIVE_OUTPUT_DIR`. `doctor` prints the host, the loaded
+`local.toml`, then environment variables. The variables are `A2E_MODELS_DIR`,
+`A2E_LLAMA_SERVER` and `A2E_NATIVE_OUTPUT_DIR`. `doctor` prints the host, the loaded
 host file and the roles.
 
 ## Run and read results

@@ -11,6 +11,7 @@ pub mod fixtures;
 pub mod inference;
 pub mod measure;
 pub mod process;
+pub mod progress;
 pub mod record;
 pub mod runner;
 pub mod sandbox;
