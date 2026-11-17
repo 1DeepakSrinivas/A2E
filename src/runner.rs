@@ -1017,7 +1017,7 @@ pub fn run(
         };
         artifacts.insert(id, json!({"model":m,"sha256":hash}));
     }
-    let mut definition = json!({"suite":suite,"cases":cases,"tools":catalog,"runtime":config.runtime,"artifacts":artifacts,"device":machine["device"],"kernel":machine["kernel"],"arch":machine["arch"],"total_memory_bytes":machine["total_memory_bytes"],"runtime_version":env!("CARGO_PKG_VERSION"),"parse_rules":crate::adapter::PARSE_RULES,"binary_sha256":crate::hash_file(&std::env::current_exe()?)?,"schema_version":DEFINITION_SCHEMA,"git":git_state(),"llama_server_sha256":llama_server_hash(config)});
+    let mut definition = json!({"suite":suite,"cases":cases,"tools":catalog,"runtime":config.runtime,"artifacts":artifacts,"device":machine["device"],"kernel":machine["kernel"],"arch":machine["arch"],"total_memory_bytes":machine["total_memory_bytes"],"runtime_version":env!("CARGO_PKG_VERSION"),"parse_rules":crate::adapter::parse_rules(),"binary_sha256":crate::hash_file(&std::env::current_exe()?)?,"schema_version":DEFINITION_SCHEMA,"git":git_state(),"llama_server_sha256":llama_server_hash(config)});
     if let Some(m) = &sandbox {
         definition["sandbox"] = json!({"version":m.version,"seed":m.seed,"sha256":m.sha256});
     }
