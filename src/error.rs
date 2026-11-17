@@ -14,7 +14,6 @@ pub enum HarnessError {
 }
 
 impl HarnessError {
-    /// Attempt status this error maps to.
     pub fn status(&self) -> Status {
         match self {
             Self::Interrupted => Status::Interrupted,

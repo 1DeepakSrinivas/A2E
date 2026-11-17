@@ -135,7 +135,6 @@ pub(super) enum Step {
     Next,
     Stop,
 }
-/// Loop state for one bounded attempt.
 pub(super) struct Attempt<'a> {
     pub(super) x: TaskExecution<'a>,
     pub(super) start: Instant,
@@ -180,10 +179,8 @@ impl Attempt<'_> {
             .join("\n");
         format!("{prompt}\nWorkflow stages, in this order:\n{steps}")
     }
-    /// Rendered prompt and completion request for the next model call.
     fn build_request(&mut self, specs: &[ToolSpec]) -> Result<Value> {
         let (suite, variant) = (self.x.suite, self.x.variant);
-        // Original request plus the selected conversation window
         let mut messages = self.history.clone();
         if variant.context == ContextWindow::Recent && messages.len() > 6 {
             messages.drain(2..messages.len() - 4);
@@ -286,7 +283,6 @@ impl Attempt<'_> {
         self.out.reason = Some(format!("parse_failure: {error}"));
         Step::Stop
     }
-    /// Validate, execute, and record one parsed action.
     fn act(&mut self, specs: &[ToolSpec], action: Action) -> Result<Step> {
         let call = match action {
             Action::Final(answer) => {
@@ -417,7 +413,6 @@ impl Attempt<'_> {
         }
         Ok(Step::Next)
     }
-    /// One model call and the action it leads to.
     fn step(&mut self) -> Result<Step> {
         self.guard()?;
         let specs = select_tools(
@@ -434,7 +429,6 @@ impl Attempt<'_> {
             Err(e) => self.parse_failed(&e, completion.truncated),
         })
     }
-    /// Initialize tools, run the loop, then evaluate the final state.
     pub(super) fn drive(&mut self) -> Result<()> {
         let case = self.x.case;
         let t = Instant::now();

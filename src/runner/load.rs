@@ -18,7 +18,6 @@ use std::{
     time::Duration,
 };
 
-/// Result of a successful model load.
 pub(super) struct Loaded {
     pub(super) load_ms: f64,
     pub(super) resources: Resources,

@@ -1,6 +1,6 @@
-// lib.rs
-// Shared modules for the evaluation CLI
-// Artifact hashing, bounded reads, and UTF-8-safe text limits
+//! Shared modules for the evaluation CLI.
+//!
+//! Artifact hashing, bounded reads, and UTF-8-safe text limits.
 
 pub mod adapter;
 pub mod case;

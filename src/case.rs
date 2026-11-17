@@ -155,7 +155,6 @@ pub struct Case {
     pub golden_answer: Option<String>,
 }
 impl Case {
-    /// Structure and cross-reference checks against the tool registry.
     pub fn validate(&self, registry: &BTreeSet<&str>) -> Result<()> {
         let id = &self.id;
         if id.is_empty()

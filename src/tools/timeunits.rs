@@ -1,6 +1,6 @@
-// tools/timeunits.rs
-// Fixture-clock date tools and table-driven unit conversion
-// Proleptic Gregorian days since 1970-01-01; results are deterministic per task
+//! Fixture-clock date tools and table-driven unit conversion.
+//!
+//! Proleptic Gregorian days since 1970-01-01; results are deterministic per task.
 
 use super::{string, Registry, World};
 use anyhow::{bail, Context, Result};

@@ -104,7 +104,6 @@ impl Builtins {
             faults: Vec::new(),
         })
     }
-    /// Names of every registered tool, sorted.
     pub fn names() -> Vec<&'static str> {
         registry().into_keys().collect()
     }
@@ -124,7 +123,6 @@ impl Builtins {
     pub fn set_sandbox_base(&mut self, base: Option<PathBuf>) {
         self.sandbox_base = base;
     }
-    /// Resets task state from fixtures.
     pub fn initialize(&mut self, fixtures: &Fixtures) -> Result<()> {
         let w = &mut self.world;
         w.files.clear();
@@ -209,7 +207,6 @@ impl Builtins {
 mod test_support {
     use super::*;
 
-    /// Initialized host in a temporary directory.
     pub fn host(fixtures: Value) -> (Builtins, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
         let mut h = Builtins::new(dir.path().into(), false).unwrap();

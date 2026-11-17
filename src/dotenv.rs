@@ -1,6 +1,6 @@
-// dotenv.rs
-// Loads KEY=VALUE pairs from .env files into the process environment
-// Variables already set in the environment take precedence over the file
+//! Loads KEY=VALUE pairs from .env files into the process environment.
+//!
+//! Variables already set in the environment take precedence over the file.
 
 use anyhow::{Context, Result};
 use std::path::Path;

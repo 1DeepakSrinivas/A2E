@@ -1,6 +1,6 @@
-// upload/payload.rs
-// Maps studies, model loads and finished attempts to Worker request bodies
-// Large resource series are split into separate sample requests
+//! Maps studies, model loads and finished attempts to Worker request bodies.
+//!
+//! Large resource series are split into separate sample requests.
 
 use super::client::Request;
 use crate::{

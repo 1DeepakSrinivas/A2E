@@ -1,6 +1,6 @@
-// tools/web.rs
-// Search and page retrieval from fixtures or live Brave search
-// Task-scoped source IDs, bounded excerpts, and public-destination checks
+//! Search and page retrieval from fixtures or live Brave search.
+//!
+//! Task-scoped source IDs, bounded excerpts, and public-destination checks.
 
 use super::words;
 use crate::{fixtures::Page, read_bounded, text_limit};
@@ -262,7 +262,6 @@ pub fn web_search(w: &mut super::World, a: &Value) -> Result<Value> {
 pub fn fetch_page(w: &mut super::World, a: &Value) -> Result<Value> {
     w.web.fetch(super::string(a, "source_id")?)
 }
-/// Loads the fixture pages.
 pub fn initialize(w: &mut super::World, fixtures: &crate::fixtures::Fixtures) {
     w.web.load(fixtures.pages.clone());
 }

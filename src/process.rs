@@ -1,6 +1,6 @@
-// process.rs
-// Bounded line reads and process-group cleanup for managed children
-// Used by the llama-server launcher and the power sampler
+//! Bounded line reads and process-group cleanup for managed children.
+//!
+//! Used by the llama-server launcher and the power sampler.
 
 use anyhow::{bail, Result};
 use std::{io::BufRead, process::Child};

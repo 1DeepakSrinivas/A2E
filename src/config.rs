@@ -1,6 +1,6 @@
-// config.rs
-// Runtime settings, model registry, and experiment definitions
-// Local overrides, pinned model downloads, and task and tool schema checks
+//! Runtime settings, model registry, and experiment definitions.
+//!
+//! Local overrides, pinned model downloads, and task and tool schema checks.
 
 use crate::case::{self, Case, Split};
 use anyhow::{bail, Context, Result};
@@ -151,7 +151,6 @@ impl Config {
         }
         Ok(output)
     }
-    /// Configuration with local overrides and validation.
     pub fn load(path: &Path) -> Result<Self> {
         let mut v: toml::Value = toml::from_str(&std::fs::read_to_string(path)?)?;
         let dir = path.parent().unwrap_or(Path::new("."));
@@ -520,7 +519,6 @@ pub struct Catalog {
     pub tools: Vec<ToolSpec>,
 }
 pub fn validate_schema(schema: &Value) -> Result<()> {
-    // Local schemas for offline validation
     fn inspect(v: &Value) -> Result<()> {
         match v {
             Value::Object(m) => {

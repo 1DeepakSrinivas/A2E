@@ -1,6 +1,6 @@
-// tools/fs.rs
-// Workspace tools: ls, tree, find, grep, cat, head, tail, wc, stat, mkdir, cp, touch, rm, diff
-// Paths are relative to the task root; results are capped with a note to narrow the query
+//! Workspace tools: ls, tree, find, grep, cat, head, tail, wc, stat, mkdir, cp, touch, rm, diff.
+//!
+//! Paths are relative to the task root; results are capped with a note to narrow the query.
 
 use super::{
     files::{charge, safe_path},
@@ -522,7 +522,6 @@ mod tests {
     use crate::tools::Builtins;
     use serde_json::{json, Value};
 
-    /// Host over a freshly generated workspace tree.
     fn workspace() -> (Builtins, tempfile::TempDir, tempfile::TempDir) {
         let sb = tempfile::tempdir().unwrap();
         crate::sandbox::init(sb.path(), crate::sandbox::DEFAULT_SEED, false).unwrap();

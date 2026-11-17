@@ -1,6 +1,6 @@
-// sandbox/mod.rs
-// Deterministic workspace tree for file tasks: generate, hash, verify, and copy per attempt
-// The base image is read-only input; each attempt works on its own copy
+//! Deterministic workspace tree for file tasks: generate, hash, verify, and copy per attempt.
+//!
+//! The base image is read-only input; each attempt works on its own copy.
 
 mod facts;
 mod filler;

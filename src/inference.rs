@@ -1,6 +1,6 @@
-// inference.rs
-// Pinned llama.cpp server lifecycle and loopback HTTP client
-// Prompt rendering, token counts, cache resets, and completion timings
+//! Pinned llama.cpp server lifecycle and loopback HTTP client.
+//!
+//! Prompt rendering, token counts, cache resets, and completion timings.
 
 use crate::{
     config::{Config, Model},

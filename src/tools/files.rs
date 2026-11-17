@@ -1,6 +1,6 @@
-// tools/files.rs
-// Task-scoped file tools: search, read, write, list, append, move, delete, grep
-// Relative paths only; symlinks denied; bounded reads and writes
+//! Task-scoped file tools: search, read, write, list, append, move, delete, grep.
+//!
+//! Relative paths only; symlinks denied; bounded reads and writes.
 
 use super::{string, words, Registry, World};
 use crate::{read_bounded, text_limit};
@@ -32,7 +32,6 @@ pub fn safe_path(root: &Path, name: &str) -> Result<PathBuf> {
     }
     Ok(p)
 }
-/// Contents of a file that belongs to this task.
 pub fn read_text(w: &World, name: &str) -> Result<String> {
     if !w.files.contains(name) {
         bail!("unknown task file");

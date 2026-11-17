@@ -1,6 +1,6 @@
-// tools/store.rs
-// Task-scoped key-value, note, and todo stores
-// Small bounded collections with 1-based IDs
+//! Task-scoped key-value, note, and todo stores.
+//!
+//! Small bounded collections with 1-based IDs.
 
 use super::{string, words, Registry, World};
 use crate::fixtures::{Fixtures, Note, Todo};
@@ -116,13 +116,11 @@ fn todo_list(w: &mut World, a: &Value) -> Result<Value> {
         .collect::<Vec<_>>();
     Ok(json!({"todos":todos}))
 }
-/// Loads the key-value, note and todo stores from fixtures.
 pub fn initialize(w: &mut World, fixtures: &Fixtures) {
     w.kv = fixtures.kv.clone();
     w.notes = fixtures.notes.clone();
     w.todos = fixtures.todos.clone();
 }
-/// Adds the stores to the final state for outcome checks.
 pub fn snapshot(w: &World, state: &mut Value) {
     state["kv"] = json!(w.kv);
     state["notes"] = json!(w.notes);

@@ -1,6 +1,6 @@
-// upload/resume.rs
-// Per-device resume state: finished attempts per job and loads per study
-// Append-only JSON lines; the Worker has no read route for the runner
+//! Per-device resume state: finished attempts per job and loads per study.
+//!
+//! Append-only JSON lines; the Worker has no read route for the runner.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

@@ -121,7 +121,6 @@ fn run_payload_carries_the_scoring_fields() {
     }
 }
 
-// Worker
 struct MockWorker {
     url: String,
     seen: Arc<Mutex<Vec<(String, String, Value)>>>,
@@ -220,7 +219,6 @@ impl Drop for MockWorker {
     }
 }
 
-// Contract
 fn schema_columns(sql: &str) -> BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)> {
     let mut tables: BTreeMap<String, (BTreeSet<String>, BTreeSet<String>)> = BTreeMap::new();
     let mut current: Option<(String, BTreeSet<String>, BTreeSet<String>)> = None;
