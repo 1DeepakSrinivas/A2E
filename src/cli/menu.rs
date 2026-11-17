@@ -46,13 +46,19 @@ fn answer<T>(result: Result<T, InquireError>) -> Result<Option<T>> {
     }
 }
 
-fn defaults(options: &[String], wanted: &[String]) -> Vec<usize> {
-    let picked: Vec<usize> = options
+/// Positions of the options chosen last time.
+fn remembered(options: &[String], wanted: &[String]) -> Vec<usize> {
+    options
         .iter()
         .enumerate()
         .filter(|(_, o)| wanted.contains(o))
         .map(|(i, _)| i)
-        .collect();
+        .collect()
+}
+
+/// Remembered positions, or every option when nothing was remembered.
+fn defaults(options: &[String], wanted: &[String]) -> Vec<usize> {
+    let picked = remembered(options, wanted);
     if picked.is_empty() {
         (0..options.len()).collect()
     } else {
@@ -155,6 +161,29 @@ fn dry_run_flow(config_path: &Path) -> Result<()> {
     print_json(&run::run(config_path, &args, Default::default())?)
 }
 
+/// Prints the attempt count per suite and the total, so the choice is clear before starting.
+fn print_summary(config_path: &Path, args: &session::StartArgs, picked: &Last) -> Result<()> {
+    let mut total = 0;
+    for s in &picked.suites {
+        let l = run::load(config_path, s, &args.select)?;
+        let cases = l.suite.load_cases(&l.path)?;
+        let catalog = a2e::config::Catalog::load(&args.tools)?;
+        let plan = a2e::runner::plan(&l.config, &l.suite, &cases, &catalog)?;
+        let n = run::total_attempts(&plan, &l.suite);
+        println!("  {s}: {n} attempts");
+        total += n;
+    }
+    println!(
+        "  {total} attempts, {}",
+        if picked.local {
+            "results stay on this device"
+        } else {
+            "results go to the Worker"
+        }
+    );
+    Ok(())
+}
+
 fn start_flow(config_path: &Path, local_flag: bool) -> Result<()> {
     let config = Config::load(config_path)?;
     let last = Last::load(&config);
@@ -173,10 +202,7 @@ fn start_flow(config_path: &Path, local_flag: bool) -> Result<()> {
                         "Suites (space selects, enter confirms):",
                         suite_names.clone(),
                     )
-                    .with_default(
-                        &defaults(&suite_names, &last.suites)
-                            [..last.suites.len().min(suite_names.len())],
-                    )
+                    .with_default(&remembered(&suite_names, &last.suites))
                     .prompt(),
                 )?;
                 match chosen {
@@ -263,24 +289,7 @@ fn start_flow(config_path: &Path, local_flag: bool) -> Result<()> {
                     retry_failed: picked.retry_failed,
                     allow_missing_model: false,
                 };
-                let mut total = 0;
-                for s in &picked.suites {
-                    let l = run::load(config_path, s, &args.select)?;
-                    let cases = l.suite.load_cases(&l.path)?;
-                    let catalog = a2e::config::Catalog::load(&args.tools)?;
-                    let plan = a2e::runner::plan(&l.config, &l.suite, &cases, &catalog)?;
-                    let n = run::total_attempts(&plan, &l.suite);
-                    println!("  {s}: {n} attempts");
-                    total += n;
-                }
-                println!(
-                    "  {total} attempts, {}",
-                    if picked.local {
-                        "results stay on this device"
-                    } else {
-                        "results go to the Worker"
-                    }
-                );
+                print_summary(config_path, &args, &picked)?;
                 match answer(Confirm::new("Start in tmux?").with_default(true).prompt())? {
                     None => step = 4,
                     Some(false) => bail!("cancelled"),

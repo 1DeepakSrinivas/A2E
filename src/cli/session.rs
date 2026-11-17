@@ -130,47 +130,15 @@ pub fn session_name(suites: &[String]) -> String {
     }
 }
 
-pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value> {
-    let suites: Vec<String> = args
-        .suites
-        .split(',')
-        .filter(|s| !s.is_empty())
-        .map(String::from)
-        .collect();
-    if suites.is_empty() {
-        bail!("name at least one suite; see: a2e cases list or ls configs/suites");
-    }
-    let running = sessions();
-    if !running.is_empty() {
-        bail!(
-            "another a2e session is running ({}); only one run can hold the runtime lock. Stop it with: a2e stop <name>",
-            running.join(", ")
-        );
-    }
-    let exe = std::env::current_exe()?;
-    if a2e::sandbox::verify(Path::new("sandbox")).is_err() {
-        bail!("the sandbox is missing or does not match its manifest. Run: a2e sandbox init");
-    }
-    for s in &suites {
-        run::plan(
-            config_path,
-            &run::RunArgs {
-                suite: s.clone(),
-                tools: args.tools.clone(),
-                select: args.select.clone(),
-                retry_failed: false,
-                allow_missing_model: false,
-                dry_run: false,
-            },
-        )
-        .with_context(|| format!("suite {s} does not plan"))?;
-    }
-    let config = Config::load(config_path)?;
-    let logs = expand_path(&config.runtime.output_dir).join("logs");
-    std::fs::create_dir_all(&logs)?;
-    let name = session_name(&suites);
-    let log = logs.join(format!("{name}-{}.log", stamp()));
-
+/// The command tmux runs: this binary's hidden `queue` command with the run options.
+fn queue_command(
+    exe: &Path,
+    config_path: &Path,
+    suites: &[String],
+    log: &Path,
+    args: &StartArgs,
+    local: bool,
+) -> Vec<String> {
     let mut command = vec![exe.to_string_lossy().into_owned()];
     command.extend([
         "--config".into(),
@@ -213,6 +181,51 @@ pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value>
     if args.allow_missing_model {
         command.push("--allow-missing-model".into());
     }
+    command
+}
+
+pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value> {
+    let suites: Vec<String> = args
+        .suites
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect();
+    if suites.is_empty() {
+        bail!("name at least one suite; see: a2e cases list or ls configs/suites");
+    }
+    let running = sessions();
+    if !running.is_empty() {
+        bail!(
+            "another a2e session is running ({}); only one run can hold the runtime lock. Stop it with: a2e stop <name>",
+            running.join(", ")
+        );
+    }
+    let exe = std::env::current_exe()?;
+    if a2e::sandbox::verify(Path::new("sandbox")).is_err() {
+        bail!("the sandbox is missing or does not match its manifest. Run: a2e sandbox init");
+    }
+    for s in &suites {
+        run::plan(
+            config_path,
+            &run::RunArgs {
+                suite: s.clone(),
+                tools: args.tools.clone(),
+                select: args.select.clone(),
+                retry_failed: false,
+                allow_missing_model: false,
+                dry_run: false,
+            },
+        )
+        .with_context(|| format!("suite {s} does not plan"))?;
+    }
+    let config = Config::load(config_path)?;
+    let logs = expand_path(&config.runtime.output_dir).join("logs");
+    std::fs::create_dir_all(&logs)?;
+    let name = session_name(&suites);
+    let log = logs.join(format!("{name}-{}.log", stamp()));
+
+    let command = queue_command(&exe, config_path, &suites, &log, args, local);
     let status = tmux()?
         .args(["new-session", "-d", "-s", &format!("a2e-{name}"), "--"])
         .args(&command)
