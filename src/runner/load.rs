@@ -25,7 +25,9 @@ pub(super) struct Loaded {
     pub(super) props: Value,
 }
 /// Longest wait for a cancelled call to leave its slot before the server is restarted.
-pub(super) const SETTLE: Duration = Duration::from_secs(60);
+pub(super) fn settle() -> Duration {
+    Duration::from_secs(crate::settings::active().advanced.settle_timeout_s)
+}
 pub(super) struct LoadRequest<'a> {
     pub(super) config: &'a Config,
     pub(super) model: &'a crate::config::Model,

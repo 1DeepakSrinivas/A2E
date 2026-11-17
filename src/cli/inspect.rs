@@ -285,7 +285,7 @@ fn probe_model(
     )?;
     let response = server.client.complete(
         &json!({"prompt":prompt,"n_predict":64,"temperature":0,"stop":adapter.generation_stops()}),
-        Duration::from_secs(300),
+        Duration::from_secs(a2e::settings::active().advanced.inference_timeout_s),
     )?;
     let parsed = adapter.parse_generation(&response.text, response.raw["stopping_word"].as_str());
     Ok(

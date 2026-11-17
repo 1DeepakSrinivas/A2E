@@ -34,7 +34,6 @@ pub struct Sample {
     pub major_faults: Option<u64>,
 }
 /// Samples kept per interval; summary statistics still cover every sample.
-pub const MAX_SAMPLES: usize = 20_000;
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Resources {
     pub harness_peak_bytes: u64,
@@ -149,7 +148,7 @@ fn is_pi3bplus() -> bool {
         .is_ok_and(|m| m.contains("Raspberry Pi 3 Model B Plus"))
 }
 fn pi_thermal() -> (Option<f64>, Option<String>) {
-    let temp = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp")
+    let temp = std::fs::read_to_string(&crate::settings::active().host.thermal_path)
         .ok()
         .and_then(|v| v.trim().parse::<f64>().ok())
         .map(|v| v / 1000.)
@@ -241,7 +240,14 @@ pub fn throttle_clean(v: &str) -> bool {
     v.is_empty() || v == "0x0" || v == "nominal"
 }
 const POWERMETRICS: &str = "/usr/bin/powermetrics";
-const POWERMETRICS_ARGS: [&str; 4] = ["--samplers", "cpu_power,gpu_power,thermal", "-i", "500"];
+fn powermetrics_args() -> [String; 4] {
+    [
+        "--samplers".into(),
+        "cpu_power,gpu_power,thermal".into(),
+        "-i".into(),
+        crate::settings::active().host.sample_ms.to_string(),
+    ]
+}
 pub const TELEMETRY_SETUP: &str = "./setup.sh telemetry";
 fn is_root() -> bool {
     // SAFETY: No memory preconditions
@@ -257,7 +263,7 @@ pub fn power_access() -> Result<()> {
     }
     let allowed = Command::new("sudo")
         .args(["-n", "-l", "--", POWERMETRICS])
-        .args(POWERMETRICS_ARGS)
+        .args(powermetrics_args())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -306,7 +312,7 @@ impl Power {
             c
         };
         let mut child = command
-            .args(POWERMETRICS_ARGS)
+            .args(powermetrics_args())
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -503,7 +509,7 @@ impl Monitor {
                         (a, b) => a.or(b),
                     };
                     let (minor, major) = (s.minor_faults, s.major_faults);
-                    if s.series.len() < MAX_SAMPLES {
+                    if s.series.len() < crate::settings::active().advanced.max_samples {
                         s.series.push(Sample {
                             t_ms: elapsed * 1000.,
                             harness_bytes: h,

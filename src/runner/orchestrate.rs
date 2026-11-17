@@ -2,7 +2,7 @@
 
 use super::{
     attempt::TaskExecution,
-    load::{launch, LoadRequest, Loaded, SETTLE},
+    load::{launch, settle, LoadRequest, Loaded},
     outcome::{classify_error, no_call_returned, Outcome, Status},
     task::{task_run, verify_sandbox},
 };
@@ -400,9 +400,9 @@ impl Study<'_> {
     /// A busy slot defers the cache erase, so wait for it or start a clean server.
     fn ensure_idle_server(&mut self, group: &mut Group) -> Result<()> {
         let ready = group.launched.as_ref().is_ok_and(|(server, _)| {
-            (!group.busy || server.client.settle(SETTLE))
+            (!group.busy || server.client.settle(settle()))
                 && (server.client.reset().is_ok()
-                    || (server.client.settle(SETTLE) && server.client.reset().is_ok()))
+                    || (server.client.settle(settle()) && server.client.reset().is_ok()))
         });
         if !ready && group.launched.is_ok() {
             eprintln!("warning: inference server did not become idle; restarting it");

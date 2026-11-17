@@ -37,16 +37,14 @@ pub fn task_run(x: TaskExecution<'_>) -> Result<Outcome> {
     let trace = Trace::create(&x.dir.join("trace.jsonl"))?;
     let t = Instant::now();
     let sandboxed = x.case.fixtures.sandbox.is_some();
-    let root = match std::env::var_os("A2E_SANDBOX_TMP").filter(|_| sandboxed) {
-        Some(tmp) => std::path::PathBuf::from(tmp)
+    let tmp_dir = crate::sandbox::tmp_dir().filter(|_| sandboxed);
+    let root = match &tmp_dir {
+        Some(tmp) => tmp
+            .clone()
             .join(&crate::canonical_hash(&x.dir.to_string_lossy())?[..16]),
         None => x.dir.join("workspace"),
     };
-    let _cleanup = RemoveOnDrop(
-        std::env::var_os("A2E_SANDBOX_TMP")
-            .filter(|_| sandboxed)
-            .map(|_| root.clone()),
-    );
+    let _cleanup = RemoveOnDrop(tmp_dir.map(|_| root.clone()));
     let mut tools = Builtins::new(root, x.suite.web_mode == WebMode::Live)?;
     if sandboxed {
         tools.set_sandbox_base(Some(crate::sandbox::default_dir().join("base")));

@@ -20,9 +20,22 @@ pub const DEFAULT_SEED: u64 = 1;
 /// 2026-01-01T00:00:00Z in seconds since the epoch; file ages count from here.
 const BASE_EPOCH: u64 = 1_767_225_600;
 
-/// Sandbox folder from `A2E_SANDBOX`, default `sandbox`.
+/// Sandbox folder from `A2E_SANDBOX`, else `host.sandbox_dir`, which is `sandbox` by default.
 pub fn default_dir() -> PathBuf {
-    std::env::var_os("A2E_SANDBOX").map_or_else(|| PathBuf::from("sandbox"), PathBuf::from)
+    std::env::var_os("A2E_SANDBOX").map_or_else(
+        || PathBuf::from(&crate::settings::active().host.sandbox_dir),
+        PathBuf::from,
+    )
+}
+
+/// Folder for task workspaces from `A2E_SANDBOX_TMP`, else `host.sandbox_tmp`; none when both are empty.
+pub fn tmp_dir() -> Option<PathBuf> {
+    std::env::var_os("A2E_SANDBOX_TMP")
+        .map(PathBuf::from)
+        .or_else(|| {
+            let t = &crate::settings::active().host.sandbox_tmp;
+            (!t.is_empty()).then(|| PathBuf::from(t))
+        })
 }
 
 pub enum Kind {

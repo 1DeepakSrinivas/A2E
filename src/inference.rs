@@ -42,7 +42,9 @@ impl Inference {
         Ok(Self {
             http: Client::builder()
                 .no_proxy()
-                .timeout(Duration::from_secs(300))
+                .timeout(Duration::from_secs(
+                    crate::settings::active().advanced.inference_timeout_s,
+                ))
                 .build()?,
             url,
         })
@@ -83,8 +85,12 @@ impl Inference {
             .len())
     }
     pub fn reset(&self) -> Result<()> {
-        self.post("/slots/0?action=erase", &json!({}), Duration::from_secs(10))
-            .context("cache_reset_failed")?;
+        self.post(
+            "/slots/0?action=erase",
+            &json!({}),
+            Duration::from_secs(crate::settings::active().advanced.slot_erase_timeout_s),
+        )
+        .context("cache_reset_failed")?;
         Ok(())
     }
     /// Waits until no slot is processing. The server defers a cache erase while a slot is

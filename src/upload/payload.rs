@@ -14,7 +14,6 @@ use anyhow::Result;
 use serde_json::{json, Value};
 use std::path::Path;
 
-const BODY_LIMIT: usize = 2_000_000;
 const SAMPLE_CHUNK: usize = 5_000;
 
 /// Identity of one attempt.
@@ -65,7 +64,7 @@ fn sample_rows(r: &Resources) -> Vec<Value> {
 /// Keeps samples inline when the body is small, otherwise returns them as follow-up requests.
 fn spill(body: &mut Value, key: &str, samples: Vec<Value>, path: &str) -> Vec<Request> {
     let size = body.to_string().len() + Value::Array(samples.clone()).to_string().len();
-    if size <= BODY_LIMIT {
+    if size <= crate::settings::active().advanced.upload_body_bytes {
         body[key] = Value::Array(samples);
         return Vec::new();
     }
