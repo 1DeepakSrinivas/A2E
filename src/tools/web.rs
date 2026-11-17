@@ -262,6 +262,10 @@ pub fn web_search(w: &mut super::World, a: &Value) -> Result<Value> {
 pub fn fetch_page(w: &mut super::World, a: &Value) -> Result<Value> {
     w.web.fetch(super::string(a, "source_id")?)
 }
+/// Loads the fixture pages.
+pub fn initialize(w: &mut super::World, fixtures: &crate::fixtures::Fixtures) {
+    w.web.load(fixtures.pages.clone());
+}
 pub fn register(r: &mut super::Registry) {
     r.insert("web_search", web_search);
     r.insert("fetch_page", fetch_page);

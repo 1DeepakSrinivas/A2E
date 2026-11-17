@@ -1,6 +1,9 @@
-// tools/mod.rs
-// Built-in tools run in the harness process: shared task state, handler registry, and fault injection
-// Domain modules register handlers by tool name
+//! Built-in tools run in the harness process.
+//!
+//! Each domain module (`fs`, `store`, `db`, `misc`, `web`, ...) owns its handlers and registers
+//! them by tool name. A module that keeps task state also provides `initialize` and `snapshot`.
+//! To add a domain, add the module, then list it in `registry`, `Builtins::initialize` and
+//! `Builtins::snapshot`.
 
 mod db;
 mod files;
@@ -148,21 +151,10 @@ impl Builtins {
             std::fs::write(p, body)?;
             fs::track(w, name);
         }
-        w.devices = fixtures.devices.clone();
-        w.kv = fixtures.kv.clone();
-        w.notes = fixtures.notes.clone();
-        w.todos = fixtures.todos.clone();
-        w.clock = fixtures
-            .clock
-            .clone()
-            .unwrap_or_else(|| "2026-01-01T00:00:00Z".into());
-        parse_date(&w.clock)?;
-        w.db = fixtures
-            .db
-            .as_ref()
-            .map(|d| db::Db::open(d.sql.as_deref().context("database seed needs sql")?))
-            .transpose()?;
-        w.web.load(fixtures.pages.clone());
+        store::initialize(w, fixtures);
+        misc::initialize(w, fixtures)?;
+        db::initialize(w, fixtures)?;
+        web::initialize(w, fixtures);
         self.faults = fixtures.faults.iter().cloned().map(|f| (f, 0)).collect();
         Ok(())
     }
@@ -207,11 +199,8 @@ impl Builtins {
         }
         let mut state = w.web.snapshot();
         state["files"] = json!(files);
-        state["devices"] = json!(w.devices);
-        state["kv"] = json!(w.kv);
-        state["notes"] = json!(w.notes);
-        state["todos"] = json!(w.todos);
-        state["clock"] = json!(w.clock);
+        store::snapshot(w, &mut state);
+        misc::snapshot(w, &mut state);
         Ok(state)
     }
 }
