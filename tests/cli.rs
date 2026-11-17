@@ -86,3 +86,50 @@ fn a_run_stops_early_when_a_model_file_is_missing() {
     assert!(!out.status.success());
     assert!(stderr(&out).contains("is missing"), "{}", stderr(&out));
 }
+
+#[cfg(unix)]
+#[test]
+fn detached_run_passes_environment_local_mode_to_tmux() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    let dir = tempfile::tempdir().unwrap();
+    symlink(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("configs"),
+        dir.path().join("configs"),
+    )
+    .unwrap();
+    let init = Command::new(env!("CARGO_BIN_EXE_a2e"))
+        .current_dir(dir.path())
+        .args(["sandbox", "init"])
+        .output()
+        .unwrap();
+    assert!(init.status.success(), "{}", stderr(&init));
+
+    let tmux = dir.path().join("tmux");
+    std::fs::write(
+        &tmux,
+        "#!/bin/sh\nif [ \"$1\" = new-session ]; then printf '%s\\n' \"$@\" > \"$A2E_TEST_TMUX_ARGS\"; fi\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&tmux, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let capture = dir.path().join("tmux-args");
+    let path = format!(
+        "{}:{}",
+        dir.path().display(),
+        std::env::var("PATH").unwrap()
+    );
+    let out = Command::new(env!("CARGO_BIN_EXE_a2e"))
+        .current_dir(dir.path())
+        .args(["start", "smoke"])
+        .env("PATH", path)
+        .env("A2E_LOCAL", "1")
+        .env("A2E_HOST_ID", "test@host")
+        .env("A2E_TEST_TMUX_ARGS", &capture)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", stderr(&out));
+    let args = std::fs::read_to_string(capture).unwrap();
+    assert!(args.lines().any(|arg| arg == "--local"));
+    let result: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(result["uploads"], "kept on this device");
+}

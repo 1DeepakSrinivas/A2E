@@ -185,6 +185,7 @@ fn queue_command(
 }
 
 pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value> {
+    let local = local || a2e::dotenv::local_only();
     let suites: Vec<String> = args
         .suites
         .split(',')

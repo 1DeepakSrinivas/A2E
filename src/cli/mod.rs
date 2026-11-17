@@ -143,8 +143,9 @@ fn entry() -> Result<()> {
         std::env::set_var("A2E_LOCAL", "1");
     }
     a2e::dotenv::load_startup(std::path::Path::new(".env"))?;
+    let local = a2e::dotenv::local_only();
     let Some(command) = cli.command else {
-        return menu::open(&cli.config, cli.local);
+        return menu::open(&cli.config, local);
     };
     let stop = Arc::new(AtomicBool::new(false));
     let flag = stop.clone();
@@ -152,7 +153,7 @@ fn entry() -> Result<()> {
     let output = match command {
         Command::Run(args) => run::run(&cli.config, &args, stop)?,
         Command::Plan(args) => run::plan(&cli.config, &args)?,
-        Command::Start(args) => session::start(&cli.config, &args, cli.local)?,
+        Command::Start(args) => session::start(&cli.config, &args, local)?,
         Command::Attach(a) => session::attach(&a.name)?,
         Command::Status(a) => session::status(&cli.config, &a.name)?,
         Command::Logs(a) => session::logs(&cli.config, &a.name)?,
