@@ -130,6 +130,19 @@ pub fn session_name(suites: &[String]) -> String {
     }
 }
 
+/// Settings that change a run. Secrets are left out because they would show in the process list;
+/// the run reads them from `.env` in the working directory.
+const FORWARDED_ENV: [&str; 8] = [
+    "A2E_HOST_ID",
+    "A2E_MODELS_DIR",
+    "A2E_LLAMA_SERVER",
+    "A2E_OUTPUT_DIR",
+    "A2E_RESULTS_ENV",
+    "A2E_SANDBOX",
+    "A2E_SANDBOX_TMP",
+    "PATH",
+];
+
 /// The command tmux runs: this binary's hidden `queue` command with the run options.
 fn queue_command(
     exe: &Path,
@@ -139,7 +152,14 @@ fn queue_command(
     args: &StartArgs,
     local: bool,
 ) -> Vec<String> {
-    let mut command = vec![exe.to_string_lossy().into_owned()];
+    // tmux starts the command with its server's environment, so pass the settings explicitly.
+    let mut command = vec!["env".to_string()];
+    command.extend(FORWARDED_ENV.iter().filter_map(|key| {
+        std::env::var(key)
+            .ok()
+            .map(|value| format!("{key}={value}"))
+    }));
+    command.push(exe.to_string_lossy().into_owned());
     command.extend([
         "--config".into(),
         config_path.to_string_lossy().into_owned(),
@@ -203,7 +223,7 @@ pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value>
         );
     }
     let exe = std::env::current_exe()?;
-    if a2e::sandbox::verify(Path::new("sandbox")).is_err() {
+    if a2e::sandbox::verify(&a2e::sandbox::default_dir()).is_err() {
         bail!("the sandbox is missing or does not match its manifest. Run: a2e sandbox init");
     }
     for s in &suites {
@@ -225,7 +245,9 @@ pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value>
 
     let command = queue_command(&exe, config_path, &suites, &log, args, local);
     let status = tmux()?
-        .args(["new-session", "-d", "-s", &format!("a2e-{name}"), "--"])
+        .args(["new-session", "-d", "-s", &format!("a2e-{name}"), "-c"])
+        .arg(std::env::current_dir()?)
+        .arg("--")
         .args(&command)
         .status()?;
     if !status.success() {

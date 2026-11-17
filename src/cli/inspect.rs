@@ -42,7 +42,7 @@ pub enum SandboxCommand {
         #[arg(long, default_value_t = a2e::sandbox::DEFAULT_SEED)]
         seed: u64,
         /// Folder to write
-        #[arg(long, default_value = "sandbox")]
+        #[arg(long, default_value_os_t = a2e::sandbox::default_dir())]
         out: PathBuf,
         /// Replace an existing tree
         #[arg(long)]
@@ -51,13 +51,13 @@ pub enum SandboxCommand {
     /// Check the tree against its manifest
     Verify {
         /// Folder holding the tree and its manifest
-        #[arg(long, default_value = "sandbox")]
+        #[arg(long, default_value_os_t = a2e::sandbox::default_dir())]
         dir: PathBuf,
     },
     /// Print the manifest
     Info {
         /// Folder holding the tree and its manifest
-        #[arg(long, default_value = "sandbox")]
+        #[arg(long, default_value_os_t = a2e::sandbox::default_dir())]
         dir: PathBuf,
     },
 }

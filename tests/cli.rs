@@ -124,12 +124,17 @@ fn detached_run_passes_environment_local_mode_to_tmux() {
         .env("PATH", path)
         .env("A2E_LOCAL", "1")
         .env("A2E_HOST_ID", "test@host")
+        .env("A2E_MODELS_DIR", "/models-from-client")
         .env("A2E_TEST_TMUX_ARGS", &capture)
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", stderr(&out));
     let args = std::fs::read_to_string(capture).unwrap();
     assert!(args.lines().any(|arg| arg == "--local"));
+    assert!(args
+        .lines()
+        .any(|arg| arg == "A2E_MODELS_DIR=/models-from-client"));
+    assert!(args.lines().any(|arg| arg == "A2E_HOST_ID=test@host"));
     let result: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(result["uploads"], "kept on this device");
 }
