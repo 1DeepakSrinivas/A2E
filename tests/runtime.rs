@@ -692,6 +692,24 @@ fn stable_guided_mode_keeps_the_prompt_prefix_and_enforces_stage_order() {
 }
 
 #[test]
+fn an_unknown_tool_outside_guided_mode_names_the_tools_that_exist() {
+    use_sandbox();
+    let t = task();
+    let server = MockServer::new(vec![call("no_such_tool", json!({}))], 100, Duration::ZERO);
+    let out = execute(&server, &t, &Variant::default(), &suite());
+    assert_eq!(out.argument_errors, 1);
+    let error = out.tool_log[0].error.as_deref().unwrap();
+    assert!(
+        error.starts_with("unknown tool no_such_tool; available tools: "),
+        "{error}"
+    );
+    for name in &t.tools.allowed {
+        assert!(error.contains(name.as_str()), "{error}");
+    }
+    assert!(!error.contains("stage"), "{error}");
+}
+
+#[test]
 fn the_tool_filter_never_hides_a_tool_the_golden_path_needs() {
     let config = Config::load(&repo().join("configs/models.toml")).unwrap();
     let catalog = catalog();
