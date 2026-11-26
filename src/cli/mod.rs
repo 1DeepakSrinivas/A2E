@@ -30,6 +30,7 @@ Run:
   a2e run core --model qwen3-0.6b --variant guided
   a2e start core,harness       run suites one after another in tmux
   a2e attach core | status core | logs core | stop core
+  a2e monitor core             show a run on the device's own screen
 
 Inspect and set up:
   a2e cases list --ids         list case ids
@@ -70,6 +71,8 @@ enum Command {
     Start(session::StartArgs),
     /// Watch a running session; detach with Ctrl-b then d
     Attach(session::NameArg),
+    /// Show a running session on the device's own screen
+    Monitor(session::NameArg),
     /// Show whether a session is running and what waits to upload
     Status(session::NameArg),
     /// Follow the newest log of a session
@@ -170,6 +173,7 @@ fn entry() -> Result<()> {
         Command::Plan(args) => run::plan(&cli.config, &args)?,
         Command::Start(args) => session::start(&cli.config, &args, local)?,
         Command::Attach(a) => session::attach(&a.name)?,
+        Command::Monitor(a) => session::monitor(&a.name)?,
         Command::Status(a) => session::status(&cli.config, &a.name)?,
         Command::Logs(a) => session::logs(&cli.config, &a.name)?,
         Command::Stop(a) => session::stop(&a.name)?,

@@ -71,11 +71,12 @@ pub fn open(config_path: &Path, local: bool) -> Result<()> {
         super::print_help();
         std::process::exit(2);
     }
-    const ACTIONS: [&str; 11] = [
+    const ACTIONS: [&str; 12] = [
         "Start a run",
         "Check what a suite would do",
         "Status",
         "Attach to a run",
+        "Show a run on the device screen",
         "Show a log",
         "Stop a run",
         "Check this machine (doctor)",
@@ -100,6 +101,8 @@ pub fn open(config_path: &Path, local: bool) -> Result<()> {
             }),
             "Attach to a run" => pick_session("Attach to:")
                 .and_then(|n| n.map_or(Ok(()), |n| session::attach(&n).map(|_| ()))),
+            "Show a run on the device screen" => pick_session("Show on screen:")
+                .and_then(|n| n.map_or(Ok(()), |n| print_json(&session::monitor(&n)?))),
             "Show a log" => {
                 let names = session::log_names(config_path);
                 if names.is_empty() {

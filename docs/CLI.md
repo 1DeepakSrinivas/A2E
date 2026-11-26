@@ -6,7 +6,7 @@ Commands that print data write JSON to stdout. Progress, warnings and prompts go
 
 ## Menu
 
-Run `a2e` with no command on a terminal to open a menu. The menu offers to start a run, check what a suite would do, show the status of a run, attach to a run, follow a log, stop a run, run `doctor`, show every setting and the layer it came from, add a model from Hugging Face, and send waiting results. Starting a run asks for the suites, models, variants, whether to keep results on the device, and whether to retry failed attempts. It then shows how many attempts the choice makes and asks before it starts. Esc goes back one step, and Ctrl-C leaves the menu. The menu remembers your last choices in `results/.last-run.toml`. Without a terminal, `a2e` prints the help and exits with code 2, so scripts never wait for input.
+Run `a2e` with no command on a terminal to open a menu. The menu offers to start a run, check what a suite would do, show the status of a run, attach to a run, show a run on the device screen, follow a log, stop a run, run `doctor`, show every setting and the layer it came from, add a model from Hugging Face, and send waiting results. Starting a run asks for the suites, models, variants, whether to keep results on the device, and whether to retry failed attempts. It then shows how many attempts the choice makes and asks before it starts. Esc goes back one step, and Ctrl-C leaves the menu. The menu remembers your last choices in `results/.last-run.toml`. Without a terminal, `a2e` prints the help and exits with code 2, so scripts never wait for input.
 
 ## Run
 
@@ -34,6 +34,7 @@ These commands run suites in a detached tmux session, so a run continues after y
 
 - `a2e start <suites>` starts one suite in the session `a2e-<suite>`, or several comma separated suites one after another in `a2e-queue`. It takes the same options as `a2e run`, except `--dry-run`. The output is also written to a log in `results/logs`.
 - `a2e attach <name>` shows the session. Press Ctrl-b and then d to detach.
+- `a2e monitor <name>` shows the session on the screen of the device itself, even when you run the command over SSH. It opens tmux on a free virtual console with `openvt` and switches the screen to it, and it asks for your sudo password once. Detach with Ctrl-b and then d on the device keyboard, or run `tmux detach-client -s a2e-<name>`. It needs the `kbd` package on the device.
 - `a2e status <name>` says whether the session is running and what waits to upload.
 - `a2e logs <name>` follows the newest log of that session.
 - `a2e stop <name>` sends Ctrl-C to the session. Start it again later to resume.

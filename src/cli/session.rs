@@ -1,4 +1,4 @@
-//! Runs in detached tmux sessions: start, attach, status, logs and stop.
+//! Runs in detached tmux sessions: start, attach, monitor, status, logs and stop.
 //!
 //! One suite runs in `a2e-<suite>`. Several run one after another in `a2e-queue`, because only one
 //! run can hold the runtime lock.
@@ -324,6 +324,40 @@ pub fn attach(name: &str) -> Result<Value> {
         .args(["attach", "-t", &format!("a2e-{name}")])
         .status()?;
     Ok(Value::Null)
+}
+
+/// Shows the session on the device's own screen by attaching tmux on a free virtual console.
+pub fn monitor(name: &str) -> Result<Value> {
+    require_running(name)?;
+    if !cfg!(target_os = "linux") {
+        bail!("monitor needs a Linux device with a screen on its virtual console");
+    }
+    if Command::new("openvt").arg("--version").output().is_err() {
+        bail!("openvt is not installed. Run: sudo apt install kbd");
+    }
+    let user = std::env::var("USER")
+        .or_else(|_| std::env::var("LOGNAME"))
+        .context("USER is not set")?;
+    // Ask for the sudo password here, while the terminal is still ours
+    if !Command::new("sudo").arg("-v").status()?.success() {
+        bail!("monitor needs sudo to open the console");
+    }
+    Command::new("sudo")
+        .args([
+            "-n", "openvt", "-s", "-w", "--", "runuser", "-u", &user, "--",
+        ])
+        .args(["env", "TERM=linux", "tmux", "attach", "-t"])
+        .arg(format!("a2e-{name}"))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .context("could not start openvt")?;
+    Ok(json!({
+        "session": format!("a2e-{name}"),
+        "screen": "shown on the device's display",
+        "next": format!("detach with Ctrl-b d on the device keyboard, or run: tmux detach-client -s a2e-{name}"),
+    }))
 }
 
 pub fn status(config_path: &Path, name: &str) -> Result<Value> {
