@@ -70,6 +70,15 @@ pub fn values_match(expected: &Value, actual: &Value, mode: MatchMode, tol: f64)
                     .zip(a)
                     .all(|(ev, av)| values_match(ev, av, mode, tol))
         }
+        // "3" and 3 name the same value; tools and models disagree on the type
+        (Value::String(e), Value::Number(_)) => e
+            .trim()
+            .parse::<f64>()
+            .is_ok_and(|e| values_match(&serde_json::json!(e), actual, mode, tol)),
+        (Value::Number(_), Value::String(a)) => a
+            .trim()
+            .parse::<f64>()
+            .is_ok_and(|a| values_match(expected, &serde_json::json!(a), mode, tol)),
         _ => expected == actual,
     }
 }
@@ -302,9 +311,10 @@ mod tests {
     }
     #[test]
     fn file_checks_cover_each_matcher_and_absence() {
-        let state = json!({"files":{"a.txt":"Reading: 17","j.json":"{\"x\":1.0}"}});
+        let state = json!({"files":{"a.txt":"Reading: 17","n.txt":"20\n","j.json":"{\"x\":1.0}"}});
         let checks = [
             ("path = \"a.txt\"\neq = \"Reading: 17\"", true),
+            ("path = \"n.txt\"\neq = \"20\"", true),
             ("path = \"a.txt\"\neq = \"reading: 17\"", false),
             ("path = \"a.txt\"\ncontains = \"17\"", true),
             ("path = \"a.txt\"\nregex = \"^Reading: \\\\d+$\"", true),
@@ -324,6 +334,15 @@ mod tests {
             );
             assert_eq!(r[0].passed, want, "{body}");
         }
+    }
+    #[test]
+    fn numeric_strings_match_numbers_but_not_other_text() {
+        let m = |e: Value, a: Value| values_match(&e, &a, MatchMode::Exact, 1e-9);
+        assert!(m(json!("3"), json!(3)));
+        assert!(m(json!(35.2), json!("35.2")));
+        assert!(m(json!({"value":"40"}), json!({"value":40})));
+        assert!(!m(json!("3"), json!(4)));
+        assert!(!m(json!("three"), json!(3)));
     }
     #[test]
     fn answer_checks_are_case_insensitive_for_contains_and_numeric_for_numbers() {

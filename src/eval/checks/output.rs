@@ -51,7 +51,8 @@ impl CheckKind for FileCheck {
         } else if self.present {
             file.is_some()
         } else if let Some(want) = &self.eq {
-            body == Some(want.as_str())
+            // A trailing newline or space is not a different answer
+            body.is_some_and(|b| b.trim_end() == want.trim_end())
         } else if let Some(part) = &self.contains {
             body.is_some_and(|b| b.contains(part.as_str()))
         } else if let Some(p) = &self.regex {
