@@ -113,3 +113,8 @@ How the measures and the decision rules are computed:
 
 - The memory limit for the harness and the server together is 1024 MiB on both devices instead of 768. At 768, LFM2.5-1.2B was stopped on the Mac before it ran out of memory, because resident memory counts the weight pages that llama.cpp maps from the file. On the 1 GB Pi the new limit is above physical memory, so the check that at least 128 MiB stays free is what stops a run there. A model that does not fit the Pi is reported as not fitting.
 - Swap stays off for measured runs. Swap does not lower the resident memory that the limit checks, and paging weights in and out would change the time and energy per success that the study measures.
+
+### 2026-11-26, context cache
+
+- Every model on every device runs with an 8-bit context cache (`--cache-type-k q8_0 --cache-type-v q8_0`) and flash attention on, instead of a 16-bit cache with flash attention left to the server. At 2048 tokens the 16-bit cache of Qwen3-0.6B is about 230 MB, which put the model over the 1024 MiB limit while it loaded on the Mac. The 8-bit cache is about half that size. It can change the generated text slightly, so it applies to all three models alike.
+- One request slot (`--parallel 1`) and the batch sizes (`--batch-size 128 --ubatch-size 64`) are unchanged; they were already the smallest settings in use.

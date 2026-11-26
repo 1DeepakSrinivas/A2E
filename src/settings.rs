@@ -118,9 +118,9 @@ impl Default for Llama {
             jinja: true,
             special: true,
             context_shift: false,
-            flash_attn: "auto".into(),
-            cache_type_k: "f16".into(),
-            cache_type_v: "f16".into(),
+            flash_attn: "on".into(),
+            cache_type_k: "q8_0".into(),
+            cache_type_v: "q8_0".into(),
             mlock: false,
             mmap: true,
             chat_template: String::new(),
@@ -288,6 +288,22 @@ impl Settings {
         }
         if !["auto", "on", "off"].contains(&l.flash_attn.as_str()) {
             bail!("llama.flash_attn must be auto, on or off");
+        }
+        let types = [
+            "f32", "f16", "bf16", "q8_0", "q4_0", "q4_1", "iq4_nl", "q5_0", "q5_1",
+        ];
+        if !types.contains(&l.cache_type_k.as_str()) || !types.contains(&l.cache_type_v.as_str()) {
+            bail!(
+                "llama.cache_type_k and cache_type_v must be one of {}",
+                types.join(", ")
+            );
+        }
+        // llama.cpp needs flash attention for a quantized value cache
+        if !["f32", "f16", "bf16"].contains(&l.cache_type_v.as_str()) && l.flash_attn == "off" {
+            bail!(
+                "llama.cache_type_v = {} needs llama.flash_attn on or auto",
+                l.cache_type_v
+            );
         }
         if h.sample_ms < 100 {
             bail!("host.sample_ms must be at least 100");
@@ -489,17 +505,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_llama_arguments_match_the_old_hard_coded_list() {
+    fn default_llama_arguments_use_one_slot_small_batches_and_a_q8_0_cache_with_flash_attention() {
         let args = Llama::default().args(Path::new("m.gguf"), 1024, Path::new("s/slots"));
-        let expected = "--host 127.0.0.1 --port 8197 --model m.gguf --ctx-size 1024 --threads 4 --n-gpu-layers 0 --parallel 1 --batch-size 128 --ubatch-size 64 --jinja --special --no-context-shift --cache-ram 0 --slots --slot-save-path s/slots";
+        let expected = "--host 127.0.0.1 --port 8197 --model m.gguf --ctx-size 1024 --threads 4 --n-gpu-layers 0 --parallel 1 --batch-size 128 --ubatch-size 64 --jinja --special --no-context-shift --cache-ram 0 --flash-attn on --cache-type-k q8_0 --cache-type-v q8_0 --slots --slot-save-path s/slots";
         assert_eq!(args.join(" "), expected);
     }
 
     #[test]
     fn optional_flags_appear_only_when_changed_and_extra_args_come_last() {
         let l = Llama {
-            flash_attn: "on".into(),
-            cache_type_k: "q8_0".into(),
+            flash_attn: "auto".into(),
+            cache_type_k: "q4_0".into(),
+            cache_type_v: "f16".into(),
             mlock: true,
             mmap: false,
             chat_template: "chatml".into(),
@@ -508,8 +525,7 @@ mod tests {
         };
         let args = l.args(Path::new("m"), 512, Path::new("s")).join(" ");
         for flag in [
-            "--flash-attn on",
-            "--cache-type-k q8_0",
+            "--cache-type-k q4_0",
             "--mlock",
             "--no-mmap",
             "--chat-template chatml",
@@ -518,6 +534,7 @@ mod tests {
         }
         assert!(args.ends_with("--verbose"));
         assert!(!args.contains("--cache-type-v"));
+        assert!(!args.contains("--flash-attn"));
     }
 
     #[test]
@@ -531,6 +548,17 @@ mod tests {
         let mut bad = s.clone();
         bad.sampling.top_p = 1.5;
         assert!(bad.validate().is_err());
+        let mut bad = s.clone();
+        bad.llama.cache_type_k = "q9".into();
+        assert!(bad.validate().is_err());
+        let mut bad = s.clone();
+        bad.llama.flash_attn = "off".into();
+        assert!(
+            bad.validate().is_err(),
+            "a q8_0 value cache needs flash attention"
+        );
+        bad.llama.cache_type_v = "f16".into();
+        assert!(bad.validate().is_ok());
         let mut bad = s.clone();
         bad.limits.context = vec![100];
         assert!(bad.validate().is_err());

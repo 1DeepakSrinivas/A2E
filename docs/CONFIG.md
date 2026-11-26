@@ -81,9 +81,9 @@ One key for each llama-server flag the harness sets. The pinned commit is the on
 | `jinja` | true | `--jinja` | Use the model's chat template engine. |
 | `special` | true | `--special` | Show special tokens in output. |
 | `context_shift` | false | `--no-context-shift` when false | Let the server drop old tokens when the context fills. |
-| `flash_attn` | `auto` | `--flash-attn` | `auto` leaves the server default. `on` and `off` pass the flag. |
-| `cache_type_k` | `f16` | `--cache-type-k` | Key cache type. Passed only when it is not `f16`. |
-| `cache_type_v` | `f16` | `--cache-type-v` | Value cache type. Passed only when it is not `f16`. |
+| `flash_attn` | `on` | `--flash-attn` | `auto` leaves the server default. `on` and `off` pass the flag. A quantized `cache_type_v` needs `on` or `auto`. |
+| `cache_type_k` | `q8_0` | `--cache-type-k` | Key cache type. Passed only when it is not `f16`. `q8_0` uses about half the memory of `f16`. |
+| `cache_type_v` | `q8_0` | `--cache-type-v` | Value cache type. Passed only when it is not `f16`. |
 | `mlock` | false | `--mlock` | Keep the model in memory. |
 | `mmap` | true | `--no-mmap` when false | Map the model file instead of reading it. |
 | `chat_template` | empty | `--chat-template` | Template name. Empty uses the template inside the model file. |
