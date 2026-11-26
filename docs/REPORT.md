@@ -77,7 +77,7 @@ A case can break a tool on purpose with a fault: fail the first `n` calls, retur
 
 - **Autonomous.** The model sees all allowed tools and works until it answers.
 - **Guided.** The model sees one stage at a time with only that stage's tools.
-- **Filter.** Only the `k` tools whose name and description share the most words with the prompt are shown.
+- **Filter.** Only the `k` tools (4 by default) whose name and description share the most words with the prompt are shown. A test checks that no tool on a golden path is hidden.
 - **Recent.** Once the conversation passes six messages, only the first two and the last four are kept.
 - **Constrained.** A grammar built from the visible tools limits decoding to valid calls.
 - **Repair.** One retry is allowed after a reply that cannot be read.
