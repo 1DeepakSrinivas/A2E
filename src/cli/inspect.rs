@@ -288,7 +288,30 @@ fn probe_model(
         Duration::from_secs(a2e::settings::active().advanced.inference_timeout_s),
     )?;
     let parsed = adapter.parse_generation(&response.text, response.raw["stopping_word"].as_str());
+    // A full turn as an attempt sends it, so the template's handling of the system message,
+    // the tool list, an earlier call and its result can be read
+    let ls = a2e::config::ToolSpec {
+        name: "ls".into(),
+        description: "List the entries of a directory.".into(),
+        parameters: json!({"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}),
+    };
+    let call = a2e::adapter::Call {
+        name: "ls".into(),
+        arguments: json!({"path":"."}),
+    };
+    let turn = [
+        a2e::runner::system_message(true),
+        json!({"role":"user","content":"List the files in the workspace."}),
+        a2e::adapter::Adapter::assistant(&call),
+        adapter.tool_message("ls", &json!({"entries":["notes.txt"]})),
+    ];
+    let sample = server.client.template(
+        &adapter.template_request(&turn, &[ls, a2e::adapter::final_tool()]),
+        Duration::from_secs(30),
+    )?;
+    let template = dir.join("template.txt");
+    std::fs::write(&template, adapter.normalize_prompt(sample))?;
     Ok(
-        json!({"loaded":true,"resources":resources,"props":props,"raw":response.raw,"format_valid":parsed.is_ok(),"parse_error":parsed.err().map(|e|e.to_string())}),
+        json!({"loaded":true,"resources":resources,"props":props,"raw":response.raw,"format_valid":parsed.is_ok(),"parse_error":parsed.err().map(|e|e.to_string()),"template":template}),
     )
 }

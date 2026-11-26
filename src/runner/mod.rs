@@ -9,7 +9,7 @@ mod orchestrate;
 mod outcome;
 mod task;
 
-pub use attempt::{select_tools, TaskExecution, Trace};
+pub use attempt::{select_tools, system_message, TaskExecution, Trace};
 pub use orchestrate::{attempt_line, plan, preflight, run, RunOptions};
 pub use outcome::{classify, classify_error, no_call_returned, Outcome, Status};
 pub use task::task_run;
