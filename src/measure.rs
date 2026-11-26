@@ -227,7 +227,7 @@ pub fn preflight_warnings(r: &Settings) -> Vec<String> {
     let total_mb = s.total_memory() >> 20;
     if total_mb > 0 && r.limits.memory_mb > total_mb {
         out.push(format!(
-            "memory_limit_mb = {} exceeds the {total_mb} MiB of physical memory, so the memory guard cannot trip",
+            "memory_limit_mb = {} exceeds the {total_mb} MiB of physical memory, so only the reserve_mb check can stop a run",
             r.limits.memory_mb
         ));
     }
