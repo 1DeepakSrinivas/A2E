@@ -92,12 +92,23 @@ pub fn select_tools(
         })
         .collect::<Result<Vec<_>>>()?;
     if !guided {
+        // Seeded by case id, so each case gets its own distractors and every variant the same ones
+        let mut others: Vec<_> = registry
+            .values()
+            .filter(|t| !case.tools.allowed.contains(&t.name))
+            .map(|t| {
+                (
+                    crate::digest(format!("{}\n{}", case.id, t.name).as_bytes()),
+                    t,
+                )
+            })
+            .collect();
+        others.sort_by(|a, b| a.0.cmp(&b.0));
         out.extend(
-            registry
-                .values()
-                .filter(|t| !case.tools.allowed.contains(&t.name))
+            others
+                .into_iter()
                 .take(case.tools.distractors)
-                .cloned(),
+                .map(|(_, t)| t.clone()),
         );
     }
     if v.filter_top_k > 0 {

@@ -192,7 +192,7 @@ final_answer = "required"      # required or optional
 
 [tools]
 allowed = ["read_file", "write_file"]
-distractors = 0                # extra unrelated tools added in autonomous mode
+distractors = 0                # extra unrelated tools in autonomous mode, picked per case from its id
 
 [fixtures.files]
 "reading.txt" = "Reading: 17"

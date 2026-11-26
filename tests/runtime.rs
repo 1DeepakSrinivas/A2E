@@ -414,6 +414,34 @@ fn distractors_extend_autonomous_tools_but_not_guided_stages() {
     assert_eq!(names.len(), stages[0].tools.len() + 1);
 }
 #[test]
+fn distractors_depend_on_the_case_and_not_the_variant() {
+    let names = |c: &Case, v: &Variant| -> Vec<String> {
+        select_tools(c, &catalog(), v, &[], 0)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.name)
+            .filter(|n| !c.tools.allowed.contains(n) && n != "final_answer")
+            .collect()
+    };
+    let mut c = task();
+    c.tools.distractors = 3;
+    let first = names(&c, &Variant::default());
+    let repair = Variant {
+        repairs: 1,
+        ..Default::default()
+    };
+    assert_eq!(names(&c, &repair), first);
+    assert_eq!(names(&c, &Variant::default()), first);
+    let picks: std::collections::BTreeSet<Vec<String>> = (0..8)
+        .map(|i| {
+            let mut other = c.clone();
+            other.id = format!("case-{i}");
+            names(&other, &Variant::default())
+        })
+        .collect();
+    assert!(picks.len() > 1, "every case got the same distractors");
+}
+#[test]
 fn state_only_case_passes_without_a_final_answer_when_optional() {
     let mut c = task();
     c.scope.final_answer = FinalAnswer::Optional;
