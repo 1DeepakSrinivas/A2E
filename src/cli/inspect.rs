@@ -1,6 +1,6 @@
 //! Commands that read the system and report: doctor, cases, tools, sandbox and upload status.
 
-use a2e::config::{expand_path, Catalog, Config};
+use a2e::config::{Catalog, Config};
 use anyhow::Result;
 use clap::Subcommand;
 use serde_json::{json, Value};
@@ -129,7 +129,7 @@ pub fn sandbox(command: &SandboxCommand) -> Result<Value> {
 
 pub fn upload(config: &Path, status: bool) -> Result<Value> {
     let config = Config::load(config)?;
-    let mut uploader = a2e::upload::Uploader::open(&expand_path(&config.settings.host.output_dir))?;
+    let mut uploader = a2e::upload::Uploader::open(&config.output_dir())?;
     Ok(serde_json::to_value(if status {
         uploader.status()?
     } else {
@@ -262,7 +262,7 @@ fn probe_model(
     stop: &Arc<AtomicBool>,
 ) -> Result<Value> {
     use std::time::Duration;
-    let root = expand_path(&c.settings.host.output_dir);
+    let root = c.output_dir();
     let _lock = a2e::store::RunLock::acquire(&root)?;
     let dir = root.join("probes").join(&m.id);
     std::fs::create_dir_all(&dir)?;

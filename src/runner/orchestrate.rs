@@ -102,7 +102,7 @@ pub(super) fn git_state() -> Value {
 
 /// Hash of the inference binary; null when it cannot be read, which `launch` reports later.
 pub(super) fn llama_server_hash(config: &Config) -> Value {
-    crate::hash_file(&crate::config::expand_path(&config.settings.llama.server))
+    crate::hash_file(&config.resolve(&config.settings.llama.server))
         .map_or(Value::Null, |h| json!(h))
 }
 
@@ -160,19 +160,57 @@ enum Flow {
     Interrupted,
 }
 
-/// Fails before any work when a model file is missing and the run did not allow that.
-fn require_model_files(config: &Config, suite: &Suite, options: RunOptions) -> Result<()> {
-    if options.allow_missing_model {
-        return Ok(());
-    }
+/// Fails before any work, with every problem in one error, when a model file or
+/// the llama-server binary is missing or the binary is not the pinned commit.
+/// Without this a setup slip fails every attempt of a group one by one.
+pub fn preflight(config: &Config, suite: &Suite, options: RunOptions) -> Result<()> {
+    let mut problems = Vec::new();
+    let mut servers = BTreeSet::new();
     for id in &suite.models {
-        let path = config.model_path(config.model(id)?);
-        if !path.exists() {
-            bail!(
-                "model file {} is missing. Run: a2e models fetch (or pass --allow-missing-model)",
-                path.display()
-            );
+        let m = config.model(id)?;
+        let path = config.model_path(m);
+        if !options.allow_missing_model && !path.is_file() {
+            problems.push(format!("model file {} for {id} is missing", path.display()));
         }
+        servers.insert((
+            config.server_path(m),
+            config.settings_for(m).llama.commit.clone(),
+        ));
+    }
+    for (server, commit) in servers {
+        if !server.is_file() {
+            problems.push(format!("llama-server {} is missing", server.display()));
+            continue;
+        }
+        match std::process::Command::new(&server)
+            .arg("--version")
+            .output()
+        {
+            Ok(out) => {
+                let text = format!(
+                    "{}{}",
+                    String::from_utf8_lossy(&out.stdout),
+                    String::from_utf8_lossy(&out.stderr)
+                );
+                if !text.contains(&commit[..commit.len().min(8)]) {
+                    problems.push(format!(
+                        "llama-server {} is not built from the pinned commit {commit}",
+                        server.display()
+                    ));
+                }
+            }
+            Err(e) => problems.push(format!(
+                "llama-server {} does not run: {e}",
+                server.display()
+            )),
+        }
+    }
+    if !problems.is_empty() {
+        bail!(
+            "cannot start the run:\n  {}\nRelative paths start at {}. Run ./setup.sh for llama-server and a2e models fetch for model files (or pass --allow-missing-model).",
+            problems.join("\n  "),
+            config.root.display()
+        );
     }
     Ok(())
 }
@@ -240,9 +278,9 @@ pub fn run(
     progress: &Progress,
 ) -> Result<Value> {
     plan(config, suite, cases, catalog)?;
-    require_model_files(config, suite, options)?;
+    preflight(config, suite, options)?;
     let sandbox = verify_sandbox(cases)?;
-    let root = crate::config::expand_path(&config.settings.host.output_dir);
+    let root = config.output_dir();
     let _lock = RunLock::acquire(&root)?;
     for w in crate::measure::preflight_warnings(&config.settings) {
         eprintln!("warning: {w}");

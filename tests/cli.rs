@@ -87,6 +87,34 @@ fn a_run_stops_early_when_a_model_file_is_missing() {
     assert!(stderr(&out).contains("is missing"), "{}", stderr(&out));
 }
 
+#[test]
+fn a_run_from_another_folder_finds_paths_from_the_repository_and_lists_every_problem() {
+    let elsewhere = tempfile::tempdir().unwrap();
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let models = tempfile::tempdir().unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_a2e"))
+        .current_dir(elsewhere.path())
+        .args(["run", "core", "--model", "qwen3-0.6b,functiongemma-270m"])
+        .arg("--config")
+        .arg(repo.join("configs/models.toml"))
+        .arg("--tools")
+        .arg(repo.join("configs/tools/standard.toml"))
+        .env("A2E_LOCAL", "1")
+        .env("A2E_HOST_ID", "test@host")
+        .env("A2E_MODELS_DIR", models.path())
+        .env("A2E_LLAMA_SERVER", "no-such/llama-server")
+        .output()
+        .unwrap();
+    let err = stderr(&out);
+    assert!(!out.status.success());
+    // Both missing models and the server are named in one error, before any attempt
+    assert!(err.contains("Qwen3-0.6B-Q4_K_M.gguf"), "{err}");
+    assert!(err.contains("functiongemma-270m-it-Q4_K_M.gguf"), "{err}");
+    let server = repo.canonicalize().unwrap().join("no-such/llama-server");
+    assert!(err.contains(&server.display().to_string()), "{err}");
+    assert!(!elsewhere.path().join("results").exists());
+}
+
 #[cfg(unix)]
 #[test]
 fn detached_run_passes_environment_local_mode_to_tmux() {

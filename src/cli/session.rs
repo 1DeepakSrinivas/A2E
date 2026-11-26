@@ -4,7 +4,7 @@
 //! run can hold the runtime lock.
 
 use super::run::{self, SelectArgs};
-use a2e::config::{expand_path, Config};
+use a2e::config::Config;
 use anyhow::{bail, Context, Result};
 use clap::Args;
 use serde_json::{json, Value};
@@ -235,7 +235,7 @@ pub fn start(config_path: &Path, args: &StartArgs, local: bool) -> Result<Value>
         .with_context(|| format!("suite {s} does not plan"))?;
     }
     let config = Config::load(config_path)?;
-    let logs = expand_path(&config.settings.host.output_dir).join("logs");
+    let logs = config.output_dir().join("logs");
     std::fs::create_dir_all(&logs)?;
     let name = session_name(&suites);
     let log = logs.join(format!("{name}-{}.log", stamp()));
@@ -341,7 +341,7 @@ pub fn status(config_path: &Path, name: &str) -> Result<Value> {
 fn latest_log(config_path: &Path, name: &str) -> Result<PathBuf> {
     check_name(name)?;
     let config = Config::load(config_path)?;
-    let dir = expand_path(&config.settings.host.output_dir).join("logs");
+    let dir = config.output_dir().join("logs");
     let prefix = format!("{name}-");
     std::fs::read_dir(&dir)
         .with_context(|| format!("no log folder at {}", dir.display()))?
@@ -376,7 +376,7 @@ pub fn log_names(config_path: &Path) -> Vec<String> {
     let Ok(config) = Config::load(config_path) else {
         return Vec::new();
     };
-    let dir = expand_path(&config.settings.host.output_dir).join("logs");
+    let dir = config.output_dir().join("logs");
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .into_iter()
         .flatten()

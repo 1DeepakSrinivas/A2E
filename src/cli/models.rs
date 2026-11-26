@@ -1,9 +1,6 @@
 //! `models add`: look up a Hugging Face GGUF, download it, and write a pinned entry.
 
-use a2e::{
-    config::{expand_path, Config},
-    hub,
-};
+use a2e::{config::Config, hub};
 use anyhow::{bail, Result};
 use clap::Args;
 use serde_json::{json, Value};
@@ -41,7 +38,9 @@ pub fn add(config_path: &Path, a: &AddArgs) -> Result<Value> {
         .unwrap_or_else(|| hub::guess_adapter(&repo).to_string());
     a2e::adapter::Adapter::new(&adapter)?;
     let adv = &config.settings.advanced;
-    let dest = expand_path(&config.settings.host.models_dir).join(&found.file.name);
+    let dest = config
+        .resolve(&config.settings.host.models_dir)
+        .join(&found.file.name);
     let hash = hub::download(
         &found,
         &dest,

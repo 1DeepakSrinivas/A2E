@@ -2,7 +2,7 @@
 //! here also exists as a command.
 
 use super::{run, session};
-use a2e::config::{expand_path, Config};
+use a2e::config::Config;
 use anyhow::{bail, Result};
 use inquire::{error::InquireError, Confirm, MultiSelect, Select};
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ struct Last {
 
 impl Last {
     fn path(config: &Config) -> std::path::PathBuf {
-        expand_path(&config.settings.host.output_dir).join(".last-run.toml")
+        config.output_dir().join(".last-run.toml")
     }
     fn load(config: &Config) -> Self {
         std::fs::read_to_string(Self::path(config))

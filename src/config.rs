@@ -52,6 +52,9 @@ pub struct Config {
     pub host_file: Option<PathBuf>,
     /// Which layer set each settings key, for `a2e config show`.
     pub layers: Layers,
+    /// Folder that relative `host.models_dir`, `host.output_dir` and `llama.server`
+    /// paths start from: the one above the folder holding `models.toml`.
+    pub root: PathBuf,
     per_model: BTreeMap<String, Settings>,
 }
 
@@ -163,6 +166,11 @@ impl Config {
     }
     pub fn load(path: &Path) -> Result<Self> {
         let dir = path.parent().unwrap_or(Path::new("."));
+        // Resolved once, so the paths a run uses do not depend on the shell's folder
+        let root = std::fs::canonicalize(dir)
+            .ok()
+            .and_then(|d| d.parent().map(Path::to_path_buf))
+            .unwrap_or_else(|| PathBuf::from("."));
         let host_id = host_id();
         let host_file = dir.join("hosts").join(format!("{host_id}.toml"));
         let host_file = host_file.exists().then_some(host_file);
@@ -231,6 +239,7 @@ impl Config {
             host_id,
             host_file,
             layers,
+            root,
             per_model,
         })
     }
@@ -249,8 +258,24 @@ impl Config {
     pub fn settings_for(&self, m: &Model) -> &Settings {
         self.per_model.get(&m.id).unwrap_or(&self.settings)
     }
+    /// A settings path with `~` expanded; a relative one starts at `root`.
+    pub fn resolve(&self, path: &str) -> PathBuf {
+        let p = expand_path(path);
+        if p.is_relative() {
+            self.root.join(p)
+        } else {
+            p
+        }
+    }
     pub fn model_path(&self, m: &Model) -> PathBuf {
-        expand_path(&self.settings.host.models_dir).join(&m.file)
+        self.resolve(&self.settings.host.models_dir).join(&m.file)
+    }
+    /// The llama-server binary for a model, which may override the shared one.
+    pub fn server_path(&self, m: &Model) -> PathBuf {
+        self.resolve(&self.settings_for(m).llama.server)
+    }
+    pub fn output_dir(&self) -> PathBuf {
+        self.resolve(&self.settings.host.output_dir)
     }
 }
 

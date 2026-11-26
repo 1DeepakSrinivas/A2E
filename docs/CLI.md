@@ -15,7 +15,7 @@ Run `a2e` with no command on a terminal to open a menu. The menu offers to start
 - `--model`, `--context` and `--variant` take comma separated values and run only that part of the suite. An unknown name stops the command and suggests the closest known name.
 - `--retry-failed` runs again the attempts that did not succeed.
 - `--model hf:<repo>:<quant>` runs a Hugging Face GGUF with no setup step. The harness looks up the newest commit, downloads the file, and runs it. The model is marked unpinned, because the commit can change, and its results are not uploaded. Add `--local`, or pass `--allow-unpinned` to upload them anyway. Run `a2e models add` to pin it.
-- `--allow-missing-model` lets a run continue when a model file is missing. Without it the run stops before it starts.
+- `--allow-missing-model` lets a run continue when a model file is missing. Without it the run stops before it starts, and it always stops when llama-server is missing or not built from the pinned commit.
 - `--dry-run` prints the runs and checks that the model files and llama-server exist, and then stops without starting a model.
 - `--tools <file>` names the tool definitions, and the default is `configs/tools/standard.toml`.
 

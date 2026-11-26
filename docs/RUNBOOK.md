@@ -78,7 +78,7 @@ Use this route only when the Pi cannot build, for example because it runs out of
 
 **`llama_commit_mismatch` on every attempt.** The runner needs the first 8 characters of the pinned commit in the output of `llama-server --version`. A binary built from a git clone with the default 7 character hash, or from a copy without `.git` (where the hash is `unknown`), fails this check. `setup.sh` sets `core.abbrev 8` and checks the version after the build. Copy the right binary to the machine that runs it, make it executable, run `llama-server --version`, and then use `--retry-failed`.
 
-**A run stops with "model file ... is missing".** The model is not in the models folder. Run `a2e models fetch`, or pass `--allow-missing-model` when you want the run to continue and record that model's attempts as failures.
+**A run stops with "cannot start the run".** Before the first attempt, the run checks every model file of the suite and the llama-server binary, and lists each one that is missing or not built from the pinned commit. Relative paths start at the repository root, which the error names, so a model in a subfolder such as `models/native` is not found. Move the files into `host.models_dir` or point that setting at their folder, run `./setup.sh` for llama-server and `a2e models fetch` for model files. Pass `--allow-missing-model` only when you want the run to continue and record that model's attempts as failures.
 
 **Pi baseline refuses to run.** The message says swap must be disabled. Turn swap off as in section 1.
 
