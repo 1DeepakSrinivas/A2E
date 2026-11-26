@@ -26,7 +26,7 @@ A2E measures how small language models use tools on small devices. For each mode
 
 ## 3. Experiment definition
 
-A suite file in `configs/suites` defines one experiment. It lists the models, the context sizes, the variants, the cases to run, the number of warm-up and measured repeats, and the seed. The shipped suites are:
+A suite file in `configs/suites` defines one experiment. It lists the models, the context sizes, the variants, the cases to run, the number of warm-up and measured repeats, and the seed. Every shipped suite runs at a context of 2048 tokens. The shipped suites are:
 
 | Suite | Cases | Variants | Warm-up and repeats |
 |---|---|---|---|
@@ -111,7 +111,7 @@ The cost of the harness itself is checked by a test that requires time outside t
 
 Each case has typed checks that run after the attempt, using only the recorded calls and the final state. An attempt succeeds when every check passes. A failed attempt gets one failure class from the first check or limit that failed, e.g., `wrong_tool` or `state_mismatch`. The full list is in the guide.
 
-Every case also lists the calls that solve it. The tests replay those calls through the real agent loop and require each offline case to succeed, which shows that no case is impossible.
+Every case also lists the calls that solve it. A test replays those calls through the real agent loop in every suite, at each of the suite's context sizes and in each of its variants, and requires each offline case to succeed. The mock server estimates the prompt length from the rendered prompt at 3.2 characters per token, so a case whose own correct path does not fit the context fails the test. This shows that no case is impossible, within the error of that estimate.
 
 A case can ask for a cloud judge for answers that a check cannot decide, such as a summary. The case then ends as `awaiting_judge`, and the A2E-Results project scores it later with a rubric from `a2e-results/rubrics`.
 

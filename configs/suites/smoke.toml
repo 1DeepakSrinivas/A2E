@@ -1,5 +1,5 @@
 name = "smoke"
-contexts = [1024]
+contexts = [2048]
 cases = ["../cases"]
 tags = ["smoke"]
 split = "dev"

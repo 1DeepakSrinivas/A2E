@@ -1,5 +1,5 @@
 name = "web_live"
-contexts = [1024]
+contexts = [2048]
 cases = ["../cases/web_live"]
 tags = ["live"]
 split = "heldout"

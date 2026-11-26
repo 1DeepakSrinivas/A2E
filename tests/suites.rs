@@ -8,7 +8,7 @@ use a2e::{
     runner::Status,
 };
 use std::{collections::BTreeSet, path::PathBuf, time::Duration};
-use support::{catalog, execute, golden_script, repo, use_sandbox, MockServer};
+use support::{catalog, execute, execute_at, golden_script, repo, use_sandbox, MockServer};
 
 const SUITES: [&str; 3] = ["test_filesystem", "test_compute", "test_data_web"];
 
@@ -160,4 +160,45 @@ fn pi_guided_suite_compares_both_guided_modes_on_staged_cases() {
     assert_eq!(modes, [Mode::Autonomous, Mode::Guided, Mode::GuidedStable]);
     let cfg = Config::load(&repo().join("configs/models.toml")).unwrap();
     a2e::runner::plan(&cfg, &s, &cases, &catalog()).unwrap();
+}
+
+/// Every case's golden path finishes in every suite, at each of the suite's real
+/// contexts and in each of its variants, with prompt tokens estimated from the
+/// rendered prompt. A case that cannot fit its own correct path fails for every model.
+#[test]
+fn golden_paths_fit_each_suite_context_in_every_variant() {
+    use_sandbox();
+    let config = Config::load(&repo().join("configs/models.toml")).unwrap();
+    let mut failed = Vec::new();
+    let mut runs = 0;
+    for entry in std::fs::read_dir(repo().join("configs/suites")).unwrap() {
+        let path = entry.unwrap().path();
+        let s = Suite::load(&path)
+            .unwrap()
+            .resolve(&config, &Selection::default())
+            .unwrap();
+        let cases = s.load_cases(&path).unwrap();
+        for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
+            for v in &s.variants {
+                for &ctx in &s.contexts {
+                    runs += 1;
+                    let server = MockServer::estimating(golden_script(case));
+                    let out = execute_at(&server, case, v, &s, ctx);
+                    let want = if case.judge.enabled {
+                        Status::AwaitingJudge
+                    } else {
+                        Status::Success
+                    };
+                    if out.status != want {
+                        failed.push(format!(
+                            "{}/{}/{}@{ctx}: {:?}",
+                            s.name, v.name, case.id, out.reason
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    assert!(runs > 0);
+    assert!(failed.is_empty(), "{} of {runs}: {failed:#?}", failed.len());
 }

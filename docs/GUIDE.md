@@ -295,8 +295,10 @@ time. The `test_pi_guided` suite runs both next to autonomous mode.
 ### Golden replays
 
 Every case lists `[[golden]]` calls that solve it. The test suite replays them
-through the real agent loop and requires each offline case to succeed. This
-keeps a case from being impossible to solve. Write the golden calls first when
+through the real agent loop in every suite, at each of its context sizes and in
+each of its variants, and requires each offline case to succeed. The prompt
+length is estimated from the rendered prompt, so a case whose correct path does
+not fit the context fails. This keeps a case from being impossible to solve. Write the golden calls first when
 you add a case.
 
 ## Workspace sandbox
