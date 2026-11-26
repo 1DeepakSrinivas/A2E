@@ -260,6 +260,12 @@ when every check passes. A case with no judge ends as `success` or a failure.
 - `fetched_url`, `fetched_source`, and `fetched_count` check what the web
   tools returned.
 
+A call that fits no tool schema is not run. Its error goes back to the model
+like a tool error, so the model can fix it, and `argument_errors` counts it.
+The attempt is classed `argument_error` only when the model stops right after
+such a call. An attempt that hits a limit still has its checks scored, so its
+milestone score shows how far it got.
+
 A failed attempt gets a failure class from the first check or limit that
 failed. The classes are `missing_call`, `wrong_tool`, `wrong_args`,
 `wrong_order`, `extra_call`, `no_final_answer`, `bad_answer`, `state_mismatch`,

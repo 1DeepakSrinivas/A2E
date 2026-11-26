@@ -397,15 +397,11 @@ impl Attempt<'_> {
         self.history.push(Adapter::assistant(&call));
         let mut fatal = None;
         let output = match invalid {
+            // A call that was read but does not fit the schema is fed back like a
+            // tool error; `argument_errors` still counts it
             Some(reason) => {
                 self.out.argument_errors += 1;
                 entry.error = Some(reason.clone());
-                if self.out.repairs >= variant.repairs as u64 {
-                    self.out.reason = Some(format!("argument_error: {reason}"));
-                    self.out.tool_log.push(entry);
-                    return Ok(Step::Stop);
-                }
-                self.out.repairs += 1;
                 json!({"error":reason})
             }
             None => {
@@ -481,11 +477,32 @@ impl Attempt<'_> {
             let step = self.step();
             // The turn is kept even when the call failed
             self.out.turns.push(std::mem::take(&mut self.turn));
-            if matches!(step?, Step::Stop) {
-                break;
+            match step {
+                Ok(Step::Stop) => break,
+                Ok(Step::Next) => {}
+                Err(e) => {
+                    // Score what was done before the limit, so the run still has checks
+                    self.score_partial();
+                    return Err(e);
+                }
             }
         }
         self.conclude()
+    }
+    /// Checks and milestone score for an attempt that ended in an error.
+    fn score_partial(&mut self) {
+        let Ok(state) = self.tools.snapshot() else {
+            return;
+        };
+        let observation = Observation {
+            calls: &self.calls,
+            attempted: &self.attempted,
+            state: &state,
+            answer: self.out.answer.as_deref().unwrap_or(""),
+        };
+        self.out.checks = evaluate(self.x.case, &observation);
+        self.out.milestone_score = milestone_score(&self.out.checks);
+        self.out.attempted_calls = self.attempted.len() as u64;
     }
     fn conclude(&mut self) -> Result<()> {
         let case = self.x.case;
