@@ -228,6 +228,18 @@ mod tests {
     }
 
     #[test]
+    fn calculate_reports_whole_results_as_integers() {
+        let (mut h, _dir) = host(json!({}));
+        let r = |h: &mut Builtins, op: &str, a: f64, b: f64| {
+            h.call("calculate", json!({"operation":op,"a":a,"b":b}))
+                .unwrap()["result"]
+                .to_string()
+        };
+        assert_eq!(r(&mut h, "divide", 40., 2.), "20");
+        assert_eq!(r(&mut h, "divide", 7., 2.), "3.5");
+        assert_eq!(r(&mut h, "subtract", 3., 5.), "-2");
+    }
+    #[test]
     fn fail_n_and_rate_limit_fail_the_first_calls_then_recover() {
         for (mode, text) in [("fail_n", "temporary"), ("rate_limit", "rate limit")] {
             let (mut h, _dir) = faulted(json!({"tool":"read_file","mode":mode,"n":2}));

@@ -141,6 +141,8 @@ struct Group<'a> {
     load_id: String,
     /// Consecutive attempts in which no model call returned.
     stalled: usize,
+    /// Set once the server was restarted after a stall.
+    restarted: bool,
     /// Set when a call may still be running on the server.
     busy: bool,
 }
@@ -328,6 +330,7 @@ impl Study<'_> {
             launched,
             load_id,
             stalled: 0,
+            restarted: false,
             busy: false,
         };
         let suite = self.suite;
@@ -378,6 +381,20 @@ impl Study<'_> {
         let dir = group.dir.join(&key[..16]);
         std::fs::create_dir_all(&dir)?;
         let attempt = self.resume.next_attempt(&self.id, &key);
+        let stalled = self.suite.budget.stall_attempts > 0
+            && group.stalled >= self.suite.budget.stall_attempts;
+        // A stall can be one wedged server, so give a fresh one a chance before skipping
+        if stalled && !group.restarted && group.launched.is_ok() {
+            eprintln!("warning: model stalled; restarting the inference server once");
+            drop(std::mem::replace(
+                &mut group.launched,
+                Err(anyhow::anyhow!("restarting")),
+            ));
+            (group.launched, group.load_id) = self.load(group.model, group.ctx, &group.dir)?;
+            group.restarted = true;
+            group.stalled = 0;
+            group.busy = false;
+        }
         let skip = self.suite.budget.stall_attempts > 0
             && group.stalled >= self.suite.budget.stall_attempts;
         if !skip {
