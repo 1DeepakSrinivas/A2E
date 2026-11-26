@@ -18,6 +18,8 @@ use serde_json::{json, Value};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Call {
     pub name: String,
+    /// Small models often write `parameters`, or leave the key out for a tool with no arguments
+    #[serde(default, alias = "parameters")]
     pub arguments: Value,
 }
 #[derive(Debug, PartialEq)]
@@ -143,6 +145,14 @@ impl Adapter {
         }
         let (open, close) = self.0.call_delimiters();
         if !t.contains(open) {
+            // A call written without its tags is still a call when it parses as one
+            if t.starts_with('{') && !t.contains(close) {
+                if let Ok((call, rest)) = self.0.parse_call(t) {
+                    if rest.trim().is_empty() {
+                        return Self::action(call, false);
+                    }
+                }
+            }
             if t.contains(close) || t.starts_with('{') || t.starts_with('[') {
                 bail!("malformed_tool_call");
             }
@@ -164,6 +174,20 @@ impl Adapter {
         }
         if !trailing.is_empty() {
             bail!("trailing expression or parallel calls");
+        }
+        Self::action(call, leading_text)
+    }
+    /// Checks a parsed call's arguments and turns final_answer into the answer.
+    fn action(mut call: Call, leading_text: bool) -> Result<(Action, bool)> {
+        match &call.arguments {
+            Value::Null => call.arguments = json!({}),
+            // Arguments sent as a JSON string holding an object
+            Value::String(text) => {
+                if let Ok(v @ Value::Object(_)) = serde_json::from_str::<Value>(text) {
+                    call.arguments = v;
+                }
+            }
+            _ => {}
         }
         if !call.arguments.is_object() {
             bail!("arguments must be an object");
@@ -257,6 +281,46 @@ mod tests {
             (Adapter::LFM2,"Reading it now.<|tool_call_start|>[read_file(path='a.txt')]<|tool_call_end|>"),
         ] {
             assert_eq!(adapter.parse_flagged(raw).unwrap(), (expected(), true), "{raw}");
+        }
+    }
+
+    #[test]
+    fn common_json_call_slips_still_parse() {
+        let want = Action::Call(Call {
+            name: "read_file".into(),
+            arguments: json!({"path":"a.txt"}),
+        });
+        for raw in [
+            r#"<tool_call>{"name":"read_file","parameters":{"path":"a.txt"}}</tool_call>"#,
+            r#"<tool_call>{"name":"read_file","arguments":"{\"path\":\"a.txt\"}"}</tool_call>"#,
+            r#"{"name":"read_file","arguments":{"path":"a.txt"}}"#,
+        ] {
+            assert_eq!(Adapter::QWEN3.parse(raw).unwrap(), want, "{raw}");
+        }
+        assert_eq!(
+            Adapter::QWEN3
+                .parse(r#"<tool_call>{"name":"device_list"}</tool_call>"#)
+                .unwrap(),
+            Action::Call(Call {
+                name: "device_list".into(),
+                arguments: json!({}),
+            })
+        );
+        // Bare JSON that is not a call, or not this model's call format, is still refused
+        for (adapter, raw) in [
+            (Adapter::QWEN3, r#"{"answer": 4}"#),
+            (Adapter::QWEN3, r#"{"name":"f","arguments":{}} and more"#),
+            (Adapter::LFM2, r#"{"name":"read_file","arguments":{}}"#),
+            (
+                Adapter::FUNCTIONGEMMA,
+                r#"{"name":"read_file","arguments":{}}"#,
+            ),
+        ] {
+            assert_eq!(
+                adapter.parse(raw).unwrap_err().to_string(),
+                "malformed_tool_call",
+                "{raw}"
+            );
         }
     }
 
