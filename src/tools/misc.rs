@@ -19,6 +19,10 @@ fn calculate(_: &mut World, a: &Value) -> Result<Value> {
     if !v.is_finite() {
         bail!("nonfinite result");
     }
+    // Whole results read as integers, so 40 / 2 shows as 20 rather than 20.0
+    if v.fract() == 0. && v.abs() < 9.007_199_254_740_992e15 {
+        return Ok(json!({"result": v as i64}));
+    }
     Ok(json!({"result":v}))
 }
 fn device_list(w: &mut World, _: &Value) -> Result<Value> {
