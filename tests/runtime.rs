@@ -610,27 +610,6 @@ number = {{ value = 1 }}
 }
 
 #[test]
-fn every_offline_golden_sequence_succeeds_through_the_agent_loop() {
-    use_sandbox();
-    let cases = a2e::case::load_all(&[repo().join("configs/cases")]).unwrap();
-    let s = suite();
-    for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
-        let script = golden_script(case);
-        let server = MockServer::new(script, 100, Duration::ZERO);
-        let out = execute(&server, case, &Variant::default(), &s);
-        let want = if case.judge.enabled {
-            Status::AwaitingJudge
-        } else {
-            Status::Success
-        };
-        assert_eq!(
-            out.status, want,
-            "{}: {:?} {:?}",
-            case.id, out.reason, out.checks
-        );
-    }
-}
-#[test]
 fn attempt_line_reports_the_failure_class_failed_checks_and_trace() {
     use_sandbox();
     let s = suite();

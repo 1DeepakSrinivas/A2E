@@ -171,6 +171,7 @@ fn golden_paths_fit_each_suite_context_in_every_variant() {
     let config = Config::load(&repo().join("configs/models.toml")).unwrap();
     let mut failed = Vec::new();
     let mut runs = 0;
+    let mut covered = std::collections::BTreeSet::new();
     for entry in std::fs::read_dir(repo().join("configs/suites")).unwrap() {
         let path = entry.unwrap().path();
         let s = Suite::load(&path)
@@ -179,6 +180,7 @@ fn golden_paths_fit_each_suite_context_in_every_variant() {
             .unwrap();
         let cases = s.load_cases(&path).unwrap();
         for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
+            covered.insert(case.id.clone());
             for v in &s.variants {
                 for &ctx in &s.contexts {
                     runs += 1;
@@ -197,6 +199,29 @@ fn golden_paths_fit_each_suite_context_in_every_variant() {
                     }
                 }
             }
+        }
+    }
+    // Cases no suite lists still run once, at the shared context
+    let all = a2e::case::load_all(&[repo().join("configs/cases")]).unwrap();
+    let smoke = Suite::load(&path("smoke"))
+        .unwrap()
+        .resolve(&config, &Selection::default())
+        .unwrap();
+    for case in all.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
+        if covered.contains(&case.id) {
+            continue;
+        }
+        runs += 1;
+        let server = MockServer::estimating(golden_script(case));
+        let out = execute_at(
+            &server,
+            case,
+            &a2e::config::Variant::default(),
+            &smoke,
+            2048,
+        );
+        if !matches!(out.status, Status::Success | Status::AwaitingJudge) {
+            failed.push(format!("unlisted/{}@2048: {:?}", case.id, out.reason));
         }
     }
     assert!(runs > 0);

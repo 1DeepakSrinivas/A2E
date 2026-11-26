@@ -113,19 +113,6 @@ fn library_covers_every_category_with_both_splits() {
     }
 }
 #[test]
-fn golden_calls_pass_every_check() {
-    for case in library().iter().filter(|c| offline(c)) {
-        let answer = case.golden_answer.as_deref().unwrap_or("");
-        let results = replay(case, &golden(case), answer);
-        assert!(
-            failures(&results).is_empty(),
-            "{}: {:?}",
-            case.id,
-            failures(&results)
-        );
-    }
-}
-#[test]
 fn golden_arguments_match_the_tool_schemas() {
     let specs = catalog().specs();
     for case in library().iter().filter(|c| offline(c)) {
