@@ -113,6 +113,49 @@ fn library_covers_every_category_with_both_splits() {
     }
 }
 #[test]
+fn live_cases_check_the_answer_for_key_facts() {
+    let state = json!({});
+    for case in library().iter().filter(|c| is_live(c)) {
+        let regexes = case
+            .checks
+            .iter()
+            .filter_map(|c| match c {
+                a2e::eval::Check::Answer(a) => a.regex.as_deref(),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert!(!regexes.is_empty(), "{} checks no answer", case.id);
+        assert!(!regexes.contains(&"."), "{} accepts any answer", case.id);
+        // The golden answer passes and an empty one does not
+        let answer = |text: &str| {
+            evaluate(
+                case,
+                &Observation {
+                    calls: &[],
+                    attempted: &[],
+                    state: &state,
+                    answer: text,
+                },
+            )
+            .into_iter()
+            .filter(|r| r.kind == "answer")
+            .collect::<Vec<_>>()
+        };
+        let golden = answer(case.golden_answer.as_deref().unwrap_or(""));
+        assert!(
+            golden.iter().all(|r| r.passed),
+            "{}: {:?}",
+            case.id,
+            failures(&golden)
+        );
+        assert!(
+            answer("I could not find it.").iter().any(|r| !r.passed),
+            "{}",
+            case.id
+        );
+    }
+}
+#[test]
 fn golden_arguments_match_the_tool_schemas() {
     let specs = catalog().specs();
     for case in library().iter().filter(|c| offline(c)) {

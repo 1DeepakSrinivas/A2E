@@ -133,7 +133,7 @@ After each attempt the runner posts the study, the model load and the attempt to
 - Greedy decoding with one prompt format per model means accuracy can differ from the numbers each model's authors publish.
 - Mac power covers CPU, GPU and ANE only, so it is not comparable with a wall-meter reading, and it is not comparable with the modeled Pi values, which are an estimate from CPU usage alone.
 - A 1 GB Pi has little free memory. Swap changes timing, so it must be off for measured runs.
-- Live search results change over time, so the `web_live` suite cannot be repeated exactly. It is scored on the tool path and the final answer only.
+- Live search results change over time, so the `web_live` suite cannot be repeated exactly. It is scored on the tool path and on key facts in the final answer, and the judge then checks the cited facts.
 - With three measured repeats, intervals on latency and memory are wide for small groups.
 
 ## 12. Security
