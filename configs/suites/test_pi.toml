@@ -1,4 +1,4 @@
-name = "test_pi_100"
+name = "test_pi"
 contexts = [2048]
 cases = [
   "../cases/simple/simple-list-dir.toml",
@@ -23,4 +23,4 @@ web_mode = "fixture"
 warmup = 0
 repeats = 1
 seed = 0
-use_variants = ["autonomous", "guided"]
+use_variants = ["autonomous", "guided", "guided_stable", "filter", "recent", "constrained", "repair"]

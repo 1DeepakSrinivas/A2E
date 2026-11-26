@@ -290,7 +290,7 @@ a numbered list after the task. The harness still enforces the order, and a
 call to a later stage's tool is refused with "tool is not available in this
 stage". The two modes are different treatments: `guided` hides tools and
 `guided_stable` does not, so compare their pass rates as well as their prefill
-time. The `test_pi_guided` suite runs both next to autonomous mode.
+time. The `test_pi` suite runs both next to autonomous mode.
 
 ### Golden replays
 
@@ -359,8 +359,8 @@ timings come out identical.
   context, constrained decoding, and repair, on the cases tagged `tier2`.
 - `web_live` runs the live search cases.
 - `test_filesystem`, `test_compute` and `test_data_web` run the dev split of one
-  tool family in autonomous and guided mode, and `test_pi_100`, `test_pi_ablation` and
-  `test_pi_guided` are sized for the Pi. The README table describes each one.
+  tool family in autonomous and guided mode, and `test_pi` is sized for the Pi.
+  The README table describes each one.
 
 ## Add a host, model, suite or variant
 
