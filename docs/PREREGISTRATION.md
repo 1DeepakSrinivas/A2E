@@ -84,4 +84,27 @@ No external meter is used, so the energy numbers cannot be checked against a ref
 
 ## Amendments
 
-None yet.
+### 2026-11-26, before the first full run
+
+Changes to how attempts are scored, from the harness fixes merged in A2E #28:
+
+- A call that does not fit its tool schema no longer ends the attempt. It is fed back like a tool error and still counted in `argument_errors`. The `argument_error` class now means the model stopped right after such a call.
+- An attempt that hits a limit (context budget, timeout, output limit) is scored on the state it reached instead of having no checks.
+- Number and whitespace formatting no longer fail a correct answer, and the Qwen and generic parsers read common JSON slips (such as arguments sent as a string) instead of failing the attempt.
+- The filter variant shows four tools instead of two. Two hid a tool on the correct path in 14 of the 19 `harness` cases, so those cases could not be solved in that variant.
+
+Changes in this amendment's pull request:
+
+- Every suite runs at a context of 2048 tokens instead of 1024. At 1024, with 256 kept for output, many `core` and `harness` cases could not fit their own correct path, so they failed for every model. A test now replays each case's correct path at its suite's context in every variant.
+- Distractor tools are chosen per case from a hash of the case id, instead of being the same first tools in name order for every case. Every variant and repeat of a case sees the same distractors, so comparisons stay paired.
+- In autonomous mode, a call to a tool that is not listed gets "unknown tool X; available tools: ..." instead of "tool is not available in this stage". Guided modes keep the stage message. The feedback is the same for every model.
+- The three live web summary cases check the answer for the facts their judge looks for, instead of accepting any text.
+- The three Pi test suites are one `test_pi` suite, with every variant on the same 16 cases.
+
+How the measures and the decision rules are computed:
+
+- An attempt is scored when it passed or failed. Pending attempts (no verdict yet) and excluded attempts (interrupted, or the harness or host failed) are left out of every measure, including the wall time in `seconds_per_success` and `waste_share`.
+- `cpu_seconds_per_success` and `joules_per_success` are computed over the scored attempts that have the reading: their summed readings divided by the successes among them. The share of scored attempts with a reading is reported beside each value. Before, one missing reading made the value empty for the whole configuration.
+- A cell for the H1 test is one device, model, context and category. Every suite runs at one context, so this is the same as the cells above. A cell where neither the variant nor autonomous succeeds on the shared cases has no ratio and is left out. The interval is the 5th and 95th percentile of the resampled geometric means.
+- When the noise check fails, the second margin is exp(2 × the median SD of log `seconds_per_success`) − 1, so it is twice the noise on the log scale.
+- Judge agreement is also reported: the share of judged attempts whose verdict matches the deterministic checks. The judge only sees attempts whose checks passed, so it is the share the judge also passed. It is not a decision rule.
