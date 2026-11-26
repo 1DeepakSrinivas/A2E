@@ -139,6 +139,9 @@ pub(super) fn failure_class(out: &Outcome, case: &Case) -> Option<FailureClass> 
         Some(FailureClass::Infrastructure)
     } else if out.tool_log.is_empty() && case.scope.expected_calls.unwrap_or(0) > 0 {
         Some(FailureClass::NoToolUse)
+    } else if out.tool_log.last().is_some_and(|t| !t.valid) {
+        // The model stopped after a call that did not fit the schema
+        Some(FailureClass::ArgumentError)
     } else if out.tool_log.last().is_some_and(|t| t.valid && !t.ok) {
         Some(FailureClass::ToolErrorAbandoned)
     } else {

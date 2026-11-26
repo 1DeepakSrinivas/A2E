@@ -48,7 +48,7 @@ Budgets for a study. A suite may override the ones that match its own budget key
 | `task_seconds` | 900 | Time limit for one task. |
 | `tool_seconds` | 20 | Time limit for one tool call. |
 | `tool_output_bytes` | 8192 | Largest tool output kept, from 256 to 65536. |
-| `stall_attempts` | 3 | Attempts in a row with no finished model call before the rest of a model and context group is skipped. 0 never skips. |
+| `stall_attempts` | 3 | Attempts in a row with no finished model call before the server is restarted once. If it stalls that many times again, the rest of the model and context group is skipped. 0 never skips. |
 
 ## sampling
 

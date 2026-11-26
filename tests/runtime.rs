@@ -133,6 +133,31 @@ fn invalid_arguments_are_not_executed() {
     assert_eq!(out.tool_invocations, 0);
 }
 #[test]
+fn a_schema_error_is_fed_back_and_the_model_can_recover() {
+    let t = task();
+    let mut script = vec![call("write_file", json!({"path":"copy.txt"}))];
+    script.extend(golden_script(&t));
+    let server = MockServer::new(script, 100, Duration::ZERO);
+    let out = execute(&server, &t, &Variant::default(), &suite());
+    assert_eq!(out.status, Status::Success, "{:?}", out.reason);
+    assert_eq!(out.argument_errors, 1);
+    let seen = server.seen.lock().unwrap();
+    let last = seen
+        .iter()
+        .rfind(|r| r["path"] == "/apply-template")
+        .unwrap();
+    assert!(last["body"].to_string().contains("error"));
+}
+#[test]
+fn an_attempt_cut_short_by_the_context_budget_still_has_checks() {
+    let t = task();
+    let server = MockServer::new(golden_script(&t), 2000, Duration::ZERO);
+    let out = execute(&server, &t, &Variant::default(), &suite());
+    assert_eq!(out.status, Status::ResourceLimit, "{:?}", out.reason);
+    assert!(!out.checks.is_empty());
+    assert!(out.milestone_score.is_some());
+}
+#[test]
 fn context_budget_prevents_generation() {
     let server = MockServer::new(vec![], 900, Duration::ZERO);
     let out = execute(&server, &task(), &Variant::default(), &suite());
@@ -651,9 +676,10 @@ fn stable_guided_mode_keeps_the_prompt_prefix_and_enforces_stage_order() {
         .unwrap();
     let server = MockServer::new(vec![call(later, json!({}))], 100, Duration::ZERO);
     let out = execute(&server, &t, &stable, &suite());
-    assert_eq!(
-        out.reason.as_deref(),
-        Some("argument_error: tool is not available in this stage")
-    );
+    assert_eq!(out.argument_errors, 1);
     assert_eq!(out.tool_invocations, 0);
+    assert_eq!(
+        out.tool_log[0].error.as_deref(),
+        Some("tool is not available in this stage")
+    );
 }
