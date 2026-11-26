@@ -108,3 +108,8 @@ How the measures and the decision rules are computed:
 - A cell for the H1 test is one device, model, context and category. Every suite runs at one context, so this is the same as the cells above. A cell where neither the variant nor autonomous succeeds on the shared cases has no ratio and is left out. The interval is the 5th and 95th percentile of the resampled geometric means.
 - When the noise check fails, the second margin is exp(2 × the median SD of log `seconds_per_success`) − 1, so it is twice the noise on the log scale.
 - Judge agreement is also reported: the share of judged attempts whose verdict matches the deterministic checks. The judge only sees attempts whose checks passed, so it is the share the judge also passed. It is not a decision rule.
+
+### 2026-11-26, memory limit
+
+- The memory limit for the harness and the server together is 1024 MiB on both devices instead of 768. At 768, LFM2.5-1.2B was stopped on the Mac before it ran out of memory, because resident memory counts the weight pages that llama.cpp maps from the file. On the 1 GB Pi the new limit is above physical memory, so the check that at least 128 MiB stays free is what stops a run there. A model that does not fit the Pi is reported as not fitting.
+- Swap stays off for measured runs. Swap does not lower the resident memory that the limit checks, and paging weights in and out would change the time and energy per success that the study measures.

@@ -30,7 +30,7 @@ pub struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
-            memory_mb: 768,
+            memory_mb: 1024,
             reserve_mb: 128,
             context: vec![1024],
             input_tokens: 0,

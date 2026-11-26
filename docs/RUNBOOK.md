@@ -92,7 +92,7 @@ Use this route only when the Pi cannot build, for example because it runs out of
 
 **`cache_reset_failed`.** The server defers a cache erase while its slot is busy, which happened after a call timed out. The runner now waits up to 60 seconds for the slot and restarts the server when it stays busy, so this should only appear when the restart itself fails.
 
-**`limits.memory_mb` is larger than the device memory.** The memory guard compares the two processes with this limit, so a limit above the physical memory can never trip. `a2e doctor` warns about it. The default is 768.
+**`limits.memory_mb` is larger than the device memory.** The default of 1024 is above the physical memory of the 1 GB Pi, so the memory limit cannot trip there and the `reserve_mb` check stops a run instead. `a2e doctor` says so. This is expected on the Pi.
 
 **exFAT drive.** exFAT has no execute bit, so run `chmod +x` on the binaries after copying. A Mac adds `._*` files, and a case file with that name breaks parsing with a UTF-8 error. Remove them with `find . -name '._*' -delete` or `dot_clean`. The device name can change between mounts (for example `sda1` and `sdb1`), so run `lsblk -f` before mounting. Mount with `sudo mount -o uid=$(id -u),gid=$(id -g) /dev/sdb1 /mnt/usb`.
 

@@ -38,7 +38,7 @@ Budgets for a study. A suite may override the ones that match its own budget key
 
 | Key | Default | Meaning |
 |---|---|---|
-| `memory_mb` | 768 | Memory limit for the harness and the server together. A run that goes over it is stopped. |
+| `memory_mb` | 1024 | Memory limit for the harness and the server together. A run that goes over it is stopped. It is the same on every device, so on the 1 GB Pi `reserve_mb` is the check that stops a run. |
 | `reserve_mb` | 128 | Free memory that must remain. |
 | `context` | `[1024]` | Context sizes to test. Each must be 256 or more. A suite calls this `contexts`. |
 | `input_tokens` | 0 | Longest prompt in tokens. 0 means only the context size limits it. |
@@ -130,14 +130,11 @@ Use a longer output budget for one run:
 a2e run core --set limits.output_tokens=512
 ```
 
-Give the Pi two threads and a smaller memory limit in `configs/hosts/<user>@<host>.toml`:
+Give the Pi two threads in `configs/hosts/<user>@<host>.toml`:
 
 ```toml
 [llama]
 threads = 2
-
-[limits]
-memory_mb = 700
 ```
 
 Pass an extra flag to the server for one model:
