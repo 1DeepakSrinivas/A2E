@@ -657,3 +657,31 @@ fn stable_guided_mode_keeps_the_prompt_prefix_and_enforces_stage_order() {
     );
     assert_eq!(out.tool_invocations, 0);
 }
+
+#[test]
+fn the_tool_filter_never_hides_a_tool_the_golden_path_needs() {
+    let config = Config::load(&repo().join("configs/models.toml")).unwrap();
+    let catalog = catalog();
+    let mut hidden = Vec::new();
+    for entry in std::fs::read_dir(repo().join("configs/suites")).unwrap() {
+        let path = entry.unwrap().path();
+        let suite = Suite::load(&path)
+            .unwrap()
+            .resolve(&config, &Selection::default())
+            .unwrap();
+        for v in suite.variants.iter().filter(|v| v.filter_top_k > 0) {
+            for case in suite.load_cases(&path).unwrap() {
+                let stages = case.stage_plan().unwrap();
+                let shown = select_tools(&case, &catalog, v, &stages, 0).unwrap();
+                for g in &case.golden {
+                    if !shown.iter().any(|t| t.name == g.tool) {
+                        hidden.push(format!("{} {} {}", suite.name, case.id, g.tool));
+                    }
+                }
+            }
+        }
+    }
+    hidden.sort();
+    hidden.dedup();
+    assert!(hidden.is_empty(), "{hidden:#?}");
+}

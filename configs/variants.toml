@@ -11,7 +11,8 @@ mode = "guided"
 [[variants]]
 name = "filter"
 mode = "autonomous"
-filter_top_k = 2
+# Two tools hid a tool the golden path needs in 14 of the 19 harness cases; four hides none
+filter_top_k = 4
 
 [[variants]]
 name = "recent"
