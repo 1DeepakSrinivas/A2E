@@ -1,5 +1,5 @@
 name = "harness"
-contexts = [1024]
+contexts = [2048]
 cases = ["../cases/multiple", "../cases/chain"]
 tags = ["tier2"]
 split = "heldout"

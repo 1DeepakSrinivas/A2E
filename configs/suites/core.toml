@@ -1,5 +1,5 @@
 name = "core"
-contexts = [1024]
+contexts = [2048]
 cases = [
   "../cases/simple",
   "../cases/multiple",

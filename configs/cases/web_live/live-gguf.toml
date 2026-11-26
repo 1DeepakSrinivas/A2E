@@ -2,7 +2,7 @@ id = "live-gguf"
 category = "web"
 tags = ["live"]
 split = "heldout"
-golden_answer = "Summary."
+golden_answer = "GGUF is a model file format used by llama.cpp [s1]."
 
 [scope]
 prompt = "Search the web for the GGUF file format and give a short cited summary."
@@ -25,7 +25,11 @@ min = 1
 
 [[check]]
 kind = "answer"
-regex = "."
+regex = "(?i)gguf"
+
+[[check]]
+kind = "answer"
+regex = "(?i)llama"
 
 [judge]
 enabled = true

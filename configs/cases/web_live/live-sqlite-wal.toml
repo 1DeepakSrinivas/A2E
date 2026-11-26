@@ -2,7 +2,7 @@ id = "live-sqlite-wal"
 category = "web"
 tags = ["live"]
 split = "heldout"
-golden_answer = "Summary."
+golden_answer = "In WAL mode SQLite appends changes to a write-ahead log, so readers do not block the writer [s1]."
 
 [scope]
 prompt = "Search the web for SQLite WAL mode and summarise how it differs from the default rollback journal, citing the source."
@@ -25,7 +25,11 @@ min = 1
 
 [[check]]
 kind = "answer"
-regex = "."
+regex = "(?i)(write[- ]ahead|\\bwal\\b)"
+
+[[check]]
+kind = "answer"
+regex = "(?i)(block|concurren|simultaneous)"
 
 [judge]
 enabled = true

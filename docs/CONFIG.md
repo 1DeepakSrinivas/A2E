@@ -69,7 +69,7 @@ One key for each llama-server flag the harness sets. The pinned commit is the on
 | Key | Default | Flag | Meaning |
 |---|---|---|---|
 | `commit` | none | none | The full 40 character llama.cpp commit. The server must report its first 8 characters. |
-| `server` | `deps/llama.cpp/build-a2e/bin/llama-server` | none | Path to the server program. |
+| `server` | `deps/llama.cpp/build-a2e/bin/llama-server` | none | Path to the server program. A relative path starts at the repository root, the folder above `configs`. |
 | `host` | `127.0.0.1` | `--host` | Address the server listens on. |
 | `port` | 8197 | `--port` | Port the server listens on. |
 | `threads` | 4 | `--threads` | CPU threads. |
@@ -100,8 +100,8 @@ A flag that is at the server default is not passed, so the command line for the 
 | `power` | `auto` | `auto` measures power when it can, `none` skips it, and `required` fails the run without a reading. |
 | `sample_ms` | 500 | Milliseconds between memory, thermal and power samples. At least 100. |
 | `thermal_path` | `/sys/class/thermal/thermal_zone0/temp` | File that holds the temperature on Linux. |
-| `models_dir` | `models` | Folder with the model files. |
-| `output_dir` | `results` | Folder for results and logs. |
+| `models_dir` | `models` | Folder with the model files. A relative path starts at the repository root, not the folder you run from. |
+| `output_dir` | `results` | Folder for results and logs. A relative path starts at the repository root. |
 | `sandbox_dir` | `sandbox` | Folder with the file sandbox. |
 | `sandbox_tmp` | empty | Folder for task workspaces. Empty uses a `workspace` folder in each run folder. |
 

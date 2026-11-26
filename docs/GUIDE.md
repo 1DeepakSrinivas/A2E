@@ -192,7 +192,7 @@ final_answer = "required"      # required or optional
 
 [tools]
 allowed = ["read_file", "write_file"]
-distractors = 0                # extra unrelated tools added in autonomous mode
+distractors = 0                # extra unrelated tools in autonomous mode, picked per case from its id
 
 [fixtures.files]
 "reading.txt" = "Reading: 17"
@@ -290,12 +290,15 @@ a numbered list after the task. The harness still enforces the order, and a
 call to a later stage's tool is refused with "tool is not available in this
 stage". The two modes are different treatments: `guided` hides tools and
 `guided_stable` does not, so compare their pass rates as well as their prefill
-time. The `test_pi_guided` suite runs both next to autonomous mode.
+time. The `test_pi` suite runs both next to autonomous mode.
 
 ### Golden replays
 
 Every case lists `[[golden]]` calls that solve it. The test suite replays them
-through the real agent loop and requires each offline case to succeed. This
+through the real agent loop in every suite, at each of its context sizes and in
+each of its variants, and requires each offline case to succeed. The prompt
+length is estimated from the rendered prompt, so a case whose correct path does
+not fit the context fails. A case that no suite lists runs once at 2048. This
 keeps a case from being impossible to solve. Write the golden calls first when
 you add a case.
 
@@ -356,8 +359,8 @@ timings come out identical.
   context, constrained decoding, and repair, on the cases tagged `tier2`.
 - `web_live` runs the live search cases.
 - `test_filesystem`, `test_compute` and `test_data_web` run the dev split of one
-  tool family in autonomous and guided mode, and `test_pi_100`, `test_pi_ablation` and
-  `test_pi_guided` are sized for the Pi. The README table describes each one.
+  tool family in autonomous and guided mode, and `test_pi` is sized for the Pi.
+  The README table describes each one.
 
 ## Add a host, model, suite or variant
 

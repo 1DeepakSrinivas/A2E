@@ -2,7 +2,7 @@ id = "live-pi-ram"
 category = "web"
 tags = ["live"]
 split = "heldout"
-golden_answer = "Summary."
+golden_answer = "The Raspberry Pi 3 Model B+ has 1 GB of RAM [s1]."
 
 [scope]
 prompt = "Search the web for the RAM size of the Raspberry Pi 3 Model B+, retrieve one result, and answer with the amount."

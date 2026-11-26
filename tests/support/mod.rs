@@ -22,6 +22,11 @@ use std::{
     time::Duration,
 };
 
+/// Characters per token for the estimating server. Below the usual 3.5 to 4 of
+/// JSON-heavy prompts, so the estimate errs toward a larger prompt.
+#[allow(dead_code)]
+pub const CHARS_PER_TOKEN: f64 = 3.2;
+
 pub struct MockServer {
     pub url: String,
     #[allow(dead_code)]
@@ -30,6 +35,12 @@ pub struct MockServer {
     handle: Option<thread::JoinHandle<()>>,
 }
 impl MockServer {
+    /// A server whose `/tokenize` estimates the prompt length from its characters,
+    /// so the context budget is exercised. `new` always reports `prompt_tokens`.
+    #[allow(dead_code)]
+    pub fn estimating(outputs: Vec<String>) -> Self {
+        Self::new(outputs, 0, Duration::ZERO)
+    }
     pub fn new(outputs: Vec<String>, prompt_tokens: usize, delay: Duration) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").expect("test server bind");
         listener.set_nonblocking(true).unwrap();
@@ -83,7 +94,15 @@ impl MockServer {
                     "/health" => json!({"status":"ok"}),
                     "/props" => json!({"chat_template":"mock template"}),
                     "/apply-template" => json!({"prompt":body.to_string()}),
-                    "/tokenize" => json!({"tokens":vec![1;prompt_tokens]}),
+                    "/tokenize" => {
+                        let n = if prompt_tokens == 0 {
+                            let chars = body["content"].as_str().unwrap_or("").chars().count();
+                            (chars as f64 / CHARS_PER_TOKEN).ceil() as usize
+                        } else {
+                            prompt_tokens
+                        };
+                        json!({"tokens":vec![1;n]})
+                    }
                     "/slots" => json!([{"id":0,"is_processing":false}]),
                     "/slots/0?action=erase" => {
                         index.store(0, Ordering::Relaxed);
@@ -146,6 +165,11 @@ pub fn use_sandbox() {
 /// Runs one attempt of a case against the mock server.
 #[allow(dead_code)]
 pub fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> Outcome {
+    execute_at(server, t, v, s, 1024)
+}
+/// Runs one attempt at the given context size.
+#[allow(dead_code)]
+pub fn execute_at(server: &MockServer, t: &Case, v: &Variant, s: &Suite, ctx: usize) -> Outcome {
     let dir = tempfile::tempdir().unwrap();
     let client = Inference::new(server.url.clone()).unwrap();
     let mut runtime = Settings::default();
@@ -159,7 +183,7 @@ pub fn execute(server: &MockServer, t: &Case, v: &Variant, s: &Suite) -> Outcome
         suite: s,
         variant: v,
         catalog: &catalog(),
-        ctx: 1024,
+        ctx,
         dir: dir.path(),
         cancel: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         server_pid: std::process::id(),

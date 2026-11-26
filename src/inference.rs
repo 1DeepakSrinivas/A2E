@@ -164,7 +164,7 @@ impl Server {
     pub fn spawn(c: &Config, m: &Model, ctx: usize, dir: &Path) -> Result<Self> {
         std::fs::create_dir_all(dir.join("slots"))?;
         let llama = &c.settings_for(m).llama;
-        let binary = crate::config::expand_path(&llama.server);
+        let binary = c.server_path(m);
         let version = Command::new(&binary)
             .arg("--version")
             .output()

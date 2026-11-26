@@ -8,7 +8,7 @@ use a2e::{
     runner::Status,
 };
 use std::{collections::BTreeSet, path::PathBuf, time::Duration};
-use support::{catalog, execute, golden_script, repo, use_sandbox, MockServer};
+use support::{catalog, execute, execute_at, golden_script, repo, use_sandbox, MockServer};
 
 const SUITES: [&str; 3] = ["test_filesystem", "test_compute", "test_data_web"];
 
@@ -97,36 +97,23 @@ fn golden_sequences_pass_in_every_suite_variant() {
 }
 
 #[test]
-fn pi_100_suite_is_a_small_slice_of_the_filesystem_suite() {
-    let (s, cases) = load("test_pi_100");
+fn pi_suite_is_a_slice_of_the_filesystem_suite_with_every_variant_on_every_case() {
+    let (s, cases) = load("test_pi");
     let (_, fs) = load("test_filesystem");
     let fs_ids = fs.iter().map(|c| c.id.as_str()).collect::<BTreeSet<_>>();
     assert_eq!(cases.len(), 16);
     assert!(cases.iter().all(|c| fs_ids.contains(c.id.as_str())));
     assert!(cases.iter().any(|c| c.fixtures.sandbox.is_some()));
-    assert!(cases.len() * s.models.len() * s.variants.len() * s.repeats <= 100);
-    assert_eq!(s.warmup, 0);
-    for case in &cases {
-        let server = MockServer::new(golden_script(case), 100, Duration::ZERO);
-        let out = execute(&server, case, &s.variants[0], &s);
-        assert_eq!(out.status, Status::Success, "{}: {:?}", case.id, out.reason);
-    }
-}
-
-#[test]
-fn pi_ablation_suite_runs_every_knob_on_the_same_cases_as_its_baseline() {
-    let (s, cases) = load("test_pi_ablation");
-    let (_, pi) = load("test_pi_100");
-    let pi_ids = pi.iter().map(|c| c.id.as_str()).collect::<BTreeSet<_>>();
-    assert_eq!(cases.len(), 6);
-    assert!(cases.iter().all(|c| pi_ids.contains(c.id.as_str())));
-    assert!(cases.len() * s.models.len() * s.variants.len() * s.repeats <= 100);
-    // The first variant is the baseline the others are compared with
+    assert_eq!((s.warmup, s.repeats), (0, 1));
+    // Every case runs in every variant, so each comparison with autonomous is paired
+    assert!(cases.iter().all(|c| c.stage_plan().is_some()));
+    assert!(cases.iter().any(|c| c.stage_plan().unwrap().len() > 1));
     let base = &s.variants[0];
     assert_eq!(base.name, "autonomous");
     assert!(base.filter_top_k == 0 && !base.constrained && base.repairs == 0);
     assert_eq!(base.context, ContextWindow::Full);
-    assert!(s.variants.iter().all(|v| v.mode == Mode::Autonomous));
+    let modes = s.variants.iter().map(|v| v.mode).collect::<Vec<_>>();
+    assert!(modes.contains(&Mode::Guided) && modes.contains(&Mode::GuidedStable));
     assert!(s.variants.iter().any(|v| v.filter_top_k > 0));
     assert!(s
         .variants
@@ -139,25 +126,75 @@ fn pi_ablation_suite_runs_every_knob_on_the_same_cases_as_its_baseline() {
 }
 #[test]
 fn a_suite_can_list_single_case_files() {
-    let (_, cases) = load("test_pi_100");
+    let (_, cases) = load("test_pi");
     let ids = cases.iter().map(|c| c.id.as_str()).collect::<Vec<_>>();
     // Listed order is kept, and nothing else in the folder is pulled in
     assert_eq!(ids[..2], ["simple-list-dir", "simple-read-file"]);
     assert_eq!(ids.len(), 16);
 }
 
+/// Every case's golden path finishes in every suite, at each of the suite's real
+/// contexts and in each of its variants, with prompt tokens estimated from the
+/// rendered prompt. A case that cannot fit its own correct path fails for every model.
 #[test]
-fn pi_guided_suite_compares_both_guided_modes_on_staged_cases() {
-    let (s, cases) = load("test_pi_guided");
-    let (_, pi) = load("test_pi_100");
-    let pi_ids = pi.iter().map(|c| c.id.as_str()).collect::<BTreeSet<_>>();
-    assert!(cases.iter().all(|c| pi_ids.contains(c.id.as_str())));
-    // Every case runs in every variant, so the comparison is paired
-    assert!(cases.iter().all(|c| c.stage_plan().is_some()));
-    assert!(cases.iter().any(|c| c.stage_plan().unwrap().len() > 1));
-    assert!(cases.len() * s.models.len() * s.variants.len() * s.repeats <= 100);
-    let modes = s.variants.iter().map(|v| v.mode).collect::<Vec<_>>();
-    assert_eq!(modes, [Mode::Autonomous, Mode::Guided, Mode::GuidedStable]);
-    let cfg = Config::load(&repo().join("configs/models.toml")).unwrap();
-    a2e::runner::plan(&cfg, &s, &cases, &catalog()).unwrap();
+fn golden_paths_fit_each_suite_context_in_every_variant() {
+    use_sandbox();
+    let config = Config::load(&repo().join("configs/models.toml")).unwrap();
+    let mut failed = Vec::new();
+    let mut runs = 0;
+    let mut covered = std::collections::BTreeSet::new();
+    for entry in std::fs::read_dir(repo().join("configs/suites")).unwrap() {
+        let path = entry.unwrap().path();
+        let s = Suite::load(&path)
+            .unwrap()
+            .resolve(&config, &Selection::default())
+            .unwrap();
+        let cases = s.load_cases(&path).unwrap();
+        for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
+            covered.insert(case.id.clone());
+            for v in &s.variants {
+                for &ctx in &s.contexts {
+                    runs += 1;
+                    let server = MockServer::estimating(golden_script(case));
+                    let out = execute_at(&server, case, v, &s, ctx);
+                    let want = if case.judge.enabled {
+                        Status::AwaitingJudge
+                    } else {
+                        Status::Success
+                    };
+                    if out.status != want {
+                        failed.push(format!(
+                            "{}/{}/{}@{ctx}: {:?}",
+                            s.name, v.name, case.id, out.reason
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    // Cases no suite lists still run once, at the shared context
+    let all = a2e::case::load_all(&[repo().join("configs/cases")]).unwrap();
+    let smoke = Suite::load(&path("smoke"))
+        .unwrap()
+        .resolve(&config, &Selection::default())
+        .unwrap();
+    for case in all.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
+        if covered.contains(&case.id) {
+            continue;
+        }
+        runs += 1;
+        let server = MockServer::estimating(golden_script(case));
+        let out = execute_at(
+            &server,
+            case,
+            &a2e::config::Variant::default(),
+            &smoke,
+            2048,
+        );
+        if !matches!(out.status, Status::Success | Status::AwaitingJudge) {
+            failed.push(format!("unlisted/{}@2048: {:?}", case.id, out.reason));
+        }
+    }
+    assert!(runs > 0);
+    assert!(failed.is_empty(), "{} of {runs}: {failed:#?}", failed.len());
 }

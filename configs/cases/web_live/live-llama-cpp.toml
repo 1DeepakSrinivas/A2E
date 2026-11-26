@@ -2,7 +2,7 @@ id = "live-llama-cpp"
 category = "web"
 tags = ["live"]
 split = "heldout"
-golden_answer = "Summary."
+golden_answer = "llama.cpp runs language models locally on the CPU and is written in C and C++ [s1]."
 
 [scope]
 prompt = "Search the web for what llama.cpp is and give a short cited summary."
@@ -25,7 +25,11 @@ min = 1
 
 [[check]]
 kind = "answer"
-regex = "."
+regex = "(?i)c\\+\\+"
+
+[[check]]
+kind = "answer"
+regex = "(?i)(local|device|cpu)"
 
 [judge]
 enabled = true

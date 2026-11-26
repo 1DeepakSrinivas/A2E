@@ -1,7 +1,7 @@
 //! `plan`, `run` and the shared suite selection.
 
 use a2e::{
-    config::{expand_path, unknown_name, Catalog, Config, Selection, Suite},
+    config::{unknown_name, Catalog, Config, Selection, Suite},
     progress::Progress,
 };
 use anyhow::Result;
@@ -152,7 +152,7 @@ fn dry_run(l: &Loaded, plan: Value) -> Value {
             json!({"id":m.id,"path":path,"exists":path.exists(),"size_mib":std::fs::metadata(&path).ok().map(|f| f.len() >> 20)})
         })
         .collect();
-    let server = expand_path(&l.config.settings.llama.server);
+    let server = l.config.resolve(&l.config.settings.llama.server);
     let missing: Vec<String> = models
         .iter()
         .filter(|m| m["exists"] == false)

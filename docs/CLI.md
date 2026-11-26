@@ -15,7 +15,7 @@ Run `a2e` with no command on a terminal to open a menu. The menu offers to start
 - `--model`, `--context` and `--variant` take comma separated values and run only that part of the suite. An unknown name stops the command and suggests the closest known name.
 - `--retry-failed` runs again the attempts that did not succeed.
 - `--model hf:<repo>:<quant>` runs a Hugging Face GGUF with no setup step. The harness looks up the newest commit, downloads the file, and runs it. The model is marked unpinned, because the commit can change, and its results are not uploaded. Add `--local`, or pass `--allow-unpinned` to upload them anyway. Run `a2e models add` to pin it.
-- `--allow-missing-model` lets a run continue when a model file is missing. Without it the run stops before it starts.
+- `--allow-missing-model` lets a run continue when a model file is missing. Without it the run stops before it starts, and it always stops when llama-server is missing or not built from the pinned commit.
 - `--dry-run` prints the runs and checks that the model files and llama-server exist, and then stops without starting a model.
 - `--tools <file>` names the tool definitions, and the default is `configs/tools/standard.toml`.
 
@@ -45,7 +45,7 @@ a2e stop queue
 
 ## Check and set up
 
-- `a2e doctor` shows the host, the machine, the memory headroom of each model and the settings. With `--probe` it also loads each model once and checks its output format.
+- `a2e doctor` shows the host, the machine, the memory headroom of each model and the settings. With `--probe` it also loads each model once, checks its output format, and writes the prompt that its template makes from one tool call and its result to `probes/<model>/template.txt` in the output folder. Read it to see how the template places the system message, the tool list and the tool result.
 - `a2e models fetch` downloads the pinned models and checks their hashes.
 - `a2e models add <repo>[:quant]` looks up a Hugging Face repository, picks one GGUF file, downloads it with a progress bar, checks it against the hash Hugging Face publishes, and writes a pinned `[[models]]` entry to `configs/local.toml`. With no quant it prefers `Q4_K_M`. `--id` names the model, `--file` names the file when the quant does not pick one, `--adapter` sets the tool-call format, and `--shared` writes to `configs/models.toml` instead. Set `HF_TOKEN` for a gated repository. Sharded GGUF files are not supported yet.
 - `a2e cases validate [path]` checks every case against the tool definitions and rubrics, and `a2e cases list [path] [--ids]` counts cases by category and split.

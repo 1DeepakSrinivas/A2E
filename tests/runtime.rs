@@ -414,6 +414,34 @@ fn distractors_extend_autonomous_tools_but_not_guided_stages() {
     assert_eq!(names.len(), stages[0].tools.len() + 1);
 }
 #[test]
+fn distractors_depend_on_the_case_and_not_the_variant() {
+    let names = |c: &Case, v: &Variant| -> Vec<String> {
+        select_tools(c, &catalog(), v, &[], 0)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.name)
+            .filter(|n| !c.tools.allowed.contains(n) && n != "final_answer")
+            .collect()
+    };
+    let mut c = task();
+    c.tools.distractors = 3;
+    let first = names(&c, &Variant::default());
+    let repair = Variant {
+        repairs: 1,
+        ..Default::default()
+    };
+    assert_eq!(names(&c, &repair), first);
+    assert_eq!(names(&c, &Variant::default()), first);
+    let picks: std::collections::BTreeSet<Vec<String>> = (0..8)
+        .map(|i| {
+            let mut other = c.clone();
+            other.id = format!("case-{i}");
+            names(&other, &Variant::default())
+        })
+        .collect();
+    assert!(picks.len() > 1, "every case got the same distractors");
+}
+#[test]
 fn state_only_case_passes_without_a_final_answer_when_optional() {
     let mut c = task();
     c.scope.final_answer = FinalAnswer::Optional;
@@ -582,27 +610,6 @@ number = {{ value = 1 }}
 }
 
 #[test]
-fn every_offline_golden_sequence_succeeds_through_the_agent_loop() {
-    use_sandbox();
-    let cases = a2e::case::load_all(&[repo().join("configs/cases")]).unwrap();
-    let s = suite();
-    for case in cases.iter().filter(|c| !c.tags.iter().any(|t| t == "live")) {
-        let script = golden_script(case);
-        let server = MockServer::new(script, 100, Duration::ZERO);
-        let out = execute(&server, case, &Variant::default(), &s);
-        let want = if case.judge.enabled {
-            Status::AwaitingJudge
-        } else {
-            Status::Success
-        };
-        assert_eq!(
-            out.status, want,
-            "{}: {:?} {:?}",
-            case.id, out.reason, out.checks
-        );
-    }
-}
-#[test]
 fn attempt_line_reports_the_failure_class_failed_checks_and_trace() {
     use_sandbox();
     let s = suite();
@@ -682,6 +689,24 @@ fn stable_guided_mode_keeps_the_prompt_prefix_and_enforces_stage_order() {
         out.tool_log[0].error.as_deref(),
         Some("tool is not available in this stage")
     );
+}
+
+#[test]
+fn an_unknown_tool_outside_guided_mode_names_the_tools_that_exist() {
+    use_sandbox();
+    let t = task();
+    let server = MockServer::new(vec![call("no_such_tool", json!({}))], 100, Duration::ZERO);
+    let out = execute(&server, &t, &Variant::default(), &suite());
+    assert_eq!(out.argument_errors, 1);
+    let error = out.tool_log[0].error.as_deref().unwrap();
+    assert!(
+        error.starts_with("unknown tool no_such_tool; available tools: "),
+        "{error}"
+    );
+    for name in &t.tools.allowed {
+        assert!(error.contains(name.as_str()), "{error}");
+    }
+    assert!(!error.contains("stage"), "{error}");
 }
 
 #[test]
